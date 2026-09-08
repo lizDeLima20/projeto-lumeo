@@ -1,0 +1,2 @@
+import type{Book}from"../../models/Book";import type{DocumentCapability}from"./DocumentCapabilityAnalyzer";
+export class DocumentCapabilityMetadataService{public apply(book:Book,capability:Pick<DocumentCapability,"documentMode"|"textCapability"|"limaCapability">):Book{book.documentMode=capability.documentMode;book.textCapability=capability.textCapability;book.limaCapability=capability.limaCapability;book.updatedAt=new Date();return book;}}

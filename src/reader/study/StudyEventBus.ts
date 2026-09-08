@@ -1,0 +1,2 @@
+export type StudyEvent={bookId:string;type:"created"|"updated"|"deleted";chapterId?:string;resource?:"marking"|"chapterSheet"};type Listener=(event:StudyEvent)=>void;
+export class StudyEventBus{public static readonly shared=new StudyEventBus();private readonly listeners=new Set<Listener>();public subscribe(listener:Listener):()=>void{this.listeners.add(listener);return()=>this.listeners.delete(listener);}public publish(event:StudyEvent):void{this.listeners.forEach(listener=>listener(event));}}

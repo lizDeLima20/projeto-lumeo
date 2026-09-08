@@ -1,0 +1,1 @@
+import{LimaDeserializer}from"./LimaDeserializer";import type{LimaDocument}from"./LimaDocument";export class LimaFileImporter{public async import(file:File):Promise<LimaDocument>{if(file.name.split(".").pop()?.toLowerCase()!=="lima")throw new Error("Escolha um arquivo .lima.");return new LimaDeserializer().deserialize(new Uint8Array(await file.arrayBuffer()));}}

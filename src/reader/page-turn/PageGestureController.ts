@@ -1,0 +1,2 @@
+export interface GestureSample{deltaX:number;velocityX:number;direction:1|-1;}
+export class PageGestureController {private x=0;private lastX=0;private lastTime=0;public start(x:number,time:number):void{this.x=this.lastX=x;this.lastTime=time;}public update(x:number,time:number):GestureSample{const elapsed=Math.max(1,time-this.lastTime),velocityX=(x-this.lastX)/elapsed;this.lastX=x;this.lastTime=time;const deltaX=x-this.x;return{deltaX,velocityX,direction:deltaX<0?1:-1};}public finish(x:number,time:number):GestureSample{return this.update(x,time);}}

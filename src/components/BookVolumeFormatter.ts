@@ -1,0 +1,1 @@
+export class BookVolumeFormatter { public format(volume?:string):string|null{const value=volume?.trim();if(!value)return null;if(/^vol\.?\s*/i.test(value))return value.replace(/^vol\.?\s*/i,"Vol. ");return`Vol. ${value}`;} }

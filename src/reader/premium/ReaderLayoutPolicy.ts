@@ -1,0 +1,1 @@
+export class ReaderLayoutPolicy{public pageLayout(width:number,preference:"single"|"double",mobileDefault=true):"single"|"double"{if(width<768)return"single";if(width<1024&&mobileDefault)return"single";return preference==="double"?"double":"single";}public doubleSupported(width:number):boolean{return width>=768;}public rtlSpread(page:number):[number,number]{return[page+1,page];}}

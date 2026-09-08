@@ -1,0 +1,2 @@
+export interface AnnotationData{id:string;bookId:string;highlightId:string;text:string;createdAt:string;updatedAt:string;}
+export class Annotation implements AnnotationData {public readonly id:string;public readonly bookId:string;public readonly highlightId:string;public readonly text:string;public readonly createdAt:string;public readonly updatedAt:string;public constructor(data:AnnotationData){Object.assign(this,data);this.id=data.id;this.bookId=data.bookId;this.highlightId=data.highlightId;this.text=data.text;this.createdAt=data.createdAt;this.updatedAt=data.updatedAt;}}

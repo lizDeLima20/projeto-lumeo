@@ -1,0 +1,2 @@
+export interface ReaderProgressState{currentPage:number;totalPages:number;percent:number;chapterTitle?:string;remainingMinutes?:number|null;}
+export class ReaderProgressModel{public build(currentPage:number,totalPages:number,chapterTitle?:string,remainingMinutes?:number|null):ReaderProgressState{const safeTotal=Math.max(1,totalPages);return{currentPage,totalPages:safeTotal,percent:Math.round(currentPage/safeTotal*100),chapterTitle,remainingMinutes};}}

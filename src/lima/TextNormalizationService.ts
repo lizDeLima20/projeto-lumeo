@@ -1,0 +1,1 @@
+export class TextNormalizationService{public normalize(value:string):string{return value.normalize("NFC").replace(/([\p{L}])-[ \t]*\n[ \t]*([\p{Ll}])/gu,"$1$2").replace(/[ \t]+/g," ").replace(/\s*\n\s*/g,"\n").replace(/\n{3,}/g,"\n\n").trim();}}

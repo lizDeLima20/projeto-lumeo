@@ -1,0 +1,1 @@
+export class WebSearchService{public url(text:string,kind:"search"|"origin"="search"):string{const query=kind==="origin"?`origem etimologia ${text}`:text;return`https://www.google.com/search?q=${encodeURIComponent(query)}`;}public open(text:string,kind:"search"|"origin"="search"):void{window.open(this.url(text,kind),"_blank","noopener,noreferrer");}}

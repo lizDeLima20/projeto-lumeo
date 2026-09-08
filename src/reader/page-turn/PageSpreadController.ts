@@ -1,0 +1,1 @@
+export class PageSpreadController {public constructor(private readonly total:number,private readonly step:1|2){}public next(current:number):number{return Math.min(this.total,current+this.step);}public previous(current:number):number{return Math.max(1,current-this.step);}public canMove(current:number,direction:1|-1):boolean{return direction===1?current<this.total:current>1;}}

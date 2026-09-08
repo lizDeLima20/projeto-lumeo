@@ -1,0 +1,12 @@
+import type{PDFDocumentProxy}from"pdfjs-dist";
+import type{BookDocumentMode,BookLimaCapability,BookTextCapability}from"../../models/Book";
+
+export type DocumentCapabilityKind="TEXT_NATIVE"|"TEXT_PARTIAL"|"IMAGE_SCANNED"|"MIXED"|"UNKNOWN";
+export type PageRenderMode="text"|"image"|"hybrid";
+export interface PageCapability{pageNumber:number;hasTextLayer:boolean;textDensity:number;imageCoverage:number;renderMode:PageRenderMode;enhancementRecommended:boolean;}
+export interface DocumentCapability{kind:DocumentCapabilityKind;documentMode:BookDocumentMode;textCapability:BookTextCapability;limaCapability:BookLimaCapability;pages:PageCapability[];}
+
+export class DocumentCapabilityAnalyzer{
+  public async analyze(document:PDFDocumentProxy):Promise<DocumentCapability>{const pages:number[]=[];const count=Math.max(1,document.numPages);for(const value of [1,Math.ceil(count/3),Math.ceil(count/2),Math.ceil(count*2/3),count])if(!pages.includes(value))pages.push(value);const capabilities:PageCapability[]=[];for(const pageNumber of pages)capabilities.push(await this.page(document,pageNumber));const textPages=capabilities.filter(page=>page.hasTextLayer).length,imagePages=capabilities.filter(page=>page.renderMode==="image").length;const partial=textPages>0&&textPages<capabilities.length;const kind:DocumentCapabilityKind=textPages===capabilities.length?"TEXT_NATIVE":textPages===0?"IMAGE_SCANNED":partial&&imagePages>0?"MIXED":"TEXT_PARTIAL";return{kind,documentMode:kind==="TEXT_NATIVE"?"native":kind==="IMAGE_SCANNED"?"scanned":"mixed",textCapability:kind==="TEXT_NATIVE"?"full":kind==="IMAGE_SCANNED"?"none":"partial",limaCapability:kind==="TEXT_NATIVE"?"full":kind==="IMAGE_SCANNED"?"unavailable":"limited",pages:capabilities};}
+  private async page(document:PDFDocumentProxy,pageNumber:number):Promise<PageCapability>{try{const page=await document.getPage(pageNumber),content=await page.getTextContent(),textLength=content.items.reduce((sum,item)=>sum+("str"in item?item.str.trim().length:0),0),viewport=page.getViewport({scale:1}),area=Math.max(1,viewport.width*viewport.height),textDensity=textLength/area,hasTextLayer=textLength>=40,renderMode:PageRenderMode=hasTextLayer?"text":"image";page.cleanup?.();return{pageNumber,hasTextLayer,textDensity,imageCoverage:hasTextLayer?.2:.92,renderMode,enhancementRecommended:!hasTextLayer};}catch{return{pageNumber,hasTextLayer:false,textDensity:0,imageCoverage:0,renderMode:"image",enhancementRecommended:true};}}
+}

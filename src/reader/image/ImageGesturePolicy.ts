@@ -1,0 +1,2 @@
+export type ImageGestureDecision="PAN"|"PAGE_SWIPE"|"IGNORE";
+export class ImageGesturePolicy{public decide(input:{zoom:number;deltaX:number;deltaY:number;atLeftEdge:boolean;atRightEdge:boolean;}):ImageGestureDecision{if(Math.abs(input.deltaX)<55||Math.abs(input.deltaX)<Math.abs(input.deltaY)*1.25)return"IGNORE";if(input.zoom>1&&((input.deltaX<0&&!input.atRightEdge)||(input.deltaX>0&&!input.atLeftEdge)))return"PAN";return"PAGE_SWIPE";}}

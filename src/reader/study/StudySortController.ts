@@ -1,0 +1,1 @@
+import type{StudyEntry}from"./StudyNotebook";export type StudySort="book"|"newest"|"oldest";export class StudySortController{public sort(entries:readonly StudyEntry[],mode:StudySort="book"):StudyEntry[]{return entries.slice().sort((a,b)=>mode==="book"?a.position-b.position:mode==="newest"?b.updatedAt.localeCompare(a.updatedAt):a.createdAt.localeCompare(b.createdAt));}}

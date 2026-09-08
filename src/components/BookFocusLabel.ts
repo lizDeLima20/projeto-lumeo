@@ -1,0 +1,2 @@
+import type{BookFocusLabelData}from"./BookContextLabelResolver";
+export class BookFocusLabel {public render(data:BookFocusLabelData,onOpen:()=>void):HTMLButtonElement{const label=document.createElement("button");label.type="button";label.className="book-focus-label";const title=document.createElement("strong");title.textContent=data.title;label.append(title);if(data.subtitle){const subtitle=document.createElement("small");subtitle.textContent=data.subtitle;label.append(subtitle);}label.addEventListener("click",onOpen);return label;} }

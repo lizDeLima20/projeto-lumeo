@@ -1,0 +1,13 @@
+body {
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+button { color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid rgba(89, 70, 178, 0.28); outline-offset: 2px; }
+.page-title { font-size: clamp(2rem, 8vw, 3.5rem); line-height: 1.08; letter-spacing: -0.045em; }
+.page-subtitle { color: var(--color-muted); }
+.section-title { font-size: 1.15rem; }
+.eyebrow { color: var(--color-primary); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }

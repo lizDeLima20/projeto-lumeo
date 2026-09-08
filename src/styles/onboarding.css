@@ -1,0 +1,32 @@
+.onboarding { max-width: 64rem; }
+.onboarding__intro { display: grid; gap: var(--spacing-sm); margin-bottom: 2rem; text-align: center; }
+.onboarding__lead { color: var(--color-muted); font-size: clamp(1.15rem, 3vw, 1.45rem); }
+.setup-panel { position: relative; display: grid; gap: var(--spacing-lg); border: 1px solid var(--color-border); border-radius: 1.5rem; background: var(--color-surface); padding: clamp(1.25rem, 4vw, 2.5rem); box-shadow: var(--shadow-sm); }
+.step-badge { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 50%; color: white; background: var(--color-primary); font-size: .8rem; font-weight: 800; }
+.setup-title { font-size: clamp(1.2rem, 3vw, 1.55rem); letter-spacing: -.025em; }
+.setup-options { display: grid; gap: var(--spacing-sm); }
+.setup-option { display: grid; grid-template-columns: 1.35rem 1fr; gap: .15rem var(--spacing-sm); min-height: 5rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text); background: var(--color-background); padding: var(--spacing-md); text-align: left; }
+.setup-option small { grid-column: 2; color: var(--color-muted); }
+.setup-option__check { width: 1.2rem; height: 1.2rem; margin-top: .15rem; border: 2px solid var(--color-border); border-radius: 50%; }
+.setup-option--active { border-color: var(--color-primary); background: var(--color-primary-soft); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 14%, transparent); }
+.setup-option--active .setup-option__check { border: .3rem solid var(--color-primary); background: white; }
+.genre-picker { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-background); }
+.genre-picker summary { cursor: pointer; padding: var(--spacing-md); font-weight: 750; list-style-position: inside; }
+.genre-checklist { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; max-height: 17rem; overflow-y: auto; border-top: 1px solid var(--color-border); padding: var(--spacing-md); }
+.genre-check { display: flex; align-items: center; gap: .6rem; border-radius: var(--radius-sm); padding: .55rem; cursor: pointer; }
+.genre-check:hover { background: var(--color-primary-soft); }
+.genre-check input { width: 1.1rem; height: 1.1rem; accent-color: var(--color-primary); }
+.selected-area { display: grid; gap: var(--spacing-sm); }
+.selected-genres { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); min-height: 2.5rem; }
+.selected-chip { display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; color: var(--color-primary-contrast); background: var(--color-primary); padding: .45rem .5rem .45rem .8rem; font-size: .85rem; font-weight: 700; }
+.selected-chip button { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: 50%; color: inherit; background: rgba(255,255,255,.18); }
+.selection-empty, .field-help { color: var(--color-muted); font-size: .85rem; }
+.custom-genre-form { display: grid; gap: var(--spacing-sm); border-top: 1px solid var(--color-border); padding-top: var(--spacing-lg); }
+.custom-genre-form > div:first-child { display: grid; gap: .2rem; }
+.theme-setup { display: grid; grid-template-columns: auto 1fr; gap: var(--spacing-sm); border-top: 1px solid var(--color-border); padding-top: var(--spacing-lg); }
+.theme-options { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); }
+.theme-choice { display: flex; align-items: center; justify-content: center; gap: var(--spacing-sm); min-height: 4.25rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text); background: var(--color-background); }
+.theme-choice--active { border-color: var(--color-primary); background: var(--color-primary-soft); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 14%, transparent); }
+.theme-choice__icon { font-size: 1.5rem; }
+.setup-complete { min-height: 3.4rem; font-size: 1rem; }
+@media (min-width: 44rem) { .setup-options { grid-template-columns: repeat(3, 1fr); } .genre-checklist { grid-template-columns: repeat(3, 1fr); } }

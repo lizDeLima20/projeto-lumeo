@@ -1,0 +1,20 @@
+import { IndexedDbService, STORE_NAMES } from "./IndexedDbService";
+import { LimaDeserializer } from "../lima/LimaDeserializer";
+import { LimaSerializer } from "../lima/LimaSerializer";
+import type { LimaDocument } from "../lima/LimaDocument";
+interface HandleRow { key: "desktop-folder"; handle: FileSystemDirectoryHandle; }
+type PermissionHandle = FileSystemDirectoryHandle & { queryPermission(options?: { mode: "readwrite" }): Promise<PermissionState>; requestPermission(options?: { mode: "readwrite" }): Promise<PermissionState> };
+interface DirectoryPickerWindow extends Window { showDirectoryPicker(options?: { mode?: "readwrite" }): Promise<FileSystemDirectoryHandle>; }
+type IterableDirectory = FileSystemDirectoryHandle & { values(): AsyncIterableIterator<FileSystemHandle> };
+export class DesktopLibraryFolderService {
+  public constructor(private readonly database: IndexedDbService) {}
+  public get supported(): boolean { return typeof window !== "undefined" && "showDirectoryPicker" in window; }
+  public async choose(): Promise<FileSystemDirectoryHandle> { if (!this.supported) throw new Error("A seleção de pasta não é suportada neste navegador."); const handle = await (window as unknown as DirectoryPickerWindow).showDirectoryPicker({ mode: "readwrite" }); await this.database.request(STORE_NAMES.librarySettings, "readwrite", store => store.put({ key: "desktop-folder", handle } satisfies HandleRow)); await this.ensureStructure(handle); return handle; }
+  public async stored(): Promise<FileSystemDirectoryHandle | null> { const row = await this.database.request<HandleRow | undefined>(STORE_NAMES.librarySettings, "readonly", store => store.get("desktop-folder")); return row?.handle ?? null; }
+  public async permission(request = false): Promise<PermissionState> { const handle = await this.stored() as PermissionHandle | null; if (!handle) return "denied"; const current = await handle.queryPermission({ mode: "readwrite" }); return current === "prompt" && request ? handle.requestPermission({ mode: "readwrite" }) : current; }
+  public async save(document: LimaDocument): Promise<void> { const root = await this.stored(); if (!root || await this.permission() !== "granted") return; const books = await root.getDirectoryHandle("livros", { create: true }), file = await books.getFileHandle(`${this.safe(document.metadata.title)}-${document.metadata.id}.lima`, { create: true }), writable = await file.createWritable(), bytes = new LimaSerializer().serialize(document); await writable.write(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/x-lima-book" })); await writable.close(); }
+  public async saveOriginal(document:LimaDocument,original:Blob,extension:"pdf"|"epub"):Promise<void>{const root=await this.stored();if(!root||await this.permission()!=="granted")return;const originals=await root.getDirectoryHandle("originais",{create:true}),file=await originals.getFileHandle(`${this.safe(document.metadata.title)}-${document.metadata.id}.${extension}`,{create:true}),writable=await file.createWritable();await writable.write(original);await writable.close();}
+  public async readAll(): Promise<LimaDocument[]> { const root = await this.stored(); if (!root || await this.permission() !== "granted") return []; const books = await root.getDirectoryHandle("livros", { create: true }) as IterableDirectory, documents: LimaDocument[] = []; for await (const entry of books.values()) { if (entry.kind !== "file" || !entry.name.endsWith(".lima")) continue; try { const file=entry as FileSystemFileHandle,bytes = new Uint8Array(await (await file.getFile()).arrayBuffer()); documents.push(new LimaDeserializer().deserialize(bytes)); } catch { /* arquivo inválido */ } } return documents; }
+  private async ensureStructure(root: FileSystemDirectoryHandle): Promise<void> { await Promise.all([root.getDirectoryHandle("livros", { create: true }),root.getDirectoryHandle("originais",{create:true})]); }
+  private safe(value: string): string { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "livro"; }
+}

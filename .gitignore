@@ -1,0 +1,8 @@
+node_modules/
+dist/
+server-dist/
+.agents/
+.codex/
+.env
+.env.*
+!.env.example

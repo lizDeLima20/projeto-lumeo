@@ -1,0 +1,347 @@
+@property --lit-front {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 25%;
+}
+
+/* A single local cuboid. Front z=0, back z=-depth, y=0 is the head. */
+.shelf-stage:has(.book-3d--physical)::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(4,2,1,.42) 0%, rgba(4,2,1,.11) 6%, transparent 14% 86%, rgba(4,2,1,.11) 94%, rgba(4,2,1,.42) 100%);
+}
+.shelf-stage:has(.book-3d--physical) {
+  /* Bleed past the page-shell gutter so the wood reaches the screen edges. */
+  margin-inline: -1rem;
+  padding-bottom: 2.3rem;
+}
+
+.shelf-stage:has(.book-3d--physical) .book-shelf__viewport {
+  /* Deep enough that a focused volume overhanging the front lip is never clipped
+     by the scroller. The board is re-anchored below by the same amount, so the
+     wood does not move. */
+  padding: 2.35rem 0 5.2rem;
+  perspective: 3000px;
+  perspective-origin: 50% -360px;
+}
+
+.shelf-stage:has(.book-3d--physical) .book-shelf {
+  --book-object-width: 6.25rem;
+  gap: 4px;
+  min-height: 14.6rem;
+  align-items: flex-end;
+  padding-left: 22px;
+  padding-right: 10px;
+}
+
+.shelf-stage:has(.book-3d--physical) .book-shelf .book-card {
+  flex-basis: var(--book-object-width);
+  width: var(--book-object-width);
+  scroll-snap-align: start;
+}
+/* The last slot is far wider than the volume it paints, leaving ~58px of dead space
+   at the end of the scroll. A negative margin does not shrink scrollWidth (the box
+   still overflows), so the trailing slot is narrowed and clipped instead. The clip
+   margin is wider than the volume, so nothing of the last book is cut; only the
+   empty right half of its slot stops extending the scroll range. Nothing follows
+   this card, so no pitch changes. */
+/* At the end of the scroll this volume sits right of the vanishing point, where its
+   cover projects narrowest, so its box is sized for that projection. */
+.shelf-stage:has(.book-3d--physical) .book-shelf .book-card:last-child .book-3d.book-3d--physical {
+  width: calc(var(--physical-width) * .55);
+}
+/* Stacking never changes on focus. Occlusion is binary per element, so any change of
+   paint order switches the neighbour's overlap of this cover off in a single frame:
+   the visible cover jumps from a 13px slice to a 42px panel, and the eye reads that
+   as the book swinging open even under a pure Z translation. Holding the focused
+   volume in its resting layer keeps the silhouette identical - it only grows and
+   drops onto the front lip. */
+.shelf-stage:has(.book-3d--physical) .book-shelf .book-card--selected,
+.shelf-stage:has(.book-3d--physical) .book-shelf .book-card--activating,
+.shelf-stage:has(.book-3d--physical) .book-shelf .book-card--returning {
+  z-index: 1;
+  animation: none !important;
+}
+
+.shelf-stage:has(.book-3d--physical) .book-shelf .book-card:last-child {
+  /* Trailing slot shrink-wraps its volume instead of keeping a full-pitch box:
+     scrollWidth follows the box, so a full-width slot left dead wood after the
+     last book. --physical-width lives on .book-3d, not here, so the size is set
+     on the volume below and the slot just follows it. */
+  flex-basis: auto;
+  width: auto;
+  margin-right: 0;
+}
+
+.book-3d.book-3d--physical {
+  --physical-width:var(--book-front-width,9.2rem);--physical-height:var(--book-height,13.8rem);--physical-depth:var(--book-depth,4.2rem);
+  --physical-cover:var(--cover-thickness,.25rem);--physical-inset:var(--page-inset,.1875rem);
+  /* Focus grows the volume in place instead of translating it toward the camera.
+     A real Z advance re-sorts this volume in front of its right neighbour, and that
+     occlusion flip is binary: the visible cover snaps from a slice to a full panel
+     and reads as a swinging door. Scaling about the base keeps the front cover at
+     the same depth, so paint order - and therefore the silhouette - never changes;
+     the volume simply gets bigger. It also lifts and tips forward, toward the viewer,
+     the way a book is pulled off a shelf by the head of its spine - dropping it
+     instead made the base press into the front lip and read as sinking INTO the
+     board. */
+  /* X is a measured anti-collision buffer, NOT a hand-made stand-in for perspective:
+     without it the focused volume's back board slides 5.3px further into its right
+     neighbour than it already sits at rest. */
+  --extract-x:-14px;--extract-y:0px;--extract-z:0px;
+  --focus-scale:1;--focus-lift:38px;--focus-tilt:0deg;
+  --rest-y:4px;--rest-z:-14px;
+  /* Share of the top face in front of the fixed shade line. Registered above, so it
+     interpolates across every frame of the extraction instead of snapping. */
+  --lit-front:25%;
+  transition:--lit-front 800ms cubic-bezier(.20,.72,.18,1);
+  /* Box tracks the projected footprint, not the flat cover width: at 78deg the
+     volume paints depth*sin78 + width*cos78, i.e. ~66% of --physical-width. The
+     volume keeps its real size and overflows to the right; transform-origin is
+     relative to the volume, so nothing moves on screen. Keeping this in sync with
+     the yaw is what stops dead wood piling up at the end of the scroll. */
+  --footprint-ratio:.665;
+  display:block;width:calc(var(--physical-width) * var(--footprint-ratio));height:var(--physical-height);
+  /* No local camera: the whole row shares the viewport's single vanishing point. */
+  perspective:none;
+  transform:none;transform-style:preserve-3d;overflow:visible;pointer-events:none;
+}
+.book-3d--physical > .book-3d__volume {
+  inset:auto;top:0;left:0;width:var(--physical-width);height:var(--physical-height);transform-style:preserve-3d;
+  filter:none!important;animation:none!important;opacity:1;overflow:visible;
+  transform-origin:50% 100%;
+  transform:translate3d(0,var(--rest-y),var(--rest-z)) rotateX(0deg) rotateY(var(--book-angle,81deg)) rotateZ(0deg) scale3d(1,1,1);
+  transition:transform 800ms cubic-bezier(.20,.72,.18,1);pointer-events:none;
+}
+/* The shade line does NOT move on focus. Sweeping it (28% -> 80%) lit the whole top
+   face from front to back during the transition, and a shading boundary travelling
+   across a surface reads as that surface rotating, so the travel is deliberately
+   short of a full sweep: the volume advances 120px but the lit band opens from
+   25% to 75%, leaving a quarter of the face still shaded at the back "coming out of the bay's shade" without the top face
+   flashing white. --lit-front is a registered property, so it interpolates on every
+   frame of the extraction, not just between the two end states. */
+.book-card--selected .book-3d.book-3d--physical,
+.book-card--activating .book-3d.book-3d--physical { --lit-front:75%; }
+.book-card--returning .book-3d.book-3d--physical { --lit-front:25%; }
+.book-card--selected .book-3d--physical > .book-3d__volume,
+.book-card--activating .book-3d--physical > .book-3d__volume {
+  transform:translate3d(var(--extract-x),calc(var(--rest-y) + var(--focus-lift)),calc(var(--rest-z) + var(--extract-z))) rotateX(0deg) rotateY(var(--book-angle,81deg)) rotateZ(0deg) scale3d(1,1,1);
+}
+.book-card--returning .book-3d--physical > .book-3d__volume {
+  transform:translate3d(0,var(--rest-y),var(--rest-z)) rotateX(0deg) rotateY(var(--book-angle,81deg)) rotateZ(0deg) scale3d(1,1,1);
+}
+.physical-face {position:absolute;display:block;box-sizing:border-box;backface-visibility:hidden;pointer-events:auto;cursor:pointer;transition:filter 800ms cubic-bezier(.20,.72,.18,1)}
+/* Directional key light: a warm lamp above and in front of the shelf. Every volume
+   carries its own vertical ramp - the top quarter takes the beam, the tone holds
+   through the middle, then darkens steadily to the base. This replaces the flat
+   brightness(.92) the faces used to carry; focusing lifts a volume into the light
+   by fading its shade. */
+.physical-spine::before,
+.physical-front::after{
+  position:absolute;inset:0;content:"";z-index:2;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(177deg,
+    rgba(255,245,220,.36) 0%,
+    rgba(255,241,210,.27) 11%,
+    rgba(255,237,202,.14) 25%,
+    rgba(255,236,200,.04) 38%,
+    rgba(0,0,0,0) 50%,
+    rgba(11,6,2,.13) 64%,
+    rgba(9,5,2,.29) 81%,
+    rgba(4,2,1,.53) 100%);
+  transition:opacity 800ms cubic-bezier(.20,.72,.18,1);
+}
+/* The beam lands on the crest of the rounded spine, so the highlight follows the
+   curve of Fase 7 instead of sitting flat across the face. */
+.physical-spine::before{
+  background:
+    radial-gradient(76% 30% at 46% 7%, rgba(255,247,226,.30), rgba(255,240,208,.08) 58%, transparent 78%),
+    linear-gradient(177deg,
+      rgba(255,245,220,.30) 0%,
+      rgba(255,241,210,.22) 11%,
+      rgba(255,237,202,.12) 25%,
+      rgba(255,236,200,.03) 38%,
+      rgba(0,0,0,0) 50%,
+      rgba(11,6,2,.14) 64%,
+      rgba(9,5,2,.31) 81%,
+      rgba(4,2,1,.56) 100%);
+}
+.book-card--selected .physical-spine::before,.book-card--activating .physical-spine::before,
+.book-card--selected .physical-front::after,.book-card--activating .physical-front::after{opacity:.86}
+.physical-front,.physical-back {inset:0;background:var(--spine-color);border:3px solid color-mix(in srgb,var(--spine-color) 80%,#100c08);border-radius:7px 4px 4px 7px;box-shadow:inset 3px 0 4px #ffffff2d,inset -4px 0 5px #00000030}
+.physical-front {transform:translateZ(0);overflow:hidden;display:grid;place-items:center}
+.physical-front img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.physical-back{transform:translateZ(calc(-1 * var(--physical-depth))) rotateY(180deg)}
+/* Generated spine: derived colour + typography only. No raster cover art. */
+.physical-spine{left:calc(-1 * var(--physical-depth));top:0;width:var(--physical-depth);height:100%;transform-origin:right center;transform:rotateY(-90deg);overflow:hidden;border-radius:7px 2px 2px 7px;color:var(--spine-ink,#e9cf91);background-color:var(--spine-color);background-image:linear-gradient(90deg,#0000001f 0 2%,#00000012 6%,transparent 24%,#ffffff16 46%,#ffffff0d 58%,transparent 76%,#0000001a 94%,#00000026 100%),radial-gradient(130% 62% at 46% 0%,#ffffff1f,transparent 58%);box-shadow:inset 2px 0 4px #ffffff1f,inset -2px 0 4px #00000026}
+.physical-spine::after{position:absolute;inset:2px 3px;content:"";pointer-events:none;border-radius:4px 1px 1px 4px;border:1px solid color-mix(in srgb,var(--spine-ink,#e9cf91) 16%,transparent)}
+.physical-spine-text{position:absolute;inset:13px 3px 30px;display:flex;flex-direction:column;align-items:stretch;gap:8px;text-align:center;font-family:Georgia,"Times New Roman",serif;line-height:1.18;text-shadow:0 1px 1px #00000059;overflow-wrap:normal;hyphens:none;color:var(--spine-ink,#e9cf91)}
+.physical-spine-author{flex:0 0 auto;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--spine-ink,#e9cf91) 30%,transparent);font-size:9px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;opacity:.92}
+/* Cover art band: the same model.cover the front face uses, scaled to the spine's
+   narrow width with its proportions kept. The spine's own colour - sampled from that
+   same image - fills above and below, so nothing is stretched to fit. */
+.physical-spine-art{flex:0 0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;max-height:42%;border-radius:2px;box-shadow:0 1px 3px #00000059,inset 0 0 0 1px #ffffff1a}
+.physical-spine-cover{display:block;width:100%;height:auto;max-height:100%;object-fit:contain;pointer-events:none}
+.physical-spine-title{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.45em;min-height:0}
+.physical-spine-title strong{display:block;max-width:100%;font-weight:500;text-transform:uppercase;letter-spacing:0}
+.book-spine__volume{font-size:9px;letter-spacing:.08em;opacity:.85}
+.physical-spine-subtitle{font-size:9px;font-style:italic;letter-spacing:.03em;opacity:.86}
+/* Imprint rule closes the composition; it carries real metadata or nothing at all. */
+.physical-spine-imprint{position:absolute;right:5px;bottom:8px;left:5px;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:5px;border-top:1px solid color-mix(in srgb,var(--spine-ink,#e9cf91) 26%,transparent);color:var(--spine-ink,#e9cf91)}
+/* Masked, not placed as colour art: the mark takes the spine's own ink so it reads as
+   a colophon on both dark and light boards. */
+.physical-spine-logo{width:min(20px,44%);aspect-ratio:1;background:currentColor;opacity:.8;-webkit-mask:url("/icons/lumeo-logo.png") center/contain no-repeat;mask:url("/icons/lumeo-logo.png") center/contain no-repeat}
+.physical-spine-year{font-family:Georgia,"Times New Roman",serif;font-size:8px;letter-spacing:.14em;opacity:.7}
+.physical-spine-bevels{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
+.physical-bevel{top:1px;bottom:1px;width:var(--physical-bevel,6px);height:auto;background:linear-gradient(90deg,color-mix(in srgb,var(--spine-color) 62%,#000),color-mix(in srgb,var(--spine-color) 92%,#fff));box-shadow:none}
+.physical-bevel-front{left:0;transform-origin:right center;transform:rotateY(-45deg)}
+.physical-bevel-back{left:0;transform-origin:right center;transform:translateZ(calc(-1 * var(--physical-depth))) rotateY(-135deg)}
+.physical-cover-lips,.physical-page-block{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none}
+.physical-lip{top:calc(-1 * var(--physical-cover));background:var(--spine-color);box-shadow:inset 0 1px 2px #fff6,inset 0 -1px 2px #0004;transform-origin:bottom center}
+.physical-lip-front,.physical-lip-back{left:0;width:100%;height:var(--physical-cover);transform:rotateX(90deg)}
+.physical-lip-back{transform:translateZ(calc(var(--physical-cover) - var(--physical-depth))) rotateX(90deg)}
+.physical-lip-right{top:calc(-1 * var(--physical-depth));right:0;width:var(--physical-inset);height:var(--physical-depth);transform:rotateX(90deg)}
+/* Top face seen from above. The element's bottom edge is the FRONT of the book and
+   its top edge the BACK (verified by colour probe), so the depth ramp runs 180deg:
+/* Top face seen from above. The element's bottom edge is the FRONT of the book and
+   its top edge the BACK (verified by colour probe). The light/shade boundary is a
+/* Top face seen from above. The shade is cast by the shelf ABOVE, so its boundary
+/* Top face. 90deg is the element's X axis, and the four-colour probe shows it lands
+   as HORIZONTAL bands on screen - the shade line runs flat across the strip, like the
+   pool of light on the wood. (180deg travels left-to-right and tilts the bands, which
+   was wrong.) 0% is the near/front edge, so the lit band leads. */
+.physical-page-top{top:calc(var(--physical-inset) - var(--physical-depth) + 2 * var(--physical-cover));left:calc(var(--physical-inset) + 1px);width:calc(100% - 2 * var(--physical-inset) - 2px);height:calc(var(--physical-depth) - 2 * var(--physical-cover));transform-origin:bottom center;transform:translateZ(calc(-1 * var(--physical-cover))) rotateX(90deg);--shade-run:calc(100% - var(--lit-front));background:linear-gradient(90deg,#fdf6e1 0%,#fdf6e1 var(--lit-front),#d9c9a8 calc(var(--lit-front) + var(--shade-run) * .12),#c4b291 calc(var(--lit-front) + var(--shade-run) * .24),#b09c78 calc(var(--lit-front) + var(--shade-run) * .37),#9c8763 calc(var(--lit-front) + var(--shade-run) * .51),#8a7553 calc(var(--lit-front) + var(--shade-run) * .65),#7a6547 calc(var(--lit-front) + var(--shade-run) * .81),#6f5f42 100%),repeating-linear-gradient(90deg,#f6eedb 0 1.2px,#cfc0a2 1.2px 1.55px,#eadfc6 1.55px 2.9px);background-blend-mode:multiply;box-shadow:inset 0 -1px 2px #fff8,inset 0 4px 7px #2a190b55,0 -1px 2px #0004}
+.physical-page-top::before{position:absolute;inset:3px 5px;content:"";border-radius:2px;background:repeating-linear-gradient(90deg,rgba(94,73,43,.25) 0 1px,transparent 1px 4px);opacity:.5;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.35) 55%,transparent 100%);mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.35) 55%,transparent 100%)}
+.physical-page-top::after{position:absolute;inset:0;content:"";background:linear-gradient(90deg,rgba(58,40,20,.14),transparent 5% 95%,rgba(58,40,20,.12));pointer-events:none}
+.physical-page-side{top:var(--physical-inset);left:calc(100% - var(--physical-inset));width:calc(var(--physical-depth) - 2 * var(--physical-cover));height:calc(100% - 2 * var(--physical-inset));transform-origin:left center;transform:translateZ(calc(-1 * var(--physical-cover))) rotateY(90deg);background:linear-gradient(90deg,#cbb994,#f0e5cb 18%,#d9c8a8),repeating-linear-gradient(0deg,#c8b99e 0 1px,#efe5d0 1px 3px);background-blend-mode:multiply;box-shadow:inset 0 0 6px #75614366}
+.physical-page-inset{inset:var(--physical-inset);background:#e8dec7;transform:translateZ(calc(-1 * var(--physical-cover)))}
+.physical-depth{top:0;left:100%;width:var(--physical-cover);height:100%;transform-origin:left center;transform:rotateY(90deg);background:linear-gradient(90deg,color-mix(in srgb,var(--spine-color) 58%,#000),color-mix(in srgb,var(--spine-color) 88%,#fff) 55%,color-mix(in srgb,var(--spine-color) 64%,#000));box-shadow:inset 0 1px 2px #ffffff2e,inset 0 -2px 3px #00000059}
+.physical-bottom{left:0;top:100%;width:100%;height:var(--physical-depth);transform-origin:top center;transform:rotateX(-90deg);background:var(--spine-color)}
+/* Per-volume shadow: a hard contact line under the base plus a soft cast lobe
+   thrown back-right, away from the warm key light. Never wider than the volume. */
+/* Resting shadow is light and identical for every volume, so the wood stays smooth:
+   a thin contact line at the base plus a soft lobe cast back-right by the key light.
+   Focus grows and lowers it with the Z advance; the return restores these exact
+   values, so no volume settles darker than its neighbours. */
+
+.physical-contact-shadow{position:absolute;right:8%;bottom:calc(-6px - var(--shadow-drop,25px));left:-8%;height:18px;pointer-events:none;border-radius:50%;background:radial-gradient(58% 100% at 40% 48%,#0603014a 0%,#06030133 50%,transparent 80%);filter:blur(5px);opacity:.55;transform:translate(3px,0);transition:transform 800ms cubic-bezier(.20,.72,.18,1),filter 800ms cubic-bezier(.20,.72,.18,1),opacity 800ms cubic-bezier(.20,.72,.18,1)}
+.physical-contact-shadow::after{position:absolute;right:10%;bottom:7px;left:9%;height:4px;content:"";border-radius:50%;background:#05030180;filter:blur(1.4px);opacity:.8}
+.book-card--selected .physical-contact-shadow,.book-card--activating /* Board reacting to a volume that came forward: wide, soft, absent at rest. It sits
+   under the volume in paint order so it reads as light on the wood, not on the book. */
+
+.physical-contact-shadow{opacity:.5;filter:blur(11px);transform:translate(4px,4px) scale(1.2,1.55)}
+.book-card--returning /* Board reacting to a volume that came forward: wide, soft, absent at rest. It sits
+   under the volume in paint order so it reads as light on the wood, not on the book. */
+
+.physical-contact-shadow{opacity:.55;filter:blur(5px);transform:translate(3px,0)}
+.book-3d--physical[data-mode="FRONT"]{perspective:none}.book-3d--physical[data-mode="FRONT"]>.book-3d__volume{transform:none}
+.book-card:focus-visible .physical-front{outline:2px solid var(--color-primary);outline-offset:3px}
+
+/* Wood plane: the books stand ON it, so the board paints behind the scrolling row.
+   Near edge (front lip) sits below every book base; the top face recedes upward. */
+.shelf-stage:has(.book-3d--physical) .shelf-board {
+  z-index: 0;
+  bottom: 2.6rem;
+  height: 1.9rem;
+  overflow: visible;
+}
+.shelf-stage:has(.book-3d--physical) .shelf-board,
+.shelf-stage:has(.book-3d--physical) .shelf-board--physical {
+  animation: none !important;
+}
+.shelf-stage:has(.book-3d--physical) .shelf-board--physical .shelf-top-face {
+  top: auto;
+  bottom: 100%;
+  height: 104px;
+  border-radius: 0;
+  transform: perspective(470px) rotateX(42deg);
+  transform-origin: bottom center;
+  background:
+    radial-gradient(78% 150% at 50% 100%, rgba(255,214,158,.34), rgba(255,198,132,.10) 46%, transparent 74%),
+    repeating-linear-gradient(2deg, transparent 0 6px, rgba(38,21,11,.20) 6px 7px, transparent 7px 15px),
+    linear-gradient(180deg, #16100c 0%, #2f1d12 20%, #4d3020 44%, #6d452a 70%, #8a5a36 100%);
+  box-shadow: inset 0 -1px rgba(255,224,178,.42), inset 0 22px 30px rgba(12,6,3,.5);
+}
+.shelf-stage:has(.book-3d--physical) .shelf-front-face {
+  /* Lacquered face: light warm wood under a smooth varnish. The sheen is a soft
+     specular band, not a saturated colour, so the finish reads premium. */
+  inset: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255,248,232,.50) 0 1px, rgba(255,238,210,.22) 1px 5px, rgba(255,232,198,.06) 5px 34%, transparent 58%),
+    linear-gradient(97deg, transparent 0 16%, rgba(255,244,220,.17) 33%, rgba(255,240,212,.05) 44%, transparent 58% 100%),
+    repeating-linear-gradient(1deg, transparent 0 9px, rgba(92,58,30,.05) 9px 10px, transparent 10px 20px),
+    linear-gradient(180deg, #d3a066 0%, #bd8449 34%, #a3673410 34%, #a36734 62%, #7c4a26 100%);
+  box-shadow:
+    inset 0 1px rgba(255,250,236,.72),
+    inset 0 -6px 9px rgba(58,30,12,.42),
+    0 6px 14px rgba(0,0,0,.34);
+}
+.shelf-stage:has(.book-3d--physical) .shelf-edge-highlight {
+  top: 0;
+  height: 3px;
+  background: linear-gradient(180deg, rgba(246,214,168,.85), rgba(150,99,58,.6) 60%, rgba(62,34,17,.7));
+  box-shadow: 0 2px 5px rgba(18,8,3,.6);
+}
+.shelf-stage:has(.book-3d--physical) .shelf-side-depth {
+  top: 0;
+  height: .95rem;
+  background: linear-gradient(90deg, #4e2f1b, #23120a);
+}
+.shelf-stage:has(.book-3d--physical) .shelf-bottom-shadow {
+  bottom: -.75rem;
+  height: .9rem;
+  filter: blur(.5rem);
+}
+
+@media(max-width:47.99rem){
+  .shelf-stage:has(.book-3d--physical){margin-inline:-1rem;padding-bottom:2.3rem}
+  .shelf-stage:has(.book-3d--physical) .book-shelf__viewport{padding-top:2.05rem;perspective:1900px;perspective-origin:50% -280px}
+  .shelf-stage:has(.book-3d--physical) .book-shelf{--book-object-width:11.3rem;gap:4px;min-height:14.9rem;padding-left:15px;padding-right:10px}
+  .book-3d.book-3d--physical{--physical-width:9.4rem;--physical-height:14.9rem;--physical-depth:3.8rem;--physical-cover:.2rem;--physical-inset:.17rem;--extract-x:-12px;--extract-y:0px;--extract-z:0px;--focus-scale:1;--focus-lift:38px;--focus-tilt:0deg;--rest-y:4px;--rest-z:-14px;--shadow-drop:25px}
+  .physical-spine-text{inset:11px 3px 26px;gap:6px}
+  .physical-spine-author{padding-bottom:5px;font-size:8px}
+  .book-spine__volume{font-size:8px}
+  .physical-spine-imprint{right:4px;bottom:7px;left:4px}
+  .physical-spine-logo{width:min(16px,42%)}
+  .physical-spine-year{font-size:7px}
+}
+@media(min-width:48rem) and (max-width:63.99rem){
+  .shelf-stage:has(.book-3d--physical) .book-shelf__viewport{perspective:2400px;perspective-origin:50% -330px}
+  .shelf-stage:has(.book-3d--physical) .book-shelf{--book-object-width:12.5rem;min-height:16.4rem}
+  .book-3d.book-3d--physical{--physical-width:10.4rem;--physical-height:16.4rem;--physical-depth:4.2rem;--physical-cover:.22rem;--physical-inset:.19rem;--extract-x:-13px;--extract-y:0px;--extract-z:0px;--focus-scale:1;--focus-lift:38px;--focus-tilt:0deg;--rest-y:4px;--rest-z:-14px;--shadow-drop:28px}
+}
+@media(min-width:64rem){
+  .shelf-stage:has(.book-3d--physical) .book-shelf{--book-object-width:13.5rem;min-height:17.6rem}
+  .book-3d.book-3d--physical{--physical-width:11.2rem;--physical-height:17.6rem;--physical-depth:4.6rem;--physical-cover:.24rem;--physical-inset:.2rem}
+}
+@media(prefers-reduced-motion:reduce){.book-3d--physical>.book-3d__volume,.physical-face,/* Board reacting to a volume that came forward: wide, soft, absent at rest. It sits
+   under the volume in paint order so it reads as light on the wood, not on the book. */
+
+.physical-contact-shadow{transition-duration:120ms}}
+
+/* Board reacting to a volume that came forward. Single definition - the earlier insert
+   duplicated because its anchor occurs several times in this file.
+   - width matches the volume, not a wide pool
+   - leans down-left as it grows, following the book's own diagonal, but sized and
+     offset so its edges land on the volume's own footprint - it must not lead the
+     book by protruding past its left edge
+   - starts rising early in the move (same 800ms, just an earlier onset) and drains
+     back along the exact mirror of that curve */
+.physical-wood-shadow{
+  position:absolute;right:2%;bottom:calc(-14px - var(--shadow-drop,25px));left:-4%;height:34px;
+  pointer-events:none;border-radius:44%;
+  background:radial-gradient(54% 100% at 50% 30%,#050301ed,#050301a6 46%,#0503015c 66%,transparent 82%);
+  filter:blur(9px);opacity:0;transform-origin:50% 0;transform:translateX(0) skewX(0deg) scale(.62,.3);
+  transition:opacity 800ms cubic-bezier(.2,.3,.6,.88),transform 800ms cubic-bezier(.2,.3,.6,.88);
+}
+.book-card--selected .physical-wood-shadow,
+.book-card--activating .physical-wood-shadow{
+  opacity:.92;transform:translateX(0px) skewX(-18deg) scale(.55,2.9);
+}
+.book-card--returning .physical-wood-shadow{
+  opacity:0;transform:translateX(0) skewX(0deg) scale(.62,.3);
+  transition:opacity 800ms cubic-bezier(.4,.12,.8,.7),transform 800ms cubic-bezier(.4,.12,.8,.7);
+}

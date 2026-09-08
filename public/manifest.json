@@ -1,0 +1,17 @@
+{
+  "name": "Lumeo — Biblioteca Digital",
+  "short_name": "Lumeo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f7fb",
+  "theme_color": "#5946b2",
+  "description": "Organize sua biblioteca digital em um só lugar.",
+  "icons": [
+    {
+      "src": "/icons/lumeo-logo.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

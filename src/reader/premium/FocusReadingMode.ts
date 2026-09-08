@@ -1,0 +1,1 @@
+export class FocusReadingMode{private active=false;public toggle():boolean{this.active=!this.active;return this.active;}public set(active:boolean):void{this.active=active;}public get enabled():boolean{return this.active;}}

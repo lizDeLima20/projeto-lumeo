@@ -1,0 +1,16 @@
+import { Book } from "../models/Book";
+import { BookRepository } from "../repositories/BookRepository";
+import { LimaDocumentRepository } from "../repositories/LimaDocumentRepository";
+import type { LimaDocument } from "../lima/LimaDocument";
+import { LocalBookFileStore } from "./LocalBookFileStore";
+import { DesktopLibraryFolderService } from "./DesktopLibraryFolderService";
+import { LibraryReconciliationService, type LibraryReconciliation } from "./LibraryReconciliationService";
+import { LimaSerializer } from "../lima/LimaSerializer";
+export class PersistentLibraryManager {
+  public constructor(private readonly books: BookRepository, private readonly files: LocalBookFileStore, private readonly documents: LimaDocumentRepository, private readonly reconciliation = new LibraryReconciliationService(), private readonly folder?: DesktopLibraryFolderService) {}
+  public async persistBook(book: Book, original: Blob, document?: LimaDocument): Promise<void> { await this.files.save(book.id, original); if (document) { await this.documents.save(book.id, document);const bytes=new LimaSerializer().serialize(document);await this.files.saveLima(book.id,new Blob([bytes as Uint8Array<ArrayBuffer>],{type:"application/x-lima-book"}));await this.folder?.save(document); } book.availability=document||book.fileType==="pdf"?"AVAILABLE":"INVALID_FILE";await this.books.save(book); }
+  public async restoreLibrary(): Promise<{ books: Book[]; integrity: LibraryReconciliation[] }> { const books = await this.books.getAll(), integrity = await Promise.all(books.map(async book => {await this.files.migrateExisting(book.id);const result=this.reconciliation.inspect(book,await this.files.exists(book.id),await this.documents.get(book.id));book.availability=result.state==="VALID"?"AVAILABLE":result.state==="MISSING_FILE"?"MISSING_FILE":"INVALID_FILE";await this.books.save(book);return result;})); await this.restoreFolder(books); return { books: await this.books.getAll(), integrity }; }
+  public async checksum(blob: Blob): Promise<string> { const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()); return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join(""); }
+  public async removeBook(bookId: string): Promise<void> { await Promise.all([this.books.delete(bookId), this.files.delete(bookId), this.documents.delete(bookId)]); }
+  private async restoreFolder(existing: Book[]): Promise<void> { if (!this.folder) return; const ids = new Set(existing.map(book => book.id)); for (const document of this.reconciliation.deduplicate(await this.folder.readAll())) { if (ids.has(document.metadata.id)) continue; const now = new Date(), book = new Book({ id: document.metadata.id, title: document.metadata.title, author: document.metadata.author, genreId: document.metadata.genre || "uncategorized", cover: "", fileType: document.metadata.sourceFormat === "epub" ? "epub" : "pdf", fileName: `${document.metadata.title}.lima`, fileSize: 0, mimeType: "application/x-lima-book", readingStatus: "unread", createdAt: now, updatedAt: now, conversionStatus: "ready" }); await this.documents.save(book.id, document); await this.books.save(book); ids.add(book.id); } }
+}

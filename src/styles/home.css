@@ -1,0 +1,15 @@
+.home-view { position: relative; display: grid; min-height: calc(100vh - 4.25rem); place-items: center; gap: 1rem; overflow: hidden; padding: 2rem 1rem 4rem; text-align: center; }
+.home-view::before { position: absolute; width: 38rem; height: 38rem; border-radius: 50%; background: radial-gradient(circle, var(--color-primary-glow), transparent 68%); content: ""; pointer-events: none; }
+.home-copy { z-index: 1; display: grid; gap: var(--spacing-sm); max-width: 38rem; }
+.home-title { font-size: clamp(2.3rem, 8vw, 4.75rem); line-height: .98; letter-spacing: -.055em; }
+.book-stage { z-index: 1; display: grid; justify-items: center; gap: 1.5rem; perspective: 1200px; }
+.closed-book { position: relative; width: clamp(11rem, 42vw, 16rem); aspect-ratio: 2 / 3; transform: rotateX(10deg) rotateY(-24deg) rotateZ(-2deg); transform-style: preserve-3d; background: transparent; transition: transform .55s cubic-bezier(.2,.8,.2,1); }
+.closed-book__front, .closed-book__back, .closed-book__pages { position: absolute; inset: 0; border-radius: .5rem 1rem 1rem .5rem; }
+.closed-book__front { z-index: 3; display: grid; place-content: center; gap: 1rem; color: #f7f3ff; background: linear-gradient(145deg, #6e59c7, #2f235f); border-left: .8rem solid #281d54; box-shadow: inset 1px 0 rgba(255,255,255,.25), 20px 25px 34px rgba(24,15,50,.3); transform: translateZ(1rem); }
+.closed-book__front strong { font-family: Georgia, serif; font-size: 1.1rem; }
+.closed-book__mark { display: grid; width: 4rem; height: 4rem; place-items: center; margin: auto; border: 1px solid rgba(255,255,255,.55); border-radius: 50%; font-family: Georgia, serif; font-size: 2rem; }
+.closed-book__pages { z-index: 2; inset: .45rem -.8rem .45rem .4rem; background: repeating-linear-gradient(90deg, #ded8c8 0 1px, #f5f0df 1px 4px); transform: translateZ(.15rem); }
+.closed-book__back { z-index: 1; background: #251b50; transform: translateZ(-.7rem); }
+.closed-book:hover { transform: rotateX(5deg) rotateY(-14deg) rotateZ(0) translateY(-8px); }
+.closed-book--opening { transform: rotateX(0) rotateY(0) scale(1.13); opacity: .4; }
+.book-stage__hint { color: var(--color-muted); font-size: .82rem; letter-spacing: .08em; text-transform: uppercase; }

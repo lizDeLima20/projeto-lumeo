@@ -1,0 +1,3 @@
+import{IndexedDbService,STORE_NAMES}from"../services/IndexedDbService";
+export interface StudyCacheEntry<T=unknown>{key:string;value:T;updatedAt:string;}
+export class StudyLookupCacheRepository{public constructor(private readonly database:IndexedDbService){}public async get<T>(key:string):Promise<T|null>{const entry=await this.database.request<StudyCacheEntry<T>|undefined>(STORE_NAMES.studyLookupCache,"readonly",store=>store.get(key));return entry?.value??null;}public save<T>(key:string,value:T):Promise<void>{return this.database.request(STORE_NAMES.studyLookupCache,"readwrite",store=>store.put({key,value,updatedAt:new Date().toISOString()})).then(()=>undefined);}}

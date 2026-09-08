@@ -1,0 +1,3 @@
+import { StorageService } from "../../services/StorageService";
+export type PaperTheme="soft-white"|"off-white"|"cream"|"natural-offset"|"soft-recycled"|"bible-paper"|"sepia"|"night";
+export class PaperThemeManager { private static readonly KEY="reader-paper";private current:PaperTheme="off-white";public constructor(private readonly storage:StorageService){}public get value():PaperTheme{return this.current;}public async initialize():Promise<void>{this.current=await this.storage.load<PaperTheme>(PaperThemeManager.KEY)??"off-white";}public async set(theme:PaperTheme):Promise<void>{this.current=theme;await this.storage.save(PaperThemeManager.KEY,theme);}}

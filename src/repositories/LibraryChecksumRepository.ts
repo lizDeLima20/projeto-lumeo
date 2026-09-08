@@ -1,0 +1,3 @@
+import { IndexedDbService, STORE_NAMES } from "../services/IndexedDbService";
+interface ChecksumRow { bookId:string; source?:string; lima?:string; }
+export class LibraryChecksumRepository { public constructor(private readonly database:IndexedDbService){} public save(row:ChecksumRow):Promise<void>{return this.database.request(STORE_NAMES.libraryChecksums,"readwrite",store=>store.put(row)).then(()=>undefined);} public async get(bookId:string):Promise<ChecksumRow|null>{return await this.database.request<ChecksumRow|undefined>(STORE_NAMES.libraryChecksums,"readonly",store=>store.get(bookId))??null;} public delete(bookId:string):Promise<void>{return this.database.request(STORE_NAMES.libraryChecksums,"readwrite",store=>store.delete(bookId)).then(()=>undefined);} }
