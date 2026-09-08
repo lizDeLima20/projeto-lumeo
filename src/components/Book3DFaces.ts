@@ -148,6 +148,21 @@ export class BookWoodShadow extends Book3DFace {
    *  the exact mirror of that curve, so it drains along the same path. */
   public static readonly matchesBookWidth = true;
   public static readonly leansLeftOnTheBoard = true;
+  /** On the way back the pool drains to nothing ON the board's corner - it must not
+   *  retract up under the volume, which read as the shadow travelling with the book. */
+  /** Forward the pool runs down the front face to its bottom edge; on the way back it
+   *  retracts only as far as the board's corner and dies there, never onto the tray. */
+  public static readonly reachesFrontFaceBottom = true;
+  /** Anchored at its base, so the return collapses the band ONTO the corner instead
+   *  of shrinking it from the top and leaving a slab lying on the tray under the book. */
+  public static readonly collapsesOntoCorner = true;
+  /** No fade on the way back: the pool holds its weight while it climbs and then cuts
+   *  out in a single step once it reaches the corner. */
+  public static readonly returnCutsOutInOneStep = true;
+  /** Snap-off window in ms - short enough to read as a light switching off, long
+   *  enough not to look like a dropped frame. */
+  public static readonly returnSnapMs = 80;
+  public static readonly fadesOutOnBoardCorner = true;
   public static readonly forwardEasing = "cubic-bezier(.2,.3,.6,.88)";
   public static readonly returnEasing = "cubic-bezier(.4,.12,.8,.7)";
   /** A cubic-bezier mirrored in both axes: (a,b,c,d) -> (1-c,1-d,1-a,1-b). */

@@ -329,19 +329,24 @@
      offset so its edges land on the volume's own footprint - it must not lead the
      book by protruding past its left edge
    - starts rising early in the move (same 800ms, just an earlier onset) and drains
-     back along the exact mirror of that curve */
+     back along the exact mirror of that curve, fading out in place ON the board's
+     corner: forward it runs down the front face to its bottom edge, and on the way
+     back it retracts only as far as the corner and dies there - never onto the tray. */
 .physical-wood-shadow{
-  position:absolute;right:2%;bottom:calc(-14px - var(--shadow-drop,25px));left:-4%;height:34px;
-  pointer-events:none;border-radius:44%;
-  background:radial-gradient(54% 100% at 50% 30%,#050301ed,#050301a6 46%,#0503015c 66%,transparent 82%);
-  filter:blur(9px);opacity:0;transform-origin:50% 0;transform:translateX(0) skewX(0deg) scale(.62,.3);
+  position:absolute;right:2%;bottom:calc(-14px - var(--shadow-drop,25px));left:-4%;height:48px;
+  pointer-events:none;border-radius:40%;
+  background:radial-gradient(56% 100% at 50% 26%,#040201f7,#040201c4 50%,#04020178 72%,transparent 88%);
+  filter:blur(8px);opacity:0;transform-origin:50% 100%;transform:translate(-24px,0) skewX(-18deg) scale(.655,.18);
   transition:opacity 800ms cubic-bezier(.2,.3,.6,.88),transform 800ms cubic-bezier(.2,.3,.6,.88);
 }
 .book-card--selected .physical-wood-shadow,
 .book-card--activating .physical-wood-shadow{
-  opacity:.92;transform:translateX(0px) skewX(-18deg) scale(.55,2.9);
+  opacity:.95;transform:translate(-24px,39.5px) skewX(-18deg) scale(.655,1);
 }
 .book-card--returning .physical-wood-shadow{
-  opacity:0;transform:translateX(0) skewX(0deg) scale(.62,.3);
-  transition:opacity 800ms cubic-bezier(.4,.12,.8,.7),transform 800ms cubic-bezier(.4,.12,.8,.7);
+  opacity:0;transform:translate(-24px,9.1px) skewX(-18deg) scale(.655,.06);
+  /* No slow drain on the way back: the pool holds its weight while it climbs the front
+     face and then snaps off in 80ms as it lands on the corner - a light being switched
+     off, not a dissolve. */
+  transition:opacity 80ms linear 700ms,transform 800ms cubic-bezier(.4,.12,.8,.7);
 }

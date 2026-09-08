@@ -271,6 +271,11 @@ describe("estante 3D — referência física", () => {
   it("sombraDaMadeiraCresceAoChegarNaPonta", () => {
     assert.equal(BookWoodShadow.matchesBookWidth, true);
     assert.equal(BookWoodShadow.leansLeftOnTheBoard, true);
+    assert.equal(BookWoodShadow.fadesOutOnBoardCorner, true);
+    assert.equal(BookWoodShadow.reachesFrontFaceBottom, true);
+    assert.equal(BookWoodShadow.collapsesOntoCorner, true);
+    assert.equal(BookWoodShadow.returnCutsOutInOneStep, true);
+    assert.ok(BookWoodShadow.returnSnapMs > 0 && BookWoodShadow.returnSnapMs <= 120);
     assert.deepEqual([...BookWoodShadow.mirrorEasing(.2, .3, .6, .88)], [.4, .12, .8, .7]);
     const forward = BookWoodShadow.forwardEasing.match(/[\d.]+/g)!.map(Number);
     const back = BookWoodShadow.returnEasing.match(/[\d.]+/g)!.map(Number);
