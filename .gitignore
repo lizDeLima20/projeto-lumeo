@@ -3,6 +3,9 @@ dist/
 server-dist/
 .agents/
 .codex/
+.vercel/
 .env
 .env.*
 !.env.example
+.vercel
+.env*

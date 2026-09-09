@@ -1,0 +1,10 @@
+.git/
+.vercel/
+.agents/
+.codex/
+.env
+.env.*
+node_modules/
+dist/
+server-dist/
+*.log

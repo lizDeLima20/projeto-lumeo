@@ -91,6 +91,12 @@ export class ApiController {
     return this.validator.installationId(value);
   }
   private async body(request: AuthenticatedRequest): Promise<Record<string, unknown>> {
+    // Vercel may have consumed the stream and already parsed JSON.
+    if (request.body !== undefined) {
+      const raw = typeof request.body === "string" ? request.body : JSON.stringify(request.body);
+      if (Buffer.byteLength(raw) > 16_384) throw new ApiError(413, "BODY_TOO_LARGE", "Corpo muito grande.");
+      return this.parseBody(raw);
+    }
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of request) {
@@ -100,7 +106,14 @@ export class ApiController {
         chunks.push(buffer);
       }
     if (chunks.length === 0) return {};
-    try { return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>; }
+    return this.parseBody(Buffer.concat(chunks).toString("utf8"));
+  }
+  private parseBody(raw: string): Record<string, unknown> {
+    try {
+      const body: unknown = JSON.parse(raw);
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("invalid body");
+      return body as Record<string, unknown>;
+    }
     catch { throw new ApiError(400, "INVALID_JSON", "JSON inválido."); }
   }
   private string(value: unknown): string {
