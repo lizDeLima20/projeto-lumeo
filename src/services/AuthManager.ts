@@ -12,10 +12,12 @@ export class AuthManager {
   public async initialize(): Promise<void> {
     this.state.authStatus = "UNKNOWN";
     const saved = await this.storage.load<AuthSession>(AuthManager.SESSION_KEY);
-    if (!saved) return this.clearSession();
-    if(import.meta.env.DEV)await this.rememberDevUser(saved.user);
+    if (!saved || !saved.user?.id || !saved.user?.email || !saved.accessToken) return this.clearSession();
+    const expired = !!saved.expiresAt && saved.expiresAt * 1000 < Date.now() + 30_000;
+    if (expired && !saved.refreshToken?.trim()) return this.clearSession();
+    if(import.meta.env?.DEV)await this.rememberDevUser(saved.user);
     try {
-      const session = saved.expiresAt && saved.expiresAt * 1000 < Date.now() + 30_000
+      const session = expired
         ? await this.api.post<AuthSession>("/auth/refresh", { refreshToken: saved.refreshToken }, false)
         : saved;
       await this.applySession(session);
@@ -50,7 +52,7 @@ export class AuthManager {
   public getSession(): User | null { return this.state.currentUser; }
 
   private async applySession(session: AuthSession): Promise<void> {
-    if(import.meta.env.DEV){const remembered=await this.storage.load<string>(this.devUserKey(session.user.email));if(remembered)session={...session,user:{...session.user,id:remembered}};else await this.rememberDevUser(session.user);}
+    if(import.meta.env?.DEV){const remembered=await this.storage.load<string>(this.devUserKey(session.user.email));if(remembered)session={...session,user:{...session.user,id:remembered}};else await this.rememberDevUser(session.user);}
     this.api.setAccessToken(session.accessToken);
     this.state.currentUser = session.user;
     this.state.authStatus = "authenticated";

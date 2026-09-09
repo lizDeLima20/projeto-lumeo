@@ -1,8 +1,10 @@
 import { StorageService, type StorageAdapter } from "../services/StorageService";
+import { EXTERNAL_LIBRARY_PT, type ExternalLibraryTranslationKey } from "./ExternalLibraryTranslations";
 
 export const SUPPORTED_LOCALES = ["pt-BR", "pt-PT", "en", "es-ES", "es-MX", "es-AR", "es-CO", "fr", "it", "de"] as const;
 export type SupportedLocale = typeof SUPPORTED_LOCALES[number];
 export type TranslationKey =
+  | ExternalLibraryTranslationKey
   | "reader.back" | "reader.pagePicker" | "reader.settings" | "reader.navigation" | "reader.notebook" | "reader.bookmark"
   | "reader.study" | "reader.previousPage" | "reader.nextPage" | "reader.toggleControls" | "reader.pdfPage"
   | "reader.loading" | "reader.closeSettings" | "reader.customization" | "reader.reading" | "reader.futureMarks"
@@ -35,6 +37,7 @@ export type TranslationKey =
 type Dictionary = Record<TranslationKey, string>;
 
 const PT_BR: Dictionary = {
+  ...EXTERNAL_LIBRARY_PT,
   "reader.back": "Voltar para biblioteca", "reader.pagePicker": "Ir para uma página", "reader.settings": "Configurações de leitura",
   "reader.navigation": "Abrir sumário, busca e mapa", "reader.notebook": "Abrir Caderno", "reader.bookmark": "Marcar posição",
   "reader.study": "Abrir marcações", "reader.previousPage": "Página anterior", "reader.nextPage": "Próxima página",

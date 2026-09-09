@@ -1,4 +1,9 @@
 import { LocalFileImporter } from "../importers/LocalFileImporter";
+import { EnvironmentConfig } from "../config/EnvironmentConfig";
+import { OneDriveConnections } from "../external/OneDriveConnections";
+import { ExternalLibraryStorage } from "../external/ExternalLibraryStorage";
+import { OneDriveImportCoordinator } from "../external/OneDriveImportCoordinator";
+import { OperationRecoveryJournal } from "../recovery/OperationRecoveryJournal";
 import { GoogleDriveImporter, type GoogleDriveConfig } from "../importers/GoogleDriveImporter";
 import { UrlImporter } from "../importers/UrlImporter";
 import type { Book } from "../models/Book";
@@ -70,9 +75,7 @@ export class App {
   private readerSettings = new ReaderSettingsManager(this.storage);
   private readerManager = new ReaderManager(this.books, new LocalBookFileStore(this.files),
     new ReadingProgressService(this.progress, this.books), this.readerSettings,this.limaDocuments);
-  private readonly api = new ApiClient(
-    import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://127.0.0.1:3000/api" : "/api"),
-  );
+  private readonly api = new ApiClient(new EnvironmentConfig().read().bffBaseUrl);
   private readonly auth = new AuthManager(this.api, this.storage, this.state);
   private readonly devices = new DeviceManager(this.api, this.storage, this.state);
   private readonly router: Router;
@@ -113,14 +116,22 @@ export class App {
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.router.navigate("reader", { id: bookId }), (bookId) => void this.deleteBook(bookId, false)));
     this.router.register("genre", (params) => new GenreView(this.state, params.get("id") ?? "",
       () => this.router.navigate("library"), (bookId) => this.router.navigate("reader", { id: bookId })));
-    this.router.register("import", () => new BookImportView(this.state, this.imports, this.genres, this.collections, this.covers, this.metadataExtractor,
-      (book) => void this.addBook(book), () => this.router.navigate("library"), (bookId) => this.deleteBook(bookId, false)));
+    this.router.register("import", (params) => {
+      const storage = new ExternalLibraryStorage(this.database);
+      const connections = new OneDriveConnections(storage, this.state.currentUser!.id);
+      const coordinator = new OneDriveImportCoordinator(connections.downloads, this.imports, this.metadataExtractor, this.covers, new OperationRecoveryJournal(storage));
+      return new BookImportView(this.state, this.imports, this.genres, this.collections, this.covers, this.metadataExtractor,
+        (book) => void this.addBook(book), () => this.router.navigate("library"), (bookId) => this.deleteBook(bookId, false),
+        { connections, coordinator, initialSourceId: params.get("source") ?? undefined, openExisting: id => this.router.navigate("reader", { id }) });
+    });
     this.router.register("book", (params) => this.detailsView(params.get("id") ?? ""));
     this.router.register("edit-book", (params) => new BookEditView(this.state, this.findBook(params.get("id")), this.genres, this.covers,
       (book) => void this.updateBook(book), () => this.router.navigate("book", { id: params.get("id") ?? "" })));
     this.router.register("reader", (params) => new ReaderView(params.get("id") ?? "", this.readerManager,
       this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database));
-    this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database)));
+    this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
+      this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
+        open: source => this.router.navigate("import", { source }) } : undefined));
   }
 
   private detailsView(id: string): BookDetailsView {

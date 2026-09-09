@@ -17,10 +17,17 @@ export class EnvironmentConfig {
       appEnv: this.normalize(this.env.VITE_APP_ENV ?? this.env.MODE),
       appVersion: this.env.VITE_APP_VERSION ?? "0.1.0",
       appBaseUrl: this.env.VITE_APP_BASE_URL ?? globalThis.location?.origin ?? "",
-      bffBaseUrl: this.env.VITE_API_URL ?? "/api",
+      bffBaseUrl: this.apiBaseUrl(),
       supabaseUrl: this.env.VITE_SUPABASE_URL ?? "",
       supabasePublishableKey: this.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? this.env.VITE_SUPABASE_ANON_KEY ?? "",
     };
+  }
+
+  private apiBaseUrl(): string {
+    // Production BFF is served by the same Vercel deployment. Never bake a
+    // developer's localhost override into production requests.
+    if (this.env.PROD || this.env.MODE === "production") return "/api";
+    return this.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:3000/api";
   }
 
   public assertNoFrontendSecrets(keys: readonly string[] = Object.keys(this.env)): boolean {

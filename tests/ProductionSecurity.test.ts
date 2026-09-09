@@ -19,6 +19,13 @@ class MemoryStorage {
 }
 
 describe("produção e segurança do frontend", () => {
+  it("productionApiNeverUsesLocalhostOverride", () => {
+    const config = new EnvironmentConfig({ MODE: "production", VITE_API_URL: "http://localhost:3000/api" } as ImportMetaEnv).read();
+    assert.equal(config.bffBaseUrl, "/api");
+  });
+  it("developmentKeepsLocalBff", () => {
+    assert.equal(new EnvironmentConfig({ MODE: "development" } as ImportMetaEnv).read().bffBaseUrl, "http://localhost:3000/api");
+  });
   it("frontendDoesNotContainServiceRoleKey", () => {
     const config = new EnvironmentConfig({ MODE: "production", VITE_APP_ENV: "production" } as ImportMetaEnv);
     assert.equal(config.assertNoFrontendSecrets(["VITE_SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_URL", "VITE_API_URL"]), true);

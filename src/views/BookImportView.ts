@@ -1,6 +1,9 @@
 import type { ImportedFile } from "../importers/BookImporter";
-import { PickerCancelledError } from "../importers/GoogleDriveImporter";
-import { FolderUrlError } from "../importers/UrlImporter";
+import { GoogleDriveLibrariesModal } from "./GoogleDriveLibrariesModal";
+import { GoogleDriveLibraryRepository } from "../external/GoogleDriveLibraryRepository";
+import { GoogleDriveLibraryService } from "../external/GoogleDriveLibraryService";
+import { ExternalLibraryStorage } from "../external/ExternalLibraryStorage";
+import { IndexedDbService } from "../services/IndexedDbService";
 import type { Book, ReadingStatus } from "../models/Book";
 import { Genre } from "../models/Genre";
 import { GenreRepository } from "../repositories/GenreRepository";
@@ -15,8 +18,19 @@ import { DuplicateBookImportError, ImportManager } from "../services/ImportManag
 import type { AppState } from "../core/AppState";
 import { BaseView } from "./BaseView";
 import { I18nManager } from "../i18n/I18nManager";
+import { ExternalLibrariesPanel } from "./ExternalLibrariesPanel";
+import type { OneDriveConnections } from "../external/OneDriveConnections";
+import type { OneDriveImportCoordinator } from "../external/OneDriveImportCoordinator";
+import { OneDriveError } from "../external/OneDriveError";
 
 export class BookImportView extends BaseView {
+  private googleModal: GoogleDriveLibrariesModal | null = null;
+  private externalPanel: ExternalLibrariesPanel | null = null;
+  private remoteBusy = false;
+  private remotePreview = false;
+  private generation = 0;
+  private remoteCancel: HTMLButtonElement | null = null;
+  private fileSummary: HTMLElement | null = null;
   private imported: ImportedFile | null = null;
   private automaticCover = "";
   private authorInput: HTMLInputElement | null = null; private genreSelect: HTMLSelectElement | null = null;
@@ -26,7 +40,15 @@ export class BookImportView extends BaseView {
   public constructor(private readonly state: AppState, private readonly manager: ImportManager,
     private readonly genres: GenreRepository, private readonly collections: CollectionRepository, private readonly covers: CoverService,
     private readonly metadataExtractor: BookMetadataExtractor,
-    private readonly onSaved: (book: Book) => void, private readonly onCancel: () => void, private readonly onReplaceExisting?: (bookId: string) => Promise<void>) { super(); }
+    private readonly onSaved: (book: Book) => void, private readonly onCancel: () => void, private readonly onReplaceExisting?: (bookId: string) => Promise<void>,
+    private readonly oneDrive?: { connections: OneDriveConnections; coordinator: OneDriveImportCoordinator; initialSourceId?: string; openExisting(id: string): void }) { super(); }
+
+  public override unmount(): void {
+    this.googleModal?.dispose(); this.googleModal = null;
+    this.generation++; this.oneDrive?.coordinator.cancel();
+    void this.oneDrive?.coordinator.discard().catch(() => undefined);
+    this.externalPanel?.unmount(); this.externalPanel = null; this.imported = null; this.automaticCover = ""; super.unmount();
+  }
 
   public render(): HTMLElement {
     const section = this.createElement("section", "page-shell import-page");
@@ -34,14 +56,10 @@ export class BookImportView extends BaseView {
     form.append(this.createElement("span", "eyebrow", "Sua biblioteca"), this.createElement("h1", "page-title", "Adicionar livro"),
       this.createElement("p", "page-subtitle", "Escolha de onde deseja importar. O arquivo será salvo somente neste dispositivo."));
     const sourceChoices = this.createElement("div", "import-sources");
-    const device = this.sourceButton("▣", "Do dispositivo", "PDF ou EPUB salvo neste aparelho");
-    const drive = this.sourceButton("◆", "Google Drive", "Escolha um arquivo da sua conta");
-    const link = this.sourceButton("↗", "Por link", "Use um endereço público compatível"); sourceChoices.append(device, drive, link);
+    const device = this.sourceButton("▣", I18nManager.shared.t("google.device"), I18nManager.shared.t("google.deviceHelp"));
+    const drive = this.sourceButton("◆", I18nManager.shared.t("google.title"), I18nManager.shared.t("google.subtitle"));
+    sourceChoices.append(device, drive);
     const file = this.input("Arquivo PDF ou EPUB", "file"); file.wrapper.classList.add("import-source-panel", "is-hidden"); file.input.required = false; file.input.accept = ".pdf,.epub,application/pdf,application/epub+zip";
-    const urlPanel = this.createElement("div", "import-source-panel is-hidden");
-    const urlLabel = this.createElement("label", "field"); urlLabel.append(this.createElement("span", "field__label", "Cole o link do arquivo"));
-    const url = this.createElement("input", "input") as HTMLInputElement; url.type = "url"; url.placeholder = "https://.../livro.pdf"; urlLabel.append(url);
-    const importUrl = this.createElement("button", "button button--secondary", "Importar link"); importUrl.type = "button"; urlPanel.append(urlLabel, importUrl);
     const download = this.createElement("p", "download-status"); download.setAttribute("role", "status");
     const metadataNote = this.createElement("p", "metadata-note"); metadataNote.setAttribute("role", "status"); this.metadataNote = metadataNote;
     const title = this.input("Título", "text"); const author = this.input("Autor", "text"); this.authorInput = author.input;
@@ -63,38 +81,79 @@ export class BookImportView extends BaseView {
     const error = this.createElement("p", "form-error"); error.setAttribute("role", "alert");
     const actions = this.createElement("div", "form-actions");
     const save = this.createElement("button", "button button--primary", "Adicionar à biblioteca"); save.type = "submit";
-    const cancel = this.createElement("button", "button button--secondary", "Cancelar"); cancel.type = "button"; cancel.addEventListener("click", this.onCancel); actions.append(save, cancel);
+    const cancel = this.createElement("button", "button button--secondary", "Cancelar"); cancel.type = "button";
+    cancel.addEventListener("click", () => { this.oneDrive?.coordinator.cancel(); this.onCancel(); }); actions.append(save, cancel);
     file.input.addEventListener("change", () => void this.selectFile(file.input, title.input, error, download, coverPreview, coverImage));
-    device.addEventListener("click", () => { file.wrapper.classList.remove("is-hidden"); urlPanel.classList.add("is-hidden"); file.input.click(); });
-    drive.addEventListener("click", () => void this.selectDrive(title.input, error, download, coverPreview, coverImage));
-    link.addEventListener("click", () => { urlPanel.classList.remove("is-hidden"); file.wrapper.classList.add("is-hidden"); url.focus(); });
-    importUrl.addEventListener("click", () => void this.selectUrl(url.value, title.input, error, download, importUrl, coverPreview, coverImage));
-    form.append(sourceChoices, file.wrapper, urlPanel, download, coverPreview, metadataNote, title.wrapper, author.wrapper, genreLabel, genreSuggestion, newGenreRow, collectionLabel, collectionSuggestion, statusLabel, error, actions);
+    device.addEventListener("click", () => { file.wrapper.classList.remove("is-hidden"); file.input.click(); });
+    drive.addEventListener("click", () => {
+      this.googleModal ??= new GoogleDriveLibrariesModal(new GoogleDriveLibraryRepository(
+        new ExternalLibraryStorage(new IndexedDbService(`lumeo-library-${this.state.currentUser?.id ?? ""}`)), this.state.currentUser?.id ?? ""), new GoogleDriveLibraryService(),
+        async downloaded => {
+          const imported = await this.manager.select(downloaded);
+          const duplicate = await this.manager.inspect(imported, { title: imported.suggestedTitle, author: "" });
+          if (duplicate.kind === "duplicate") throw new Error(I18nManager.shared.t("import.remote.duplicate"));
+          await this.applyImported({ ...imported, source: "google-drive" }, title.input, download, coverPreview, coverImage);
+          error.textContent = ""; download.textContent = I18nManager.shared.t("import.remote.preview");
+        });
+      this.googleModal.open();
+    });
+    form.append(sourceChoices, file.wrapper, download, coverPreview, metadataNote, title.wrapper, author.wrapper, genreLabel, genreSuggestion, newGenreRow, collectionLabel, collectionSuggestion, statusLabel, error, actions);
+    if (this.oneDrive) {
+      const cancelDownload = this.createElement("button", "button button--secondary is-hidden", I18nManager.shared.t("import.download.cancel"));
+      cancelDownload.type = "button"; this.remoteCancel = cancelDownload;
+      cancelDownload.addEventListener("click", () => { this.oneDrive?.coordinator.cancel(); this.imported = null; this.remotePreview = false; });
+      const summary = this.createElement("p", "metadata-note"); this.fileSummary = summary;
+      form.insertBefore(summary, metadataNote); form.insertBefore(cancelDownload, coverPreview);
+      this.externalPanel = new ExternalLibrariesPanel(this.oneDrive.connections,
+        async (driveId, item) => {
+          if (this.remoteBusy) return;
+          this.remoteBusy = true; this.remotePreview = false; this.imported = null; this.automaticCover = "";
+          const generation = ++this.generation; save.disabled = true; sourceChoices.inert = true; cancelDownload.classList.remove("is-hidden");
+          coverPreview.classList.add("is-hidden"); coverImage.removeAttribute("src"); summary.textContent = ""; error.replaceChildren();
+          const progress = (key: Parameters<typeof I18nManager.shared.t>[0], percent?: number | null): void => {
+            if (generation === this.generation) download.textContent = `${I18nManager.shared.t(key)}${percent == null ? "" : ` ${percent}%`}`;
+          };
+          try {
+            const preview = await this.oneDrive!.coordinator.prepare(driveId, item.id, progress);
+            if (generation !== this.generation) return;
+            if (preview.duplicate.kind === "duplicate") {
+              error.textContent = I18nManager.shared.t("import.remote.duplicate");
+              const id = preview.duplicate.book.id;
+              const open = this.createElement("button", "button button--secondary", I18nManager.shared.t("import.remote.openExisting")); open.type = "button";
+              open.addEventListener("click", () => this.oneDrive!.openExisting(id)); error.append(open);
+              await this.oneDrive!.coordinator.discard(); return;
+            }
+            this.imported = preview.imported; this.automaticCover = preview.cover; this.remotePreview = true;
+            title.input.value = preview.metadata.title.value; author.input.value = preview.metadata.author?.value ?? "";
+            coverImage.src = preview.cover; coverPreview.classList.remove("is-hidden");
+            summary.textContent = `${I18nManager.shared.t("import.remote.name")}: ${preview.imported.originalName} · ${I18nManager.shared.t("import.remote.format")}: ${preview.imported.fileType.toUpperCase()} · ${I18nManager.shared.t("import.remote.size")}: ${(preview.imported.size / 1048576).toFixed(1)} MB`;
+            metadataNote.textContent = I18nManager.shared.t("import.remote.preview");
+            if (preview.metadata.genre) await this.suggestGenre(preview.metadata.genre.value);
+            if (preview.metadata.collection) await this.suggestCollection(preview.metadata.collection.value);
+            title.input.focus();
+          } catch (caught) {
+            if (generation === this.generation) { this.imported = null; this.remotePreview = false;
+              error.textContent = caught instanceof OneDriveError ? caught.message : I18nManager.shared.t("import.remote.failed"); }
+          } finally {
+            if (generation === this.generation) { this.remoteBusy = false; save.disabled = false; sourceChoices.inert = false; cancelDownload.classList.add("is-hidden"); }
+          }
+        }, undefined, this.oneDrive.initialSourceId);
+      // OneDrive remains available from Settings; the main source area has only
+      // Device and Google Drive. Explicit OneDrive navigation still opens it.
+      if (this.oneDrive.initialSourceId) form.insertBefore(this.externalPanel.render(), sourceChoices.nextSibling);
+    }
     form.addEventListener("submit", (event) => void this.submit(event, { title: title.input, author: author.input, genre, collection, status, error, save,progress:download }));
     section.append(form); return section;
   }
-  private async selectDrive(title: HTMLInputElement, error: HTMLElement, status: HTMLElement, preview: HTMLElement, image: HTMLImageElement, folderId?: string): Promise<void> {
-    error.textContent = ""; status.textContent = "Abrindo Google Drive…";
-    try { await this.applyImported(await this.manager.selectGoogleDrive(folderId, (percent) => this.downloadProgress(status, percent)), title, status, preview, image); status.textContent = "Livro e capa preparados. Personalize os dados abaixo."; }
-    catch (caught) { status.textContent = ""; if (!(caught instanceof PickerCancelledError)) error.textContent = caught instanceof Error ? caught.message : "Não foi possível importar do Google Drive."; }
-  }
-  private async selectUrl(value: string, title: HTMLInputElement, error: HTMLElement, status: HTMLElement, button: HTMLButtonElement, preview: HTMLElement, image: HTMLImageElement): Promise<void> {
-    if (!value.trim()) { error.textContent = "Cole o link do arquivo."; return; } error.textContent = ""; button.disabled = true; status.textContent = "Baixando livro…";
-    try { await this.applyImported(await this.manager.selectUrl(value, (percent) => this.downloadProgress(status, percent)), title, status, preview, image); status.textContent = "Livro e capa preparados. Personalize os dados abaixo."; }
-    catch (caught) {
-      status.textContent = ""; error.textContent = caught instanceof Error ? caught.message : "Não foi possível importar este link.";
-      if (caught instanceof FolderUrlError) { const choose = this.createElement("button", "button button--secondary", "Escolher arquivo da pasta"); choose.type = "button";
-        choose.addEventListener("click", () => void this.selectDrive(title, error, status, preview, image, caught.folderId)); error.append(document.createTextNode(" "), choose); }
-    } finally { button.disabled = false; }
-  }
   private async applyImported(imported: ImportedFile, title: HTMLInputElement, status: HTMLElement, preview: HTMLElement, image: HTMLImageElement): Promise<void> {
+    this.remotePreview = false; await this.oneDrive?.coordinator.discard(); if (this.fileSummary) this.fileSummary.textContent = "";
     this.imported = imported; if (!title.value) title.value = imported.suggestedTitle; status.textContent = "Preparando capa…";
     this.automaticCover = await this.covers.fromBookFile(imported.file, imported.fileType, imported.suggestedTitle);
     image.src = this.automaticCover; preview.classList.remove("is-hidden");
     status.textContent = "Identificando título, autor e organização…"; await this.analyzeMetadata(imported, title);
   }
-  private downloadProgress(status: HTMLElement, percent: number | null): void { status.textContent = percent === null ? "Baixando livro…" : `Baixando livro… ${percent}%`; }
   private async selectFile(input: HTMLInputElement, title: HTMLInputElement, error: HTMLElement, status: HTMLElement, preview: HTMLElement, image: HTMLImageElement): Promise<void> {
+    if (this.remoteBusy) return;
     const file = input.files?.[0]; if (!file) return;
     try { await this.applyImported(await this.manager.select(file), title, status, preview, image); status.textContent = "Livro e capa preparados. Personalize os dados abaixo."; error.textContent = ""; }
     catch (caught) { this.imported = null; input.value = ""; error.textContent = caught instanceof Error ? caught.message : "Arquivo inválido."; }
@@ -102,6 +161,7 @@ export class BookImportView extends BaseView {
   private async submit(event: SubmitEvent, fields: { title: HTMLInputElement; author: HTMLInputElement; genre: HTMLSelectElement;
     collection: HTMLSelectElement; status: HTMLSelectElement; error: HTMLElement; save: HTMLButtonElement;progress:HTMLElement }): Promise<void> {
     event.preventDefault();
+    if (this.remoteBusy) return;
     if (!this.imported) { fields.error.textContent = "Selecione um arquivo PDF ou EPUB."; return; }
     fields.save.disabled = true;
     try {
@@ -109,10 +169,18 @@ export class BookImportView extends BaseView {
         genreId: fields.genre.value, collectionId: fields.collection.value || undefined, readingStatus: fields.status.value as ReadingStatus, cover: this.automaticCover };
       const options = await this.resolveVersionConflict(this.imported, metadata);
       if(options.cancelled){fields.progress.textContent="";return;}
+      if (this.remotePreview && this.oneDrive) {
+        this.remoteBusy = true; this.remoteCancel?.classList.remove("is-hidden");
+        const book = await this.oneDrive.coordinator.confirm(metadata, options,
+          (stage, percent) => { fields.progress.textContent = `${I18nManager.shared.t(stage)}${percent == null ? "" : ` ${percent}%`}`; });
+        this.remoteBusy = false; this.remotePreview = false;
+        if (options.replaceBookId) await this.onReplaceExisting?.(options.replaceBookId);
+        this.onSaved(book); return;
+      }
       if(options.replaceBookId) await this.onReplaceExisting?.(options.replaceBookId);
       fields.progress.textContent="Preparando seu livro… Lendo conteúdo";this.onSaved(await this.manager.save(this.imported, metadata,step=>{const labels={reading:"Lendo conteúdo",organizing:"Organizando páginas",chapters:"Preparando capítulos",finalizing:"Finalizando"};fields.progress.textContent=`Preparando seu livro… ${labels[step.stage]} (${step.percent}%)`;},options));
     } catch (caught) { fields.error.textContent = caught instanceof ApiError || caught instanceof Error ? caught.message : "Não foi possível salvar o livro."; }
-    finally { fields.save.disabled = false; }
+    finally { this.remoteBusy = false; this.remoteCancel?.classList.add("is-hidden"); fields.save.disabled = false; }
   }
   private async resolveVersionConflict(imported:ImportedFile,metadata:{title:string;author:string}):Promise<{allowPossibleVersion?:boolean;replaceBookId?:string;cancelled?:boolean}>{
     const decision=await this.manager.inspect(imported,metadata);

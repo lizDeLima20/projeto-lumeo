@@ -24,6 +24,14 @@ export class OperationRecoveryJournal {
     await this.storage.save(OperationRecoveryJournal.KEY, (await this.pending()).map((item) => item.id === id ? { ...item, state: "completed" as const } : item));
   }
 
+  public async attachBook(id: string, bookId: string): Promise<void> {
+    await this.storage.save(OperationRecoveryJournal.KEY, (await this.pending()).map(row => row.id === id ? { ...row, bookId } : row));
+  }
+
+  public async fail(id: string): Promise<void> {
+    await this.storage.save(OperationRecoveryJournal.KEY, (await this.pending()).map(row => row.id === id ? { ...row, state: "failed" as const } : row));
+  }
+
   public async pending(): Promise<RecoverableOperation[]> {
     const rows = await this.storage.load<RecoverableOperation[]>(OperationRecoveryJournal.KEY) ?? [];
     return rows.filter((row) => row.state === "running");

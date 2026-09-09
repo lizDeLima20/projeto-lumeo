@@ -2,7 +2,7 @@ import type { ImportedFile } from "../importers/BookImporter";
 import { LocalFileImporter } from "../importers/LocalFileImporter";
 import type { GoogleDriveImporter } from "../importers/GoogleDriveImporter";
 import type { UrlImporter } from "../importers/UrlImporter";
-import { Book, type ReadingStatus } from "../models/Book";
+import { Book, type ReadingStatus, type BookDocumentMode, type BookTextCapability, type BookLimaCapability } from "../models/Book";
 import { BookRepository } from "../repositories/BookRepository";
 import { LimaDocumentRepository } from "../repositories/LimaDocumentRepository";
 import { LimaConversionManager } from "../lima/LimaConversionManager";
@@ -10,11 +10,13 @@ import type{LimaConversionProgress}from"../lima/LimaConverter";
 import type{DesktopLibraryFolderService}from"./DesktopLibraryFolderService";
 import{LimaSerializer}from"../lima/LimaSerializer";import type{LibraryChecksumRepository}from"../repositories/LibraryChecksumRepository";
 import { DuplicateBookDetector, type DuplicateDecision, type IncomingBookIdentity } from "../storage/DuplicateBookDetector";
+import type { OperationRecoveryJournal } from "../recovery/OperationRecoveryJournal";
+import { checkCancelled } from "../external/OneDriveError";
 
 interface BookFileStorage { save(bookId:string,file:Blob):Promise<unknown>; delete(bookId:string):Promise<unknown>; get?(bookId:string):Promise<Blob|null>; saveLima?(bookId:string,file:Blob):Promise<unknown>; }
 
-export interface ImportMetadata { title: string; author: string; genreId: string; collectionId?: string; readingStatus: ReadingStatus; cover: string; volume?: string; series?: string; publicationYear?: number; }
-export interface SaveImportOptions { allowPossibleVersion?: boolean; replaceBookId?: string; }
+export interface ImportMetadata { title: string; author: string; genreId: string; collectionId?: string; readingStatus: ReadingStatus; cover: string; volume?: string; series?: string; publicationYear?: number; documentMode?: BookDocumentMode; textCapability?: BookTextCapability; limaCapability?: BookLimaCapability; }
+export interface SaveImportOptions { allowPossibleVersion?: boolean; replaceBookId?: string; signal?: AbortSignal; journal?: OperationRecoveryJournal; operationId?: string; }
 export class DuplicateBookImportError extends Error { public constructor(public readonly decision: Extract<DuplicateDecision,{kind:"duplicate"}>) { super("Este livro já está na sua biblioteca."); } }
 export class BookVersionConflictError extends Error { public constructor(public readonly decision: Extract<DuplicateDecision,{kind:"possible-version"}>) { super("Já existe outra versão deste livro na biblioteca."); } }
 
@@ -36,6 +38,7 @@ export class ImportManager {
     return this.duplicates.classify(await this.books.getAll(), await this.existingHashes(), identity);
   }
   public async save(imported: ImportedFile, metadata: ImportMetadata,onConversionProgress?:(value:LimaConversionProgress)=>void,options:SaveImportOptions={}): Promise<Book> {
+    checkCancelled(options.signal);
     await this.assertCapacity(imported.file.size);
     const decision = await this.inspect(imported, metadata);
     if (decision.kind === "duplicate") throw new DuplicateBookImportError(decision);
@@ -44,13 +47,40 @@ export class ImportManager {
     const book = new Book({ id: crypto.randomUUID(), ...metadata, fileType: imported.fileType,
       fileName: imported.file.name, fileSize: imported.file.size, mimeType: imported.file.type,
       createdAt: now, updatedAt: now });
-    await this.files.save(book.id, imported.file);
-    book.offlineAvailability="AVAILABLE";
-    try { await this.books.save(book); }
-    catch (error) { await this.files.delete(book.id); throw error; }
-    await this.checksums?.save({ bookId: book.id, source: await this.checksum(imported.file) });
-    if(this.limaDocuments){await new LimaConversionManager(this.limaDocuments,this.books).convert(book,imported.file,onConversionProgress);const document=await this.limaDocuments.get(book.id);if(document){const bytes=new LimaSerializer().serialize(document),limaBlob=new Blob([bytes as Uint8Array<ArrayBuffer>],{type:"application/x-lima-book"});await this.files.saveLima?.(book.id,limaBlob);await Promise.all([this.desktopFolder?.save(document),this.desktopFolder?.saveOriginal(document,imported.file,book.fileType)]);await this.checksums?.save({bookId:book.id,source:await this.checksum(imported.file),lima:await this.checksum(limaBlob)});book.availability="AVAILABLE";book.offlineAvailability="AVAILABLE";}else{book.availability="INVALID_FILE";book.offlineAvailability="ERROR";}await this.books.save(book);}
-    return book;
+    checkCancelled(options.signal);
+    if (options.journal && options.operationId) await options.journal.attachBook(options.operationId, book.id);
+    try {
+      await this.files.save(book.id, imported.file); checkCancelled(options.signal);
+      book.offlineAvailability = "AVAILABLE";
+      await this.books.save(book);
+      await this.checksums?.save({ bookId: book.id, source: await this.checksum(imported.file) });
+      if (this.limaDocuments) {
+        const conversion = new LimaConversionManager(this.limaDocuments, this.books);
+        const cancel = (): void => conversion.cancel();
+        options.signal?.addEventListener("abort", cancel, { once: true });
+        try { checkCancelled(options.signal); await conversion.convert(book, imported.file, onConversionProgress); }
+        finally { options.signal?.removeEventListener("abort", cancel); }
+        checkCancelled(options.signal);
+        const document = await this.limaDocuments.get(book.id);
+        if (document) {
+          const bytes = new LimaSerializer().serialize(document), blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/x-lima-book" });
+          await this.files.saveLima?.(book.id, blob);
+          // Remote imports commit to local app storage first. They do not write
+          // an external folder during a cancellable transaction.
+          if (imported.source !== "onedrive") await Promise.all([this.desktopFolder?.save(document), this.desktopFolder?.saveOriginal(document, imported.file, book.fileType)]);
+          await this.checksums?.save({ bookId: book.id, source: await this.checksum(imported.file), lima: await this.checksum(blob) });
+        }
+        // Original PDF/EPUB remains readable even when optional reflow fails.
+        book.availability = "AVAILABLE"; book.offlineAvailability = "AVAILABLE";
+        await this.books.save(book);
+      }
+      checkCancelled(options.signal);
+      if (options.journal && options.operationId) await options.journal.complete(options.operationId);
+      return book;
+    } catch (error) {
+      await Promise.all([this.books.delete(book.id), this.files.delete(book.id), this.limaDocuments?.delete(book.id), this.checksums?.delete(book.id)]);
+      throw error;
+    }
   }
   private async assertCapacity(fileSize: number): Promise<void> {
     if (typeof navigator === "undefined" || !navigator.storage?.estimate) return;

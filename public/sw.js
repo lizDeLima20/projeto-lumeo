@@ -1,4 +1,4 @@
-const SW_VERSION = "v9";
+const SW_VERSION = "v10";
 const SHELL_CACHE = `lumeo-shell-${SW_VERSION}`;
 const ASSET_CACHE = `lumeo-assets-${SW_VERSION}`;
 const RUNTIME_CACHE = `lumeo-runtime-${SW_VERSION}`;
@@ -30,6 +30,8 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== "GET") return;
+  // OAuth callbacks must never receive the offline app shell or be cached.
+  if (url.origin === self.location.origin && url.pathname === "/onedrive-auth.html") return;
   if (BOOK_FILE_PATTERN.test(url.pathname)) return;
 
   if (request.mode === "navigate" || request.headers.get("accept")?.includes("text/html")) {
