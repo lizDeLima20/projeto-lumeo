@@ -61,6 +61,13 @@ export class PageCurl {
   }
   private element(className:string):HTMLElement{const node=document.createElement("div");node.className=className;return node;}
 
+  /** The whole leaf drifts, sags, tilts and shrinks as one once it leaves the gutter;
+   *  only the bend is per strip. Pivoting on the hinge, not on the leaf's middle. */
+  public settleHost(value:{flyX:number;flyY:number;tilt:number;scale:number},direction:1|-1):void{
+    if(!this.host)return;
+    this.host.style.transformOrigin=direction===1?"0 50%":"100% 50%";
+    this.host.style.transform=`translate3d(${value.flyX.toFixed(2)}px,${value.flyY.toFixed(2)}px,0) rotateZ(${value.tilt.toFixed(3)}deg) scale(${value.scale.toFixed(4)})`;
+  }
   public apply(progress:number,landingAngle:number,direction:1|-1):CurlStrip[]{
     const plan=this.geometry.build(progress,this.width,landingAngle,direction,this.strips.length);
     plan.forEach(strip=>{

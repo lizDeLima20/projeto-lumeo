@@ -11,11 +11,14 @@ export function easeProgress(a:number,b:number,c:number,d:number,t:number):numbe
 }
 
 export class PageTurnEngine {
-  public static readonly settleEasing="cubic-bezier(.22,.61,.24,1)";
-  public static readonly settleCurve=[.22,.61,.24,1] as const;
+  public static readonly settleEasing="cubic-bezier(.22,.61,.36,1)";
+  public static readonly settleCurve=[.22,.61,.36,1] as const;
+  /** Long enough to read the leaf finishing, short enough not to feel stuck. */
+  public static readonly completeMs=[500,800] as const;
+  public static readonly restoreMs=[350,600] as const;
   private stateValue:PageTurnState="IDLE";private readonly gesture=new PageGestureController();
   private frame=0;private pending:PageTransform|null=null;private velocity=0;private direction:TurnDirection=1;
-  public constructor(private readonly page:HTMLElement,private readonly under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.35,private readonly curl=new PageCurl()){}
+  public constructor(private readonly page:HTMLElement,private readonly under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.3,private readonly curl=new PageCurl()){}
 
   public get state():PageTurnState{return this.stateValue;}
   public begin(x:number,time=performance.now()):boolean{
@@ -52,7 +55,7 @@ export class PageTurnEngine {
   public async programmatic(direction:TurnDirection):Promise<boolean>{
     if(!this.begin(direction===1?this.page.clientWidth:0))return false;
     this.direction=direction;
-    const start=this.geometry.calculate(this.page.clientWidth*.08,this.page.clientWidth,direction);
+    const start=this.geometry.atProgress(.08,this.page.clientWidth,direction);
     this.apply(start);await this.settle(true,start);this.commit(direction);this.reset();return true;
   }
   public disable():void{this.stateValue="DISABLED";}
@@ -64,7 +67,7 @@ export class PageTurnEngine {
   private apply(value:PageTransform):void{
     this.page.classList.toggle("page-turn--next",this.direction===1);
     this.page.classList.toggle("page-turn--previous",this.direction===-1);
-    if(this.curl.mounted)this.curl.apply(value.progress,PageGeometry.landingAngle,this.direction);
+    if(this.curl.mounted){this.curl.apply(value.progress,PageGeometry.landingAngle,this.direction);this.curl.settleHost(value,this.direction);}
     else{this.page.style.transformOrigin=value.origin;this.page.style.transform=`translateX(${value.translateX}px) translateZ(${value.translateZ}px) rotateY(${value.angle}deg)`;}
     this.shadows.render(this.page,this.under,value);
   }
@@ -76,7 +79,10 @@ export class PageTurnEngine {
     this.stateValue=complete?"COMPLETING":"RETURNING";
     cancelAnimationFrame(this.frame);this.frame=0;
     const from=current.progress,to=complete?1:0;
-    const duration=Math.max(220,Math.abs(to-from)*520);
+    /* The finishing move is deliberately unhurried: the reader has to see the leaf let
+       go of the gutter, sag and leave. Duration scales with how far is left to go. */
+    const span=complete?PageTurnEngine.completeMs:PageTurnEngine.restoreMs;
+    const duration=span[0]+(span[1]-span[0])*Math.min(1,Math.abs(to-from));
     const width=this.page.clientWidth||1;
     if(typeof requestAnimationFrame!=="function")return Promise.resolve();
     return new Promise(resolve=>{
@@ -84,7 +90,7 @@ export class PageTurnEngine {
       const step=()=>{
         const t=Math.min(1,(performance.now()-started)/duration);
         const eased=easeProgress(...PageTurnEngine.settleCurve,t);
-        this.apply(this.geometry.calculate(-(from+(to-from)*eased)*width,width,this.direction));
+        this.apply(this.geometry.atProgress(from+(to-from)*eased,width,this.direction));
         if(t<1){this.frame=requestAnimationFrame(step);return;}
         this.frame=0;resolve();
       };

@@ -21,7 +21,9 @@ export class PageCurlGeometry {
    *  compressed. Scale it by 1/cos, capped so a strip can never swallow the next. */
   public static readonly screenBleedPixels = 1.6;
   public static readonly minShade = 0;
-  public static readonly maxShade = .58;
+  /** Ambient paper, not a spotlight. At .58 the crease went to charcoal and the leaf
+   *  read as a grey roll rather than as paper. */
+  public static readonly maxShade = .3;
 
   public bendAt(progress:number):number{
     return PageCurlGeometry.maxBendDegrees*Math.sin(Math.PI*Math.min(1,Math.max(0,progress)));
