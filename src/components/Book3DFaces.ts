@@ -27,6 +27,9 @@ export class BookSpineFace extends Book3DFace {
   public static readonly compressesCoverProportionally = true;
   public static readonly stretchesCover = false;
   public static readonly derivesColoursFromCover = true;
+  /** Printed art on the spine sits in the same bay light as the cloth around it: a
+   *  pale cover reproduced at full brightness made the whole volume glow. */
+  public static readonly artBrightness = .78;
   public static readonly inventsNoOrnament = true;
   public static readonly zones = ["author", "art", "title", "subtitle", "imprint"] as const;
   public static readonly imprintCarriesAppMark = true;
@@ -102,6 +105,9 @@ export class PageTopFace extends Book3DFace {
    *  so it never leaves the shaded zone and the lit share stays put. Sweeping the
    *  boundary across the face during the transition read as the top rotating open. */
   public static readonly shadeLineHoldsDuringFocus = true;
+  /** Ceiling for the lit end of the ramp. A pure-paper #fdf6e1 read as the brightest
+   *  thing in the bay, on every single volume - the shelf looked washed out. */
+  public static readonly litBandHex = "#ded0ac";
   public static readonly litFrontFraction = .25;
   public static readonly litFrontAtRest = .25;
   public static readonly litFrontAtFocus = .25;

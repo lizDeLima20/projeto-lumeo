@@ -1,2 +1,21 @@
 export interface PageTransform {progress:number;angle:number;translateX:number;translateZ:number;skewY:number;scaleX:number;curlInset:number;curlTail:number;curlRadius:number;origin:string;}
-export class PageGeometry {public calculate(deltaX:number,width:number,direction:1|-1):PageTransform{const progress=Math.min(1,Math.max(0,Math.abs(deltaX)/Math.max(1,width))),eased=1-Math.pow(1-progress,2.4),curl=Math.sin(progress*Math.PI);return{progress,angle:direction*-148*eased,translateX:direction*-width*.12*progress,translateZ:curl*Math.min(28,width*.045),skewY:direction*-3.8*curl,scaleX:1-.045*curl,curlInset:curl*7,curlTail:curl*2.5,curlRadius:curl*18,origin:direction===1?"left center":"right center"};}}
+/** A leaf is a rigid rectangle hinged on the gutter. It swings sideways and lands
+ *  flat; it is never skewed, squeezed or corner-clipped, so the type on it stays
+ *  perfectly set at every angle. The only depth is a small lift off the block so
+ *  the paper clears the gutter at mid-swing. */
+export class PageGeometry {
+  public static readonly landingAngle=178;
+  public static readonly liftPixels=14;
+  /** The leaf tracks the finger one-to-one: no easing during the drag. */
+  public static readonly tracksPointerLinearly=true;
+  public static readonly keepsPerfectRectangle=true;
+  public calculate(deltaX:number,width:number,direction:1|-1):PageTransform{
+    const progress=Math.min(1,Math.max(0,Math.abs(deltaX)/Math.max(1,width))),lift=Math.sin(progress*Math.PI);
+    return{progress,
+      angle:direction*-PageGeometry.landingAngle*progress,
+      translateX:0,
+      translateZ:lift*Math.min(PageGeometry.liftPixels,width*.022),
+      skewY:0,scaleX:1,curlInset:0,curlTail:0,curlRadius:0,
+      origin:direction===1?"left center":"right center"};
+  }
+}

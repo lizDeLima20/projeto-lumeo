@@ -143,13 +143,13 @@
 .physical-front::after{
   position:absolute;inset:0;content:"";z-index:2;pointer-events:none;border-radius:inherit;
   background:linear-gradient(177deg,
-    rgba(255,245,220,.36) 0%,
-    rgba(255,241,210,.27) 11%,
-    rgba(255,237,202,.14) 25%,
-    rgba(255,236,200,.04) 38%,
+    rgba(255,245,220,.20) 0%,
+    rgba(255,241,210,.15) 11%,
+    rgba(255,237,202,.08) 25%,
+    rgba(255,236,200,.02) 38%,
     rgba(0,0,0,0) 50%,
-    rgba(11,6,2,.13) 64%,
-    rgba(9,5,2,.29) 81%,
+    rgba(11,6,2,.18) 64%,
+    rgba(9,5,2,.35) 81%,
     rgba(4,2,1,.53) 100%);
   transition:opacity 800ms cubic-bezier(.20,.72,.18,1);
 }
@@ -157,15 +157,15 @@
    curve of Fase 7 instead of sitting flat across the face. */
 .physical-spine::before{
   background:
-    radial-gradient(76% 30% at 46% 7%, rgba(255,247,226,.30), rgba(255,240,208,.08) 58%, transparent 78%),
+    radial-gradient(76% 30% at 46% 7%, rgba(255,247,226,.19), rgba(255,240,208,.05) 58%, transparent 78%),
     linear-gradient(177deg,
-      rgba(255,245,220,.30) 0%,
-      rgba(255,241,210,.22) 11%,
-      rgba(255,237,202,.12) 25%,
-      rgba(255,236,200,.03) 38%,
+      rgba(255,245,220,.17) 0%,
+      rgba(255,241,210,.13) 11%,
+      rgba(255,237,202,.07) 25%,
+      rgba(255,236,200,.015) 38%,
       rgba(0,0,0,0) 50%,
-      rgba(11,6,2,.14) 64%,
-      rgba(9,5,2,.31) 81%,
+      rgba(11,6,2,.19) 64%,
+      rgba(9,5,2,.37) 81%,
       rgba(4,2,1,.56) 100%);
 }
 .book-card--selected .physical-spine::before,.book-card--activating .physical-spine::before,
@@ -183,7 +183,7 @@
    narrow width with its proportions kept. The spine's own colour - sampled from that
    same image - fills above and below, so nothing is stretched to fit. */
 .physical-spine-art{flex:0 0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;max-height:42%;border-radius:2px;box-shadow:0 1px 3px #00000059,inset 0 0 0 1px #ffffff1a}
-.physical-spine-cover{display:block;width:100%;height:auto;max-height:100%;object-fit:contain;pointer-events:none}
+.physical-spine-cover{display:block;filter:brightness(.78) saturate(1.05);width:100%;height:auto;max-height:100%;object-fit:contain;pointer-events:none}
 .physical-spine-title{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.45em;min-height:0}
 .physical-spine-title strong{display:block;max-width:100%;font-weight:500;text-transform:uppercase;letter-spacing:0}
 .book-spine__volume{font-size:9px;letter-spacing:.08em;opacity:.85}
@@ -212,7 +212,7 @@
    as HORIZONTAL bands on screen - the shade line runs flat across the strip, like the
    pool of light on the wood. (180deg travels left-to-right and tilts the bands, which
    was wrong.) 0% is the near/front edge, so the lit band leads. */
-.physical-page-top{top:calc(var(--physical-inset) - var(--physical-depth) + 2 * var(--physical-cover));left:calc(var(--physical-inset) + 1px);width:calc(100% - 2 * var(--physical-inset) - 2px);height:calc(var(--physical-depth) - 2 * var(--physical-cover));transform-origin:bottom center;transform:translateZ(calc(-1 * var(--physical-cover))) rotateX(90deg);--shade-run:calc(100% - var(--lit-front));background:linear-gradient(90deg,#fdf6e1 0%,#fdf6e1 var(--lit-front),#d9c9a8 calc(var(--lit-front) + var(--shade-run) * .12),#c4b291 calc(var(--lit-front) + var(--shade-run) * .24),#b09c78 calc(var(--lit-front) + var(--shade-run) * .37),#9c8763 calc(var(--lit-front) + var(--shade-run) * .51),#8a7553 calc(var(--lit-front) + var(--shade-run) * .65),#7a6547 calc(var(--lit-front) + var(--shade-run) * .81),#6f5f42 100%),repeating-linear-gradient(90deg,#f6eedb 0 1.2px,#cfc0a2 1.2px 1.55px,#eadfc6 1.55px 2.9px);background-blend-mode:multiply;box-shadow:inset 0 -1px 2px #fff8,inset 0 4px 7px #2a190b55,0 -1px 2px #0004}
+.physical-page-top{top:calc(var(--physical-inset) - var(--physical-depth) + 2 * var(--physical-cover));left:calc(var(--physical-inset) + 1px);width:calc(100% - 2 * var(--physical-inset) - 2px);height:calc(var(--physical-depth) - 2 * var(--physical-cover));transform-origin:bottom center;transform:translateZ(calc(-1 * var(--physical-cover))) rotateX(90deg);--shade-run:calc(100% - var(--lit-front));background:linear-gradient(90deg,#ded0ac 0%,#ded0ac var(--lit-front),#c4b391 calc(var(--lit-front) + var(--shade-run) * .12),#b09e7d calc(var(--lit-front) + var(--shade-run) * .24),#9c8a69 calc(var(--lit-front) + var(--shade-run) * .37),#877658 calc(var(--lit-front) + var(--shade-run) * .51),#75654a calc(var(--lit-front) + var(--shade-run) * .65),#65563f calc(var(--lit-front) + var(--shade-run) * .81),#594c38 100%),repeating-linear-gradient(90deg,#e6dcc2 0 1.2px,#bdae90 1.2px 1.55px,#d8ccae 1.55px 2.9px);background-blend-mode:multiply;box-shadow:inset 0 -1px 2px #fff8,inset 0 4px 7px #2a190b55,0 -1px 2px #0004}
 .physical-page-top::before{position:absolute;inset:3px 5px;content:"";border-radius:2px;background:repeating-linear-gradient(90deg,rgba(94,73,43,.25) 0 1px,transparent 1px 4px);opacity:.5;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.35) 55%,transparent 100%);mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.35) 55%,transparent 100%)}
 .physical-page-top::after{position:absolute;inset:0;content:"";background:linear-gradient(90deg,rgba(58,40,20,.14),transparent 5% 95%,rgba(58,40,20,.12));pointer-events:none}
 .physical-page-side{top:var(--physical-inset);left:calc(100% - var(--physical-inset));width:calc(var(--physical-depth) - 2 * var(--physical-cover));height:calc(100% - 2 * var(--physical-inset));transform-origin:left center;transform:translateZ(calc(-1 * var(--physical-cover))) rotateY(90deg);background:linear-gradient(90deg,#cbb994,#f0e5cb 18%,#d9c8a8),repeating-linear-gradient(0deg,#c8b99e 0 1px,#efe5d0 1px 3px);background-blend-mode:multiply;box-shadow:inset 0 0 6px #75614366}

@@ -1,2 +1,26 @@
 import type{PageTransform}from"./PageGeometry";
-export class PageShadowRenderer {public render(page:HTMLElement,under:HTMLElement|null,geometry:PageTransform):void{const p=geometry.progress,curl=Math.sin(p*Math.PI);page.style.setProperty("--fold-shadow",`${Math.round(12+curl*38)}%`);page.style.setProperty("--fold-opacity",String(.1+curl*.34));page.style.setProperty("--page-light",String(.025+curl*.09));page.style.setProperty("--page-back-opacity",String(.16+p*.2));page.style.setProperty("--curl-inset",`${geometry.curlInset}%`);page.style.setProperty("--curl-tail",`${geometry.curlTail}%`);page.style.setProperty("--curl-radius",`${geometry.curlRadius}px`);under?.style.setProperty("--under-shadow",String(Math.min(.36,p*.3+curl*.12)));}public clear(page:HTMLElement,under:HTMLElement|null):void{["--fold-shadow","--fold-opacity","--page-light","--page-back-opacity","--curl-inset","--curl-tail","--curl-radius"].forEach(key=>page.style.removeProperty(key));under?.style.removeProperty("--under-shadow");}}
+/** Only light a real leaf would produce: the shadow it throws on the page
+ *  underneath, and the shading across its own back as it comes round. The old fold
+ *  gradient parked on the right edge of the sheet is gone - it was painted at rest
+ *  too, and read as a permanent smudge in the corner.
+ *
+ *  The verso is driven from here rather than from a mirrored pseudo-element,
+ *  because the sheet needs `overflow:hidden` to keep its type inside the page and
+ *  that would force `transform-style` back to flat. Swapping faces at exactly 90deg
+ *  is seamless: the leaf is edge-on there, so it has no width to show a seam. */
+export class PageShadowRenderer {
+  public static readonly castsOnPageBelow=true;
+  public static readonly hasRightEdgeFoldGradient=false;
+  public static readonly versoTakesOverAtDegrees=90;
+  public render(page:HTMLElement,under:HTMLElement|null,geometry:PageTransform):void{
+    const p=geometry.progress,lift=Math.sin(p*Math.PI);
+    page.style.setProperty("--verso-opacity",Math.abs(geometry.angle)>PageShadowRenderer.versoTakesOverAtDegrees?"1":"0");
+    page.style.setProperty("--verso-shade",String(.3-.24*p));
+    page.style.setProperty("--leaf-lift",String(lift));
+    under?.style.setProperty("--under-shadow",String(Math.min(.34,lift*.34)));
+  }
+  public clear(page:HTMLElement,under:HTMLElement|null):void{
+    ["--verso-opacity","--verso-shade","--leaf-lift"].forEach(key=>page.style.removeProperty(key));
+    under?.style.removeProperty("--under-shadow");
+  }
+}

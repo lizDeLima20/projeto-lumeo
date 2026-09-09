@@ -4,9 +4,9 @@ import { PdfPasswordCancelledError } from "../reader/PdfReaderEngine";
 import { BaseView } from "./BaseView";
 import { ReaderToolbar, type ReaderToolbarActions } from "./ReaderToolbar";
 import { ReflowReaderEngine } from "../reader/reflow/ReflowReaderEngine";
-import { PageTurnAnimator } from "../reader/reflow/PageTurnAnimator";
 import { PageTurnController } from "../reader/reflow/PageTurnController";
 import { DesktopBookReaderView } from "./DesktopBookReaderView";
+import { ReaderLayoutPolicy } from "../reader/premium/ReaderLayoutPolicy";
 import { OpenBookNavigationController } from "../reader/desktop/OpenBookNavigationController";
 import { ReaderSettingsPanel } from "./ReaderSettingsPanel";
 import { FontSettingsController } from "../reader/settings/FontSettingsController";
@@ -97,11 +97,15 @@ export class ReaderView extends BaseView {
     } catch (error) { this.showError(this.errorMessage(error)); }
   }
   private mountReflow(title:string):void{if(!this.stage||!this.element)return;this.stage.replaceChildren();this.stage.classList.add("reader-stage--reflow");this.stage.append(this.createElement("div","reflow-pages"),this.tapZones());this.element.querySelector(".reader-loading")?.remove();this.mountControls(title);document.addEventListener("keydown",this.handleKeydown);window.addEventListener("resize",this.handleResize);this.applyReflowStyles();this.scheduleControlsHide();}
+  /** One page on a phone, an open spread on a wider screen. Asked here, in one place,
+   *  so the three call sites cannot answer it differently. renderReflow() already runs
+   *  again on resize, so crossing the breakpoint re-lays the reader out. */
+  private wantsSpread():boolean{return this.manager.settings.preferencesService.preferences.pageLayout==="double"&&new ReaderLayoutPolicy().spreadFits(window);}
   private renderReflow():void{if(!this.reflow||!this.stage)return;const host=this.stage.querySelector<HTMLElement>(".reflow-pages");if(!host)return;this.turnController?.unbind();this.desktopView?.destroy();host.replaceChildren();const current=this.reflow.currentPageNumber;
-    const preferences=this.manager.settings.preferencesService.preferences;const doublePage=preferences.pageLayout==="double"&&window.innerWidth>=768;
-    if(doublePage){const navigation=new OpenBookNavigationController(this.reflow.totalPages),start=navigation.spreadStart(current);this.desktopView=new DesktopBookReaderView(start?this.reflow.pageAt(start):null,this.reflow.pageAt(start?start+1:1),()=>void this.moveDesktop(navigation.previous(current)),()=>void this.moveDesktop(navigation.next(current)),paragraph=>this.renderParagraph(paragraph));host.append(this.desktopView.render());this.bindSelection(host);this.currentPage=start||1;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();return;}
+    const doublePage=this.wantsSpread();
+    if(doublePage){const navigation=new OpenBookNavigationController(this.reflow.totalPages),start=navigation.spreadStart(current);const at=(page:number)=>page>=1?this.reflow!.pageAt(page):null;this.desktopView=new DesktopBookReaderView(start?this.reflow.pageAt(start):null,this.reflow.pageAt(start?start+1:1),()=>void this.moveDesktop(navigation.previous(current)),()=>void this.moveDesktop(navigation.next(current)),paragraph=>this.renderParagraph(paragraph),{versoAfter:at(start+2),underAfter:at(start+3),versoBefore:at(start-1),underBefore:at(start-2)});host.append(this.desktopView.render());this.bindSelection(host);this.currentPage=start||1;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();return;}
     this.reflow.window().forEach(page=>{const sheet=this.createElement("article",`reflow-sheet${page.cover?" reflow-sheet--cover":""}${page.index+1===current?" reflow-sheet--current":""}`);sheet.dataset.page=String(page.index+1);if(page.cover)sheet.append(this.renderCover(page.cover));else page.paragraphs.forEach(paragraph=>sheet.append(this.renderParagraph(paragraph)));host.append(sheet);});this.bindSelection(host);
-    const active=host.querySelector<HTMLElement>(".reflow-sheet--current");if(active&&this.manager.settings.settings.animation==="page-turn"){this.turnController=new PageTurnController(active,new PageTurnAnimator(),()=>void this.next(),()=>void this.previous());this.turnController.bind();}
+    const active=host.querySelector<HTMLElement>(".reflow-sheet--current");if(active&&this.manager.settings.settings.animation==="page-turn"){this.turnController=new PageTurnController(active,()=>void this.next(),()=>void this.previous());this.turnController.bind();}
     this.currentPage=this.reflow.currentPageNumber;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();this.updateProgress();}
   private async moveDesktop(page:number):Promise<void>{if(!this.reflow||page===this.reflow.currentPageNumber)return;this.reflow.goTo(page);this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber>=this.reflow.totalPages);}
   private async saveReflow(reachedEnd=false):Promise<void>{if(!this.reflow||!this.reflowBook)return;const anchor=this.reflow.readingAnchor,location=this.reflow instanceof LimaReaderEngine?`lima:${anchor.paragraphId}:${anchor.textOffset}`:undefined;this.reflowBook=await this.manager.saveReflow(this.reflowBook,this.reflow.currentPageNumber,this.reflow.totalPages,anchor.logicalOffset,reachedEnd,location);this.onBookUpdated(this.reflowBook);}
@@ -144,8 +148,8 @@ export class ReaderView extends BaseView {
     const zone = this.createElement("button", `reader-tap-zone ${className}`); zone.type = "button"; zone.setAttribute("aria-label", label); zone.addEventListener("click", () => { if(!this.interactions.consumeSuppressedClick()) action(); }); return zone;
   }
 
-  private async next(): Promise<void> { if(this.reflow){if(this.manager.settings.preferencesService.preferences.pageLayout==="double"&&window.innerWidth>=768){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.next(this.reflow.currentPageNumber));return;}const moved=this.reflow.next();if(moved){this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber===this.reflow.totalPages);}return;}await this.manager.navigation?.nextPage(); }
-  private async previous(): Promise<void> { if(this.reflow){if(this.manager.settings.preferencesService.preferences.pageLayout==="double"&&window.innerWidth>=768){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.previous(this.reflow.currentPageNumber));return;}if(this.reflow.previous()){this.renderReflow();await this.saveReflow();}return;}await this.manager.navigation?.previousPage(); }
+  private async next(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.next(this.reflow.currentPageNumber));return;}const moved=this.reflow.next();if(moved){this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber===this.reflow.totalPages);}return;}await this.manager.navigation?.nextPage(); }
+  private async previous(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.previous(this.reflow.currentPageNumber));return;}if(this.reflow.previous()){this.renderReflow();await this.saveReflow();}return;}await this.manager.navigation?.previousPage(); }
   private handleSwipe(event: TouchEvent): void {
     const touch = event.changedTouches[0]; if (!touch) return;
     const deltaX = touch.clientX - this.touchStartX; const deltaY = touch.clientY - this.touchStartY;

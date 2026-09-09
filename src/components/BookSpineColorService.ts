@@ -49,9 +49,18 @@ export class BookSpinePaletteService {
     return `rgb(${ink.map(value => Math.min(255, Math.max(0, value))).join(", ")})`;
   }
 
+  /** Ceiling for a spine on the shelf. Bookbinding cloth never reads as paper white
+   *  under a shelf lamp, and the old rule did the opposite - it BRIGHTENED light
+   *  covers to as much as 245, which turned pale spines into glowing slabs. Light
+   *  boards are now damped into cloth range instead; legibility is bought back on
+   *  the ink side, in legible(). */
+  public static readonly boardLuminanceCeiling = 178;
+  public static readonly brightensLightBoards = false;
   private readableBoard(board: readonly number[], boardLuma: number): string {
     if (boardLuma <= 105) return `rgb(${board.join(", ")})`;
-    return `rgb(${board.map(value => Math.min(245, Math.round(value * 1.25 + 25))).join(", ")})`;
+    const ceiling = BookSpinePaletteService.boardLuminanceCeiling;
+    const scale = Math.min(1, ceiling / Math.max(1, boardLuma));
+    return `rgb(${board.map(value => Math.round(value * scale)).join(", ")})`;
   }
 
   public fallbackPalette(background: string): BookSpinePalette {

@@ -276,6 +276,20 @@ describe("estante 3D — referência física", () => {
     assert.equal(BookWoodShadow.collapsesOntoCorner, true);
     assert.equal(BookWoodShadow.returnCutsOutInOneStep, true);
     assert.ok(BookWoodShadow.returnSnapMs > 0 && BookWoodShadow.returnSnapMs <= 120);
+  });
+  it("os volumes ficam assentados na luz da baia, nao estourados", () => {
+    const css = readFileSync(new URL("../src/styles/book-physical.css", import.meta.url), "utf8");
+    assert.equal(BookSpinePaletteService.brightensLightBoards, false);
+    assert.ok(BookSpinePaletteService.boardLuminanceCeiling <= 190);
+    const service = new BookSpinePaletteService();
+    const light = service.fallbackPalette("rgb(236, 228, 205)");
+    const channels = light.background.match(/\d+/g)!.map(Number);
+    const luma = .2126 * channels[0]! + .7152 * channels[1]! + .0722 * channels[2]!;
+    assert.ok(luma <= BookSpinePaletteService.boardLuminanceCeiling + 1, `board luma ${luma}`);
+    assert.equal(light.ink, BookSpinePaletteService.darkInk);
+    assert.ok(css.includes(PageTopFace.litBandHex));
+    assert.ok(!css.includes("#fdf6e1"));
+    assert.ok(css.includes(`brightness(${String(BookSpineFace.artBrightness).replace("0.", ".")})`));
     assert.deepEqual([...BookWoodShadow.mirrorEasing(.2, .3, .6, .88)], [.4, .12, .8, .7]);
     const forward = BookWoodShadow.forwardEasing.match(/[\d.]+/g)!.map(Number);
     const back = BookWoodShadow.returnEasing.match(/[\d.]+/g)!.map(Number);
