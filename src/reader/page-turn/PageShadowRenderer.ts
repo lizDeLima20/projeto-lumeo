@@ -12,12 +12,14 @@ export class PageShadowRenderer {
   public static readonly castsOnPageBelow=true;
   public static readonly hasRightEdgeFoldGradient=false;
   public static readonly versoTakesOverAtDegrees=90;
+  /** The leaf casts a narrow shadow beside the gutter, not a wash across the text. */
+  public static readonly maxCastShadow=.3;
   public render(page:HTMLElement,under:HTMLElement|null,geometry:PageTransform):void{
     const p=geometry.progress,lift=Math.sin(p*Math.PI);
     page.style.setProperty("--verso-opacity",Math.abs(geometry.angle)>PageShadowRenderer.versoTakesOverAtDegrees?"1":"0");
     page.style.setProperty("--verso-shade",String(.3-.24*p));
     page.style.setProperty("--leaf-lift",String(lift));
-    under?.style.setProperty("--under-shadow",String(Math.min(.34,lift*.34)));
+    under?.style.setProperty("--under-shadow",String(Math.min(PageShadowRenderer.maxCastShadow,lift*PageShadowRenderer.maxCastShadow)));
   }
   public clear(page:HTMLElement,under:HTMLElement|null):void{
     ["--verso-opacity","--verso-shade","--leaf-lift"].forEach(key=>page.style.removeProperty(key));

@@ -67,7 +67,24 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
    squeeze, and no gradient parked on its right edge. Its front is the real page;
    past 90deg an opaque paper verso takes over (driven from PageShadowRenderer,
    because the sheet keeps overflow:hidden to hold its type inside the page). */
-.page-turn-active{position:relative;z-index:12;overflow:hidden;user-select:none;backface-visibility:visible;filter:drop-shadow(0 .5rem 1.6rem rgba(18,12,6,calc(var(--leaf-lift,0)*.34)))}
+/* The leaf must keep overflow:visible and carry no filter: either one is a grouping
+   property that would force transform-style back to flat and collapse the arc into a
+   plane. Clipping lives on the strips, which are each planar anyway. */
+.page-turn-active,.open-book-page.page-turn-active,.reflow-sheet.page-turn-active{position:relative;z-index:12;overflow:visible;user-select:none;backface-visibility:visible;transform-style:preserve-3d}
+.page-turn-curled,.open-book-page.page-turn-curled,.reflow-sheet.page-turn-curled{background-color:transparent;background-image:none;box-shadow:none}
+.page-turn-curled>*:not(.page-turn-curl){visibility:hidden}
+.page-turn-curled::after,.page-turn-curled::before{display:none}
+.open-book-page>.page-turn-curl,.reflow-sheet>.page-turn-curl{position:absolute;inset:0;z-index:2;transform-style:preserve-3d;pointer-events:none;visibility:visible}
+.page-turn-strip{position:absolute;top:0;bottom:0;overflow:hidden;transform-origin:0 50%;background:var(--reader-paper-lit);will-change:transform}
+/* Shading is baked into the strip's own opaque paper rather than laid over it. As a
+   translucent overlay it was drawn twice wherever two strips overlap, and every seam
+   came out as a dark hairline - the banding that read as a roll lying on the page. */
+.page-turn-strip__front,.page-turn-strip__back{position:absolute;inset:0;overflow:hidden;background-color:var(--reader-paper-lit);background-image:linear-gradient(90deg,rgba(22,15,7,var(--strip-shade-a,0)),rgba(22,15,7,var(--strip-shade-b,0)))}
+.page-turn-strip[data-face="front"] .page-turn-strip__back,
+.page-turn-strip[data-face="back"] .page-turn-strip__front{display:none}
+.page-turn-strip__inner{position:absolute;top:0;bottom:0;left:0}
+/* The crease darkening is the geometry shading itself - each strip takes the lamp in
+   proportion to how squarely it faces the reader - not a band painted across the page. */
 .page-turn-active::before{display:none}
 .page-turn-active::after{position:absolute;inset:0;z-index:29;background-image:linear-gradient(270deg,rgba(22,15,8,0) 46%,rgba(22,15,8,var(--verso-shade,.2)) 100%),linear-gradient(270deg,color-mix(in srgb,var(--reader-paper-lit) 95%,#fff),var(--reader-paper-lit) 34%,color-mix(in srgb,var(--reader-paper-lit) 88%,#241a10));content:"";opacity:var(--verso-opacity,0);pointer-events:none}
 /* The back of the leaf, carrying the real next page. It is mirrored in the leaf's own
@@ -90,8 +107,8 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .open-book-page--left{grid-column:1}
 .open-book-page--right{grid-column:2}
 .open-book-page:not(.page-turn-active)::before{position:absolute;inset:0;z-index:2;content:"";pointer-events:none}
-.open-book-page--left:not(.page-turn-active)::before{background:linear-gradient(270deg,rgba(25,18,12,var(--under-shadow)),transparent 46%)}
-.open-book-page--right:not(.page-turn-active)::before{background:linear-gradient(90deg,rgba(25,18,12,var(--under-shadow)),transparent 46%)}
+.open-book-page--left:not(.page-turn-active)::before{background:linear-gradient(270deg,rgba(25,18,12,var(--under-shadow)),rgba(25,18,12,calc(var(--under-shadow) * .3)) 4%,transparent 12%)}
+.open-book-page--right:not(.page-turn-active)::before{background:linear-gradient(90deg,rgba(25,18,12,var(--under-shadow)),rgba(25,18,12,calc(var(--under-shadow) * .3)) 4%,transparent 12%)}
 .open-book-page>*{position:relative;z-index:1}
 /* Dog-ear: the affordance from the reference album, saying this corner turns. It lives
    only at rest - the :not() drops it the instant the leaf takes off, so the page in
