@@ -1,10 +1,12 @@
-const SW_VERSION = "v10";
+const SW_VERSION = "v11";
 const SHELL_CACHE = `lumeo-shell-${SW_VERSION}`;
 const ASSET_CACHE = `lumeo-assets-${SW_VERSION}`;
 const RUNTIME_CACHE = `lumeo-runtime-${SW_VERSION}`;
 const LOOKUP_CACHE = `lumeo-lookup-${SW_VERSION}`;
 const LUMEO_CACHES = [SHELL_CACHE, ASSET_CACHE, RUNTIME_CACHE, LOOKUP_CACHE];
-const APP_SHELL = ["/", "/index.html", "/manifest.json", "/icons/lumeo-logo.png"];
+// Only what the shell needs to boot offline. The 890 KB source logo used to be precached
+// here on every install; the sized icons below are a few KB each.
+const APP_SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/favicon-48.png"];
 const BOOK_FILE_PATTERN = /\.(pdf|epub|lima)$/i;
 const ASSET_PATTERN = /\.(css|js|mjs|png|jpg|jpeg|svg|webp|ico|woff2?|ttf)$/i;
 

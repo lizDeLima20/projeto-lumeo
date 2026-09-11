@@ -131,7 +131,7 @@ export class App {
       this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database));
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
-        open: source => this.router.navigate("import", { source }) } : undefined));
+        open: source => this.router.navigate("import", { source }) } : undefined, this.pwaInstall));
   }
 
   private detailsView(id: string): BookDetailsView {

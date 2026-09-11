@@ -25,6 +25,6 @@
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index?__lumeo_route=:path*" },
-    { "source": "/((?!api/.*|assets/.*|icons/.*|sw.js|manifest.json|onedrive-auth.html).*)", "destination": "/index.html" }
+    { "source": "/((?!api/.*|assets/.*|icons/.*|screenshots/.*|sw.js|manifest.json|onedrive-auth.html).*)", "destination": "/index.html" }
   ]
 }

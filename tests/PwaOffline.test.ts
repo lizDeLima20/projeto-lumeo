@@ -51,6 +51,29 @@ describe("PWA offline e armazenamento robusto", () => {
     assert.match(sw, /lumeo-shell-\$\{SW_VERSION\}/);
   });
 
+  it("aVersaoDoServiceWorkerEUmaSo", async () => {
+    // sw.js estava em v10 enquanto o app declarava v9: a tela de versao mentia sobre o
+    // cache em uso. As duas pontas precisam dizer a mesma coisa.
+    const sw = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
+    const declared = /const SW_VERSION = "([^"]+)"/.exec(sw)?.[1];
+    const { AppVersionManager } = await import("../src/pwa/AppVersionManager");
+    assert.equal(declared, AppVersionManager.SERVICE_WORKER_VERSION);
+  });
+
+  it("manifestoProntoParaInstalarEEmpacotar", async () => {
+    const manifest = JSON.parse(await readFile(new URL("../public/manifest.json", import.meta.url), "utf8"));
+    for (const key of ["id", "name", "short_name", "description", "start_url", "scope", "display", "background_color", "theme_color", "lang"]) assert.ok(manifest[key], `falta ${key}`);
+    const sizes = (purpose: string) => manifest.icons.filter((icon: { purpose: string }) => icon.purpose === purpose).map((icon: { sizes: string }) => icon.sizes);
+    assert.ok(sizes("any").includes("192x192") && sizes("any").includes("512x512"), "icones 192 e 512");
+    assert.ok(sizes("maskable").includes("512x512"), "icone maskable proprio - nunca 'any maskable' no mesmo arquivo");
+    assert.equal(manifest.icons.some((icon: { purpose: string }) => /any maskable|maskable any/.test(icon.purpose)), false);
+    assert.ok(manifest.screenshots.some((shot: { form_factor: string }) => shot.form_factor === "narrow"), "screenshot de celular");
+    assert.ok(manifest.screenshots.some((shot: { form_factor: string }) => shot.form_factor === "wide"), "screenshot de desktop");
+    for (const shortcut of manifest.shortcuts) assert.match(shortcut.url, /^\/(import|library)$/, "atalho aponta para rota existente");
+    const sw = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
+    assert.doesNotMatch(sw, /lumeo-logo\.png/, "o logo de 890 KB nao entra no cache inicial");
+  });
+
   it("libraryMetadataLoadsOffline", () => {
     const restored = [book()];
     assert.equal(restored[0].cover, "cover.png");
