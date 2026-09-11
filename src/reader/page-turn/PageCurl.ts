@@ -1,14 +1,16 @@
 import{PageCurlGeometry,type CurlStrip}from"./PageCurlGeometry";
 
-/** Draws the leaf as a bent surface. The page's own content is cloned into a run of
- *  strips laid along the arc; each strip carries the matching band of the front and,
- *  mirrored, of the back, and shows whichever one it is facing the reader with.
+interface StripNodes{root:HTMLElement;front:HTMLElement;back:HTMLElement;}
+
+/** Draws the leaf as a folding surface. The page's content is cloned into a run of
+ *  strips; each carries the matching slice of the front and, mirrored, of the back, and
+ *  shows whichever face it turns toward the reader.
  *
- *  Clipping lives on the strips rather than on the leaf, because `overflow` on the
- *  leaf would force `transform-style` back to flat and collapse the whole arc. */
+ *  Clipping lives on the strips rather than on the leaf, because `overflow` on the leaf
+ *  would force `transform-style` back to flat and collapse the fold. */
 export class PageCurl {
   public static readonly stripClass="page-turn-strip";
-  private strips:HTMLElement[]=[];
+  private strips:StripNodes[]=[];
   private host:HTMLElement|null=null;
   private width=0;
   private padding="";
@@ -18,67 +20,69 @@ export class PageCurl {
 
   public mount(page:HTMLElement,count=PageCurlGeometry.strips):void{
     if(this.host)this.unmount();
-    /* Bail out where there is no DOM to build into, or no width to slice: the engine
-       then falls back to moving the leaf as a single plane. */
+    /* No DOM to build into, or no width to slice: the engine then moves the leaf as a
+       single plane. */
     this.width=page.clientWidth;
     if(!this.width||typeof document==="undefined"||!page.children)return;
-    /* The clones lose the page's own box, so its padding is carried over verbatim -
-       otherwise the type would sit flush against the strip's clipping edge. */
+    /* The clones lose the page's own box, so its padding is carried over verbatim. */
     this.padding=typeof getComputedStyle==="function"?getComputedStyle(page).padding:"";
     const front=[...page.children].filter(child=>!child.classList.contains("page-turn-verso"));
-    /* The verso wraps its page in a full page box of its own. Cloning that box would
-       apply the page padding twice - the type ended up in a small panel floating
-       inside the leaf. Take its children, exactly as the front side does. */
+    /* The verso wraps its page in a page box of its own; cloning that box would apply the
+       padding twice. Take its children, exactly as the front does. */
     const verso=page.querySelector<HTMLElement>(".page-turn-verso");
     const versoContent=verso?[...(verso.firstElementChild?.children??verso.children)]:[];
     const host=document.createElement("div");host.className="page-turn-curl";host.setAttribute("aria-hidden","true");
-    const step=this.width/count;
     for(let index=0;index<count;index+=1){
-      const strip=document.createElement("div");strip.className=PageCurl.stripClass;
-      strip.style.width=`${step}px`;strip.style.left=`${index*step}px`;
-      strip.append(this.band("front",front,-index*step,this.width),
-        this.band("back",versoContent,-index*step,this.width));
-      host.append(strip);this.strips.push(strip);
+      const root=document.createElement("div");root.className=PageCurl.stripClass;
+      const front$=this.band("front",front),back$=this.band("back",versoContent);
+      root.append(front$.band,back$.band);host.append(root);
+      this.strips.push({root,front:front$.inner,back:back$.inner});
     }
     page.append(host);this.host=host;page.classList.add("page-turn-curled");
   }
 
-  /** One band of the leaf: a full-width copy of the content slid sideways so that only
-   *  this strip's slice shows through the strip's own clipping. */
-  private band(face:"front"|"back",source:readonly Element[],offset:number,width:number):HTMLElement{
-    const band=this.element(`page-turn-strip__${face}`);
-
-    const inner=this.element("page-turn-strip__inner");
-    inner.style.width=`${width}px`;
-    /* Mirroring happens on the CONTENT, not on the band. Flipping the band left the
-       anti-seam bleed outside the mirrored box, which reopened every seam on the verso
-       as a bright hairline; the inner is a fixed full-width box, so its mirror axis
-       never moves. */
-    inner.style.transform=face==="back"?`translateX(${offset}px) scaleX(-1)`:`translateX(${offset}px)`;
+  /** One band of the leaf: a full-width copy of the content, slid sideways in apply() so
+   *  only this strip's slice shows through the strip's clipping. */
+  private band(face:"front"|"back",source:readonly Element[]):{band:HTMLElement;inner:HTMLElement}{
+    const band=this.element(`page-turn-strip__${face}`),inner=this.element("page-turn-strip__inner");
+    inner.style.width=`${this.width}px`;
     if(this.padding)inner.style.padding=this.padding;
     source.forEach(child=>inner.append(child.cloneNode(true)));
-    band.append(inner);return band;
+    band.append(inner);return{band,inner};
   }
   private element(className:string):HTMLElement{const node=document.createElement("div");node.className=className;return node;}
 
-  /** The whole leaf drifts, sags, tilts and shrinks as one once it leaves the gutter;
-   *  only the bend is per strip. Pivoting on the hinge, not on the leaf's middle. */
-  public settleHost(value:{flyX:number;flyY:number;tilt:number;scale:number},direction:1|-1):void{
-    if(!this.host)return;
-    this.host.style.transformOrigin=direction===1?"0 50%":"100% 50%";
-    this.host.style.transform=`translate3d(${value.flyX.toFixed(2)}px,${value.flyY.toFixed(2)}px,0) rotateZ(${value.tilt.toFixed(3)}deg) scale(${value.scale.toFixed(4)})`;
-  }
+  /** The hinge is on the side the leaf is bound: its left edge going forward, its right
+   *  edge going back. For a while it was the left edge both ways, so a backward turn swung
+   *  the leaf about its OUTER edge, into the screen and out of sight - turning back simply
+   *  did nothing. The plan is computed hinge-first and laid onto whichever edge is bound,
+   *  with the anti-seam bleed always growing away from the hinge. */
   public apply(progress:number,landingAngle:number,direction:1|-1):CurlStrip[]{
-    const plan=this.geometry.build(progress,this.width,landingAngle,direction,this.strips.length);
-    plan.forEach(strip=>{
-      const node=this.strips[strip.index];if(!node)return;
-      node.style.width=`${strip.width+strip.bleed}px`;
-      node.style.transform=`translate3d(${strip.x-strip.left}px,0,${strip.z}px) rotateY(${strip.angle}deg)`;
-      node.style.setProperty("--strip-shade-a",strip.shadeStart.toFixed(3));
-      node.style.setProperty("--strip-shade-b",strip.shadeEnd.toFixed(3));
-      node.dataset.face=strip.showsBack?"back":"front";
-    });
+    const count=this.strips.length;
+    const plan=this.geometry.build(progress,this.width,landingAngle,1,count);
+    for(let slot=0;slot<count;slot+=1){
+      const nodes=this.strips[slot]!,strip=plan[direction===1?slot:count-1-slot]!;
+      const{left,origin,shiftX,angle,shadeLeft,shadeRight}=PageCurl.place(strip,slot,count,this.width,direction);
+      const root=nodes.root.style;
+      root.left=`${left}px`;root.width=`${this.width/count+strip.bleed}px`;root.transformOrigin=origin;
+      root.transform=`translate3d(${shiftX}px,${strip.y}px,${strip.z}px) rotateY(${angle}deg)`;
+      nodes.root.style.setProperty("--strip-shade-a",shadeLeft.toFixed(3));
+      nodes.root.style.setProperty("--strip-shade-b",shadeRight.toFixed(3));
+      nodes.root.dataset.face=strip.showsBack?"back":"front";
+      nodes.root.style.setProperty("--strip-ink",strip.ink.toFixed(3));
+      /* Mirroring happens on the content, whose box never moves, so its axis is stable. */
+      nodes.front.style.transform=`translateX(${-left}px)`;
+      nodes.back.style.transform=`translateX(${-left}px) scaleX(-1)`;
+    }
     return plan;
+  }
+
+  /** Where one strip goes on the element, for a leaf bound on its left edge (forward) or
+   *  its right edge (back). Pure, so the hinge rule can be tested without a DOM. */
+  public static place(strip:CurlStrip,slot:number,count:number,width:number,direction:1|-1):{left:number;origin:string;shiftX:number;angle:number;shadeLeft:number;shadeRight:number}{
+    const step=width/count;
+    if(direction===1)return{left:slot*step,origin:"0 50%",shiftX:strip.x-slot*step,angle:strip.angle,shadeLeft:strip.shadeStart,shadeRight:strip.shadeEnd};
+    return{left:slot*step-strip.bleed,origin:"100% 50%",shiftX:(width-strip.x)-(slot+1)*step,angle:-strip.angle,shadeLeft:strip.shadeEnd,shadeRight:strip.shadeStart};
   }
 
   public unmount():void{

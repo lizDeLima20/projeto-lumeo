@@ -16,6 +16,9 @@ export class PageTurnEngine {
   /** Long enough to read the leaf finishing, short enough not to feel stuck. */
   public static readonly completeMs=[500,800] as const;
   public static readonly restoreMs=[350,600] as const;
+  /** A flick finishes the turn on its own - the range touch readers use (~0.3-0.4 px/ms).
+   *  .55px/ms was faster than most thumbs swipe. */
+  public static readonly flickVelocity=.3;
   private stateValue:PageTurnState="IDLE";private readonly gesture=new PageGestureController();
   private frame=0;private pending:PageTransform|null=null;private velocity=0;private direction:TurnDirection=1;
   public constructor(private readonly page:HTMLElement,private readonly under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.3,private readonly curl=new PageCurl()){}
@@ -50,7 +53,7 @@ export class PageTurnEngine {
     return this.settle(false,current).then(()=>this.reset());
   }
   public shouldComplete(progress:number,velocityX:number,direction:TurnDirection):boolean{
-    return progress>=this.threshold||Math.abs(velocityX)>=.55&&(direction===1?velocityX<0:velocityX>0);
+    return progress>=this.threshold||Math.abs(velocityX)>=PageTurnEngine.flickVelocity&&(direction===1?velocityX<0:velocityX>0);
   }
   public async programmatic(direction:TurnDirection):Promise<boolean>{
     if(!this.begin(direction===1?this.page.clientWidth:0))return false;
@@ -67,7 +70,7 @@ export class PageTurnEngine {
   private apply(value:PageTransform):void{
     this.page.classList.toggle("page-turn--next",this.direction===1);
     this.page.classList.toggle("page-turn--previous",this.direction===-1);
-    if(this.curl.mounted){this.curl.apply(value.progress,PageGeometry.landingAngle,this.direction);this.curl.settleHost(value,this.direction);}
+    if(this.curl.mounted)this.curl.apply(value.progress,PageGeometry.landingAngle,this.direction);
     else{this.page.style.transformOrigin=value.origin;this.page.style.transform=`translateX(${value.translateX}px) translateZ(${value.translateZ}px) rotateY(${value.angle}deg)`;}
     this.shadows.render(this.page,this.under,value);
   }
