@@ -67,6 +67,7 @@ export const EXTERNAL_LIBRARY_PT = {
   "import.remote.failed": "Não foi possível importar o arquivo. Tente novamente.",
   "import.download.loading": "Baixando livro…",
   "import.download.cancel": "Cancelar download",
+  "import.download.retry": "Tentar novamente",
   "import.download.cancelled": "Importação cancelada.",
   "import.download.tooLarge": "O arquivo excede o limite de 256 MB para importação remota.",
   "import.download.interrupted": "O download foi interrompido. Tente novamente.",

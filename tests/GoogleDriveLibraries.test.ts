@@ -6,6 +6,7 @@ import { GoogleDriveLibraryService } from "../src/external/GoogleDriveLibrarySer
 import { AuthManager, type AuthSession } from "../src/services/AuthManager";
 import { ApiError } from "../src/services/ApiClient";
 import { AppState } from "../src/core/AppState";
+import { BookDownloadError } from "../src/diagnostics/StartTelemetry";
 import type { StorageAdapter } from "../src/services/StorageService";
 class Memory implements StorageAdapter {
   private rows = new Map<string, unknown>();
@@ -77,6 +78,39 @@ it("validLocalSessionDoesNotRefresh", async () => {
   await storage.save<AuthSession>("auth-session", { user: { id: "u", email: "test@example.com" }, accessToken: "fake", refreshToken: "", expiresAt: null });
   await new AuthManager({ post: async () => { calls++; }, setAccessToken: () => undefined } as never, storage as never, state).initialize();
   assert.equal(calls, 0); assert.equal(state.authStatus, "authenticated");
+});
+
+it("mobileCompatibleDownloadRetriesNetworkFailureAndNeverUsesChromeExtension", async () => {
+  let calls = 0;
+  const service = new GoogleDriveLibraryService("test", async () => {
+    calls++;
+    if (calls === 1) throw new TypeError("network temporarily unavailable");
+    return new Response("epub-data");
+  });
+  Object.assign(service, { token: "test-only", expires: Date.now() + 10_000 });
+  const result = await service.download({ id: "book", name: "book.epub", mimeType: "application/epub+zip", size: "9" }, new AbortController().signal, () => undefined);
+  assert.equal(await result.text(), "epub-data"); assert.equal(calls, 2);
+  const source = await readFile("src/external/GoogleDriveLibraryService.ts", "utf8");
+  for (const forbidden of ["chrome.runtime", "chrome.downloads", "localhost:8765", "localhost:8766", "window.open", "location.href", "AbortSignal.any", "AbortSignal.timeout"]) assert.equal(source.includes(forbidden), false);
+});
+
+it("downloadMapsPermanentHttpFailuresAndPreventsDoubleClick", async () => {
+  const service = new GoogleDriveLibraryService("test", async () => new Response("no", { status: 403 }));
+  Object.assign(service, { token: "test-only", expires: Date.now() + 10_000 });
+  const input = { id: "protected", name: "book.epub", mimeType: "application/epub+zip", size: "2" };
+  await assert.rejects(service.download(input, new AbortController().signal, () => undefined), (error: unknown) => error instanceof BookDownloadError && error.code === "DOWNLOAD_HTTP_403" && error.status === 403 && !error.retryable);
+  let release!: () => void;
+  const pendingService = new GoogleDriveLibraryService("test", async () => { await new Promise<void>(resolve => { release = resolve; }); return new Response("ok"); });
+  Object.assign(pendingService, { token: "test-only", expires: Date.now() + 10_000 });
+  const pending = pendingService.download({ ...input, id: "same", size: "2" }, new AbortController().signal, () => undefined);
+  await assert.rejects(pendingService.download({ ...input, id: "same", size: "2" }, new AbortController().signal, () => undefined), (error: unknown) => error instanceof BookDownloadError && error.code === "DOWNLOAD_ALREADY_RUNNING");
+  release(); await pending;
+});
+
+it("startupFallbackIsReservedForAppStartAndLogsTechnicalFailure", async () => {
+  const source = await readFile("src/errors/GlobalErrorHandler.ts", "utf8");
+  assert.match(source, /showStartupFailure/); assert.match(source, /StartTelemetry\.failed/);
+  assert.equal(source.includes("unhandledrejection\", () => this.showFallback"), false);
 });
 
 it("a tela Adicionar livro oferece so dispositivo e Google Drive", async () => {

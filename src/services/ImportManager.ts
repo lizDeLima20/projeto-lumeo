@@ -12,6 +12,7 @@ import{LimaSerializer}from"../lima/LimaSerializer";import type{LibraryChecksumRe
 import { DuplicateBookDetector, type DuplicateDecision, type IncomingBookIdentity } from "../storage/DuplicateBookDetector";
 import type { OperationRecoveryJournal } from "../recovery/OperationRecoveryJournal";
 import { checkCancelled } from "../external/OneDriveError";
+import { BookDownloadError, StartTelemetry } from "../diagnostics/StartTelemetry";
 
 interface BookFileStorage { save(bookId:string,file:Blob):Promise<unknown>; delete(bookId:string):Promise<unknown>; get?(bookId:string):Promise<Blob|null>; saveLima?(bookId:string,file:Blob):Promise<unknown>; }
 
@@ -48,6 +49,8 @@ export class ImportManager {
       fileName: imported.file.name, fileSize: imported.file.size, mimeType: imported.file.type,
       createdAt: now, updatedAt: now });
     checkCancelled(options.signal);
+    const fromGoogle = imported.source === "google-drive";
+    if (fromGoogle) StartTelemetry.request(book.id, undefined, "SAVING");
     if (options.journal && options.operationId) await options.journal.attachBook(options.operationId, book.id);
     try {
       await this.files.save(book.id, imported.file); checkCancelled(options.signal);
@@ -79,6 +82,10 @@ export class ImportManager {
       return book;
     } catch (error) {
       await Promise.all([this.books.delete(book.id), this.files.delete(book.id), this.limaDocuments?.delete(book.id), this.checksums?.delete(book.id)]);
+      if (fromGoogle && !(error instanceof DuplicateBookImportError) && !(error instanceof BookVersionConflictError)) {
+        const typed = error instanceof BookDownloadError ? error : new BookDownloadError("INDEXEDDB_SAVE_FAILED", "SAVING", book.id, undefined, false, error);
+        StartTelemetry.failed(book.id, undefined, "SAVING", error); throw typed;
+      }
       throw error;
     }
   }

@@ -19,7 +19,8 @@ const footer = document.querySelector<HTMLElement>("#app-footer");
 
 if (!outlet || !header || !footer) throw new Error("Os containers principais da aplicação não foram encontrados.");
 
-new GlobalErrorHandler(outlet).bind();
+const errors = new GlobalErrorHandler(outlet);
+errors.bind();
 const app = new App(outlet, header, footer);
-void app.start();
+void app.start().catch(error => errors.showStartupFailure(error));
 new ServiceWorkerRegistrationService().register(import.meta.env.PROD);

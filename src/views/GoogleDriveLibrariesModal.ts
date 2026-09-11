@@ -1,6 +1,7 @@
 import { I18nManager, type TranslationKey } from "../i18n/I18nManager";
 import { GoogleDriveLibraryRepository, type GoogleDriveLibrarySource } from "../external/GoogleDriveLibraryRepository";
 import { GoogleDriveLibraryService, type GoogleLibraryFile } from "../external/GoogleDriveLibraryService";
+import { BookDownloadError, StartTelemetry } from "../diagnostics/StartTelemetry";
 
 export class GoogleDriveLibrariesModal {
   private dialog: HTMLDialogElement | null = null;
@@ -124,7 +125,16 @@ export class GoogleDriveLibrariesModal {
         if (!controller.signal.aborted) this.status.textContent = `${this.t("import.download.loading")}${percent === null ? "" : ` ${percent}%`}`;
       });
       if (!this.dialog || controller.signal.aborted) return;
+      StartTelemetry.request(file.id, undefined, "VALIDATING");
       await this.importFile(downloaded); this.close();
-    } catch (error) { if (!controller.signal.aborted) { this.report(error); this.body.append(this.button("google.back", () => void this.showSources())); } }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        const typed = error instanceof BookDownloadError ? error : new BookDownloadError("EPUB_INVALID", "VALIDATING", file.id, undefined, false, error);
+        if (!(error instanceof BookDownloadError)) StartTelemetry.failed(file.id, undefined, "VALIDATING", error);
+        this.report(typed);
+        if (typed.retryable) this.body.append(this.button("import.download.retry", () => void this.download(file)));
+        this.body.append(this.button("google.back", () => void this.showSources()));
+      }
+    }
   }
 }
