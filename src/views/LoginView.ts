@@ -7,12 +7,12 @@ export class LoginView extends BaseView {
   public render(): HTMLElement {
     const section = this.createElement("section", "auth-page page-shell");
     const form = this.createElement("form", "auth-card");
-    form.append(this.createElement("span", "eyebrow", "Sua biblioteca espera"), this.createElement("h1", "page-title", "Entrar"));
-    const email = this.field("email", "E-mail", "email", !import.meta.env.DEV);
-    const password = this.field("password", "Senha", "current-password", !import.meta.env.DEV);
+    form.append(this.createElement("span", "eyebrow", this.t("ui.auth.waiting")), this.createElement("h1", "page-title", this.t("ui.auth.login")));
+    const email = this.field("email", this.t("ui.auth.email"), "email", !import.meta.env.DEV);
+    const password = this.field("password", this.t("ui.auth.password"), "current-password", !import.meta.env.DEV);
     const error = this.createElement("p", "form-error"); error.setAttribute("role", "alert");
-    const submit = this.createElement("button", "button button--primary", "Entrar"); submit.type = "submit";
-    const register = this.createElement("button", "text-button", "Criar conta"); register.type = "button";
+    const submit = this.createElement("button", "button button--primary", this.t("ui.auth.login")); submit.type = "submit";
+    const register = this.createElement("button", "text-button", this.t("ui.auth.register")); register.type = "button";
     register.addEventListener("click", this.onRegister);
     form.append(email.wrapper, password.wrapper, error, submit, register);
     form.addEventListener("submit", async (event) => {
@@ -22,7 +22,7 @@ export class LoginView extends BaseView {
         await this.auth.login(localDemo ? "local@lumeo.test" : email.input.value, localDemo ? "lumeo-local" : password.input.value);
         this.onSuccess();
       }
-      catch (caught) { error.textContent = caught instanceof ApiError ? caught.message : "Não foi possível entrar."; }
+      catch (caught) { error.textContent = caught instanceof ApiError ? caught.message : this.t("ui.auth.loginFailed"); }
       finally { submit.disabled = false; }
     });
     section.append(form); return section;
@@ -31,7 +31,7 @@ export class LoginView extends BaseView {
     const wrapper = this.createElement("label", "field"); wrapper.append(this.createElement("span", "field__label", label));
     const input = this.createElement("input", "input") as HTMLInputElement;
     input.type = type; input.required = required; input.setAttribute("autocomplete", autocomplete);
-    if (!required) input.placeholder = "Opcional no modo local";
+    if (!required) input.placeholder = this.t("ui.auth.localOptional");
     wrapper.append(input); return { wrapper, input };
   }
 }

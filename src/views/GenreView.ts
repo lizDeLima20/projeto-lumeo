@@ -14,16 +14,17 @@ export class GenreView extends BaseView {
 
   public render(): HTMLElement {
     const section = this.createElement("section", "page-shell");
-    const back = this.createElement("button", "back-link", "← Voltar à biblioteca");
+    const back = this.createElement("button", "back-link", this.t("ui.library.back"));
     back.type = "button";
     back.addEventListener("click", this.onBack);
     const genre = this.state.genres.find((item) => item.id === this.genreId);
-    section.append(back, this.createElement("h1", "page-title", genre?.name ?? "Gênero não encontrado"));
+    section.append(back, this.createElement("h1", "page-title", genre?.name ?? this.t("ui.library.notFoundGenre")));
     if (genre) {
       const books = this.state.library.findBooksByGenre(genre.id);
-      section.append(this.createElement("p", "page-subtitle", `${books.length} ${books.length === 1 ? "livro" : "livros"} nesta coleção.`));
+      const count=this.t("ui.library.collectionBooks",{count:books.length}).split("|")[books.length===1?0:1]??"";
+      section.append(this.createElement("p", "page-subtitle", count));
       if (books.length) section.append(new BookShelf(books, this.onBookOpen).render());
-      else section.append(this.createElement("p", "book-grid__empty genre-books", "Nenhum livro neste gênero ainda."));
+      else section.append(this.createElement("p", "book-grid__empty genre-books", this.t("ui.library.emptyGenre")));
     }
     return section;
   }

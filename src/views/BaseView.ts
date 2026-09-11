@@ -1,3 +1,6 @@
+import { I18nManager } from "../i18n/I18nManager";
+import type { TranslationKey } from "../i18n/I18nManager";
+
 export abstract class BaseView {
   protected element: HTMLElement | null = null;
 
@@ -6,6 +9,9 @@ export abstract class BaseView {
   public mount(container: HTMLElement): void {
     this.unmount();
     this.element = this.render();
+    // Older views are progressively migrated to explicit keys. This bridge
+    // keeps their reviewed legacy labels localized during that migration.
+    I18nManager.shared.localizeTree(this.element);
     container.replaceChildren(this.element);
   }
 
@@ -23,5 +29,9 @@ export abstract class BaseView {
     if (className) element.className = className;
     if (text) element.textContent = text;
     return element;
+  }
+
+  protected t(key: TranslationKey, parameters?: Readonly<Record<string, string | number>>): string {
+    return I18nManager.shared.t(key, parameters);
   }
 }

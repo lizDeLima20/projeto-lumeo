@@ -258,6 +258,8 @@ Ao ser selecionado, o livro mantém integralmente sua geometria e sai da shelf s
 
 A iluminação e a sombra respondem progressivamente ao foco e ao retorno.
 
+Toda nova string visível deve usar I18nManager. IDs, enums, códigos de erro e valores persistidos não são traduzidos. pt-BR é o locale base e fallback. A internacionalização da interface e a tradução do conteúdo de livros são sistemas separados.
+
 Lumeo é local-first.
 
 Livros do usuário não são enviados ao backend.

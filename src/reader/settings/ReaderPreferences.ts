@@ -4,7 +4,9 @@ export type ReaderSpacing = "compact" | "normal" | "comfortable" | "wide";
 export type ReaderMargins = "narrow" | "normal" | "wide";
 export type ReaderPaper = "pure-white" | "ivory" | "cream" | "sepia" | "soft-white" | "natural" | "dark";
 export type ReaderPageLayout = "single" | "double";
-export type ReaderPageAnimation = "none" | "slide" | "page-turn";
+/** Folhear = physical page, Deslize = vertical continuous, Carrossel = horizontal snap. */
+export type ReaderPageAnimation = "page-turn" | "slide" | "carousel";
+export type ImageProfile = "normal" | "high-contrast" | "soft";
 export type ReaderReadingMode = "standard" | "book-real";
 
 export interface ReaderPreferences {
@@ -19,12 +21,14 @@ export interface ReaderPreferences {
   readingMode: ReaderReadingMode;
   pageLayout: ReaderPageLayout;
   pageAnimation: ReaderPageAnimation;
+  imagePreset: "original" | "scannedText" | "oldDocument" | "manga";
+  imageProfile: ImageProfile;
 }
 
 export const DEFAULT_READER_PREFERENCES: ReaderPreferences = {
   fontFamily: "classic", fontSize: 18, fontWeight: 400, textColor: "soft-black",
   lineSpacing: "normal", margins: "normal", paperTheme: "ivory", readerBrightness: 100, readingMode: "standard",
-  pageLayout: "double", pageAnimation: "page-turn",
+  pageLayout: "double", pageAnimation: "page-turn", imagePreset: "original", imageProfile: "normal",
 };
 
 export const spacingValues: Record<ReaderSpacing, { lineHeight: number; paragraphSpacing: number }> = {

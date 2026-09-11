@@ -1,10 +1,11 @@
 import { StorageService } from "../services/StorageService";
 import { marginValues, spacingValues, textColorValues } from "./settings/ReaderPreferences";
+import type { ScanEnhancementSettings } from "./image/ScanEnhancementPipeline";
 import { ReaderPreferencesService } from "./settings/ReaderPreferencesService";
 
 export type ReaderFitMode = "custom" | "width" | "page";
 export type ReaderTheme = "light" | "dark" | "paper";
-export type PageAnimation = "none" | "slide" | "page-turn";
+export type PageAnimation = "slide" | "page-turn" | "carousel";
 export interface ReflowSettings { fontFamily:"classic"|"modern"|"sans"|"accessible";fontSize:number;fontWeight:number;textColor:string;lineHeight:number;paragraphSpacing:number;margins:number;alignment:"left"|"justify";readingWidth:number; }
 export interface ReaderSettings extends ReflowSettings { zoom: number; fitMode: ReaderFitMode; theme: ReaderTheme; brightness: number; animation: PageAnimation; }
 
@@ -19,6 +20,7 @@ export class ReaderSettingsManager {
     this.syncPreferences(); this.normalize();
   }
   public syncPreferences(): void { const preferences=this.preferencesService.preferences;const spacing=spacingValues[preferences.lineSpacing];this.value={...this.value,fontFamily:preferences.fontFamily,fontSize:preferences.fontSize,fontWeight:preferences.fontWeight,textColor:textColorValues[preferences.textColor],lineHeight:spacing.lineHeight,paragraphSpacing:spacing.paragraphSpacing,margins:marginValues[preferences.margins],brightness:preferences.readerBrightness,animation:preferences.pageAnimation}; }
+  public imageSettings(): ScanEnhancementSettings { const value=this.preferencesService.preferences;return{preset:value.imagePreset,profile:value.imageProfile,brightness:100,contrast:100,sharpness:0,grayscale:false,invert:false}; }
   public get settings(): Readonly<ReaderSettings> { return this.value; }
   public async zoomIn(): Promise<number> { return this.setZoom(this.value.zoom + 10); }
   public async zoomOut(): Promise<number> { return this.setZoom(this.value.zoom - 10); }

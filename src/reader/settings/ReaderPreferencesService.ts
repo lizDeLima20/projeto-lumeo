@@ -15,7 +15,8 @@ export class ReaderPreferencesService {
     await this.storage.save(ReaderPreferencesService.KEY, this.value); return this.value;
   }
   private normalize(value: ReaderPreferences): ReaderPreferences {
-    return { ...value, fontSize: Math.min(36, Math.max(13, Math.round(value.fontSize))),
+    const animation = value.pageAnimation === ("none" as string) ? "page-turn" : value.pageAnimation;
+    return { ...value, pageAnimation: animation, fontSize: Math.min(36, Math.max(13, Math.round(value.fontSize))),
       readerBrightness: Math.min(100, Math.max(15, Math.round(value.readerBrightness))) };
   }
 }

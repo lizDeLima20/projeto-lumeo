@@ -1,7 +1,8 @@
 import type { RouteName } from "../core/Router";
+import type { TranslationKey } from "../i18n/I18nManager";
 
 export interface NavigationItem {
-  label: string;
+  labelKey: TranslationKey;
   route?: RouteName;
   action?: "logout";
   icon: string;
@@ -9,9 +10,9 @@ export interface NavigationItem {
 }
 
 export const AUTHENTICATED_NAVIGATION: readonly NavigationItem[] = [
-  { label: "Adicionar livro", route: "import", icon: "+", primary: true },
-  { label: "Início", route: "home", icon: "⌂" },
-  { label: "Biblioteca", route: "library", icon: "▤" },
-  { label: "Configurações", route: "settings", icon: "⚙" },
-  { label: "Sair", action: "logout", icon: "↗" },
+  { labelKey: "ui.import.title", route: "import", icon: "+", primary: true },
+  { labelKey: "ui.navigation.home", route: "home", icon: "⌂" },
+  { labelKey: "ui.navigation.library", route: "library", icon: "▤" },
+  { labelKey: "ui.settings.title", route: "settings", icon: "⚙" },
+  { labelKey: "ui.navigation.logout", action: "logout", icon: "↗" },
 ];

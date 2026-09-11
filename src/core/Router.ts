@@ -6,6 +6,8 @@ type ViewFactory = (params: URLSearchParams) => BaseView;
 export class Router {
   private readonly routes = new Map<RouteName, ViewFactory>();
   private activeView: BaseView | null = null;
+  private activeRoute: RouteName | null = null;
+  private activeParameters = new URLSearchParams();
   private guard: (route: RouteName) => RouteName = (route) => route;
 
   public constructor(private readonly outlet: HTMLElement) {}
@@ -30,6 +32,10 @@ export class Router {
     this.render(route, url.searchParams);
   }
 
+  /** Repaints chrome after an interface-locale switch without changing URL or state. */
+  public refresh(): void { if (this.activeRoute) this.render(this.activeRoute, new URLSearchParams(this.activeParameters)); }
+  public get currentRoute(): RouteName | null { return this.activeRoute; }
+
   private renderFromLocation(fallback: RouteName): void {
     const params = new URLSearchParams(window.location.search);
     const requested = window.location.pathname.slice(1) as RouteName;
@@ -47,6 +53,8 @@ export class Router {
     const factory = this.routes.get(route);
     if (!factory) return;
     this.activeView?.unmount();
+    this.activeRoute = route;
+    this.activeParameters = new URLSearchParams(params);
     this.activeView = factory(params);
     this.activeView.mount(this.outlet);
     window.scrollTo({ top: 0, behavior: "smooth" });

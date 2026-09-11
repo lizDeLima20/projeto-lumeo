@@ -10,21 +10,21 @@ export class BookEditView extends BaseView {
     private readonly covers: CoverService, private readonly onSave: (book: Book) => void, private readonly onCancel: () => void) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "page-shell import-page");
-    if (!this.book) { section.append(this.createElement("h1", "page-title", "Livro não encontrado")); return section; }
-    const form = this.createElement("form", "import-card"); form.append(this.createElement("h1", "page-title", "Editar livro"));
-    const title = this.field("Título", this.book.title); const author = this.field("Autor", this.book.author);
+    if (!this.book) { section.append(this.createElement("h1", "page-title", this.t("ui.book.notFound"))); return section; }
+    const form = this.createElement("form", "import-card"); form.append(this.createElement("h1", "page-title", this.t("ui.edit.title")));
+    const title = this.field(this.t("ui.edit.bookTitle"), this.book.title); const author = this.field(this.t("ui.edit.author"), this.book.author);
     const genre = this.createElement("select", "input") as HTMLSelectElement; this.state.genres.forEach((item) => genre.append(new Option(item.name, item.id))); genre.value = this.book.genreId;
-    const genreLabel = this.createElement("label", "field"); genreLabel.append(this.createElement("span", "field__label", "Gênero"), genre);
-    const newGenreRow = this.createElement("div", "inline-form"); const newGenre = this.createElement("input", "input") as HTMLInputElement; newGenre.placeholder = "Novo gênero";
-    const create = this.createElement("button", "button button--secondary", "+ Criar gênero"); create.type = "button";
+    const genreLabel = this.createElement("label", "field"); genreLabel.append(this.createElement("span", "field__label", this.t("ui.edit.genre")), genre);
+    const newGenreRow = this.createElement("div", "inline-form"); const newGenre = this.createElement("input", "input") as HTMLInputElement; newGenre.placeholder = this.t("ui.edit.newGenre");
+    const create = this.createElement("button", "button button--secondary", this.t("ui.edit.createGenre")); create.type = "button";
     create.addEventListener("click", () => void this.createGenre(newGenre, genre)); newGenreRow.append(newGenre, create);
-    const status = this.createElement("select", "input") as HTMLSelectElement; status.append(new Option("Não iniciado", "unread"), new Option("Lendo", "reading"), new Option("Concluído", "finished")); status.value = this.book.readingStatus;
-    const statusLabel = this.createElement("label", "field"); statusLabel.append(this.createElement("span", "field__label", "Status"), status);
-    const coverLabel = this.createElement("label", "field"); coverLabel.append(this.createElement("span", "field__label", "Trocar capa"));
+    const status = this.createElement("select", "input") as HTMLSelectElement; status.append(new Option(this.t("ui.book.unread"), "unread"), new Option(this.t("ui.book.reading"), "reading"), new Option(this.t("ui.book.finished"), "finished")); status.value = this.book.readingStatus;
+    const statusLabel = this.createElement("label", "field"); statusLabel.append(this.createElement("span", "field__label", this.t("ui.book.status")), status);
+    const coverLabel = this.createElement("label", "field"); coverLabel.append(this.createElement("span", "field__label", this.t("ui.edit.changeCover")));
     const cover = this.createElement("input", "input") as HTMLInputElement; cover.type = "file"; cover.accept = "image/*"; coverLabel.append(cover);
     const error = this.createElement("p", "form-error"); const actions = this.createElement("div", "form-actions");
-    const save = this.createElement("button", "button button--primary", "Salvar alterações"); save.type = "submit";
-    const cancel = this.createElement("button", "button button--secondary", "Cancelar"); cancel.type = "button"; cancel.addEventListener("click", this.onCancel); actions.append(save, cancel);
+    const save = this.createElement("button", "button button--primary", this.t("ui.edit.saveChanges")); save.type = "submit";
+    const cancel = this.createElement("button", "button button--secondary", this.t("ui.common.cancel")); cancel.type = "button"; cancel.addEventListener("click", this.onCancel); actions.append(save, cancel);
     form.append(title.wrapper, author.wrapper, genreLabel, newGenreRow, statusLabel, coverLabel, error, actions);
     form.addEventListener("submit", async (event) => {
       event.preventDefault(); save.disabled = true;
@@ -35,7 +35,7 @@ export class BookEditView extends BaseView {
           cover: chosenCover, fileType: this.book.fileType, fileName: this.book.fileName, fileSize: this.book.fileSize,
           mimeType: this.book.mimeType, readingStatus: status.value as ReadingStatus, createdAt: this.book.createdAt,
           updatedAt: new Date(), currentLocation: this.book.currentLocation, progressPercent: this.book.progressPercent, collectionId: this.book.collectionId }));
-      } catch (caught) { error.textContent = caught instanceof Error ? caught.message : "Não foi possível salvar."; }
+      } catch (caught) { error.textContent = caught instanceof Error ? caught.message : this.t("ui.edit.saveFailed"); }
       finally { save.disabled = false; }
     }); section.append(form); return section;
   }
@@ -48,6 +48,6 @@ export class BookEditView extends BaseView {
   }
   private field(label: string, value: string): { wrapper: HTMLLabelElement; input: HTMLInputElement } {
     const wrapper = this.createElement("label", "field"); wrapper.append(this.createElement("span", "field__label", label));
-    const input = this.createElement("input", "input") as HTMLInputElement; input.required = label === "Título"; input.value = value; wrapper.append(input); return { wrapper, input };
+    const input = this.createElement("input", "input") as HTMLInputElement; input.required = label === this.t("ui.edit.bookTitle"); input.value = value; wrapper.append(input); return { wrapper, input };
   }
 }

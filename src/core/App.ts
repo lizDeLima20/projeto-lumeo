@@ -88,6 +88,12 @@ export class App {
     this.router.setGuard((route) => this.guardRoute(route));
     this.registerRoutes();
     this.state.subscribe(() => this.renderHeader());
+    I18nManager.shared.subscribe(() => {
+      this.renderHeader();
+      // Reader holds an in-memory document and selection. Its controls subscribe
+      // independently; rebuilding it here would close the book on locale change.
+      if (this.router.currentRoute !== "reader") this.router.refresh();
+    });
     this.renderHeader();
   }
 
@@ -269,6 +275,7 @@ export class App {
     this.headerView.mount(this.headerRoot);
     this.footerRoot.replaceChildren(...(this.isAuthenticated() && this.state.deviceStatus === "authorized"
       ? [new MobileBottomNavigation((route)=>this.router.navigate(route)).render()] : []));
+    I18nManager.shared.localizeTree(this.footerRoot);
   }
 
   private isAuthenticated(): boolean { return this.state.authStatus === "authenticated" || this.state.authStatus === "AUTHENTICATED" || this.state.authStatus === "OFFLINE_AUTHENTICATED"; }

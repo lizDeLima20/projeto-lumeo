@@ -1,5 +1,6 @@
 import type { RouteName } from "../core/Router";
 import type { NavigationItem } from "../navigation/NavigationItem";
+import { I18nManager } from "../i18n/I18nManager";
 
 export class MobileNavigationDrawer {
   public static readonly motionDuration = 300;
@@ -9,6 +10,7 @@ export class MobileNavigationDrawer {
   private drawer: HTMLElement | null = null;
   private openState = false;
   private returnFocusTo: HTMLElement | null = null;
+  private readonly i18n = I18nManager.shared;
 
   public constructor(private readonly items: readonly NavigationItem[], private readonly userName: string,
     private readonly onNavigate: (route: RouteName) => void, private readonly onLogout: () => void,
@@ -17,15 +19,15 @@ export class MobileNavigationDrawer {
   public render(): HTMLElement {
     const root = document.createElement("div"); root.className = "mobile-navigation";
     const overlay = document.createElement("button"); overlay.className = "drawer-overlay"; overlay.type = "button";
-    overlay.setAttribute("aria-label", "Fechar menu"); overlay.tabIndex = -1; overlay.addEventListener("click", () => this.close());
+    overlay.setAttribute("aria-label", this.i18n.t("ui.navigation.closeMenu")); overlay.tabIndex = -1; overlay.addEventListener("click", () => this.close());
     const drawer = document.createElement("aside"); drawer.className = "navigation-drawer"; drawer.id = "mobile-navigation-drawer";
-    drawer.setAttribute("aria-label", "Menu principal"); drawer.setAttribute("aria-hidden", "true"); drawer.setAttribute("role", "navigation");
+    drawer.setAttribute("aria-label", this.i18n.t("ui.navigation.menu")); drawer.setAttribute("aria-hidden", "true"); drawer.setAttribute("role", "navigation");
     const profile = document.createElement("div"); profile.className = "drawer-profile";
     const avatar = document.createElement("img"); avatar.className = "drawer-avatar"; avatar.src = "/icons/lumeo-logo.png"; avatar.alt = ""; avatar.width = 64; avatar.height = 64;
     const greeting = document.createElement("div");
-    const hello = document.createElement("strong"); hello.textContent = `Olá, ${this.userName}!`;
-    const wish = document.createElement("span"); wish.textContent = "Boa leitura"; greeting.append(hello, wish); profile.append(avatar, greeting);
-    const nav = document.createElement("nav"); nav.className = "drawer-links"; nav.setAttribute("aria-label", "Navegação mobile");
+    const hello = document.createElement("strong"); hello.textContent = this.i18n.t("ui.greeting.hello", { name: this.userName });
+    const wish = document.createElement("span"); wish.textContent = this.i18n.t("ui.greeting.goodReading"); greeting.append(hello, wish); profile.append(avatar, greeting);
+    const nav = document.createElement("nav"); nav.className = "drawer-links"; nav.setAttribute("aria-label", this.i18n.t("ui.navigation.mobile"));
     this.items.forEach((item) => nav.append(this.navigationButton(item)));
     drawer.append(profile, nav); root.append(overlay, drawer); this.root = root; this.drawer = drawer; return root;
   }
@@ -61,7 +63,7 @@ export class MobileNavigationDrawer {
     const button = document.createElement("button"); button.type = "button";
     button.className = `drawer-link${item.primary ? " drawer-link--primary" : ""}`;
     const icon = document.createElement("span"); icon.className = "drawer-link__icon"; icon.textContent = item.icon; icon.setAttribute("aria-hidden", "true");
-    const label = document.createElement("span"); label.textContent = item.label; button.append(icon, label);
+    const label = document.createElement("span"); label.textContent = this.i18n.t(item.labelKey); button.append(icon, label);
     if (item.route && window.location.pathname === `/${item.route}`) { button.classList.add("drawer-link--current"); button.setAttribute("aria-current", "page"); }
     button.addEventListener("click", () => { this.close(false); item.route ? this.onNavigate(item.route) : this.onLogout(); }); return button;
   }

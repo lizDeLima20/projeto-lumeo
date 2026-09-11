@@ -3,7 +3,6 @@ import { BookRepository } from "../repositories/BookRepository";
 import { PdfPageRenderer, type ReaderStageSize } from "./PdfPageRenderer";
 import { PdfReaderEngine, type PasswordProvider } from "./PdfReaderEngine";
 import { ImagePageReaderEngine } from "./image/ImagePageReaderEngine";
-import { DEFAULT_IMAGE_READER_PREFERENCES } from "./image/ImageReaderPreferences";
 import { DocumentCapabilityMetadataService } from "./image/DocumentCapabilityMetadataService";
 import { ReaderNavigationController, type NavigationReason } from "./ReaderNavigationController";
 import { ReadingProgressService } from "./ReadingProgressService";
@@ -67,5 +66,5 @@ export class ReaderManager {
     return this.renderer.render(await this.engine.getPage(pageNumber), this.settings.settings, this.stageSize());
   }
   private async renderImagePage(pageNumber:number,reason:NavigationReason):Promise<void>{if(!await this.renderImageOnly(pageNumber))return;if(!this.book||!this.navigation)return;this.book=await this.progress.saveProgress(this.book,pageNumber,this.navigation.totalPages,reason==="next"&&pageNumber===this.navigation.totalPages);this.onPageChange?.({currentPage:pageNumber,totalPages:this.navigation.totalPages,reason,book:this.book});}
-  private async renderImageOnly(pageNumber:number):Promise<boolean>{if(!this.imageCanvas||!this.stageSize)return false;return this.imageEngine.render(pageNumber,this.imageCanvas,this.settings.settings,this.stageSize(),DEFAULT_IMAGE_READER_PREFERENCES.scan);}
+  private async renderImageOnly(pageNumber:number):Promise<boolean>{if(!this.imageCanvas||!this.stageSize)return false;return this.imageEngine.render(pageNumber,this.imageCanvas,this.settings.settings,this.stageSize(),this.settings.imageSettings());}
 }

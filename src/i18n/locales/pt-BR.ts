@@ -1,0 +1,67 @@
+import { EXTERNAL_LIBRARY_PT } from "../ExternalLibraryTranslations";
+import { INTERFACE_PT } from "./interface";
+
+/**
+ * Base catalogue for the interface. Content from user books is deliberately
+ * not part of this catalogue: interface i18n and book translation are separate
+ * systems.
+ */
+export const PT_BR = {
+  ...EXTERNAL_LIBRARY_PT,
+  ...INTERFACE_PT,
+  "reader.back": "Voltar para biblioteca", "reader.pagePicker": "Ir para uma página", "reader.settings": "Configurações de leitura",
+  "reader.navigation": "Abrir sumário, busca e mapa", "reader.notebook": "Abrir Caderno", "reader.bookmark": "Marcar posição",
+  "reader.study": "Abrir marcações", "reader.previousPage": "Página anterior", "reader.nextPage": "Próxima página",
+  "reader.toggleControls": "Mostrar ou esconder controles", "reader.pdfPage": "Página do PDF", "reader.loading": "Preparando seu livro…",
+  "reader.closeSettings": "Fechar configurações de leitura", "reader.customization": "Personalização da leitura",
+  "reader.reading": "Leitura", "reader.futureMarks": "Marcações — em breve", "reader.text": "Texto", "reader.font": "Fonte",
+  "reader.font.classic": "Clássica", "reader.font.modern": "Moderna", "reader.font.sans": "Limpa", "reader.font.accessible": "Alta legibilidade",
+  "reader.fontSize": "Tamanho", "reader.weight": "Peso", "reader.weight.light": "Fina", "reader.weight.normal": "Normal",
+  "reader.weight.strong": "Forte", "reader.color": "Cor", "reader.color.softBlack": "Preto suave", "reader.color.graphite": "Grafite",
+  "reader.color.darkBrown": "Marrom", "reader.color.nightBeige": "Bege claro", "reader.spacing": "Espaçamento",
+  "reader.spacing.compact": "Compacto", "reader.spacing.normal": "Normal", "reader.spacing.comfortable": "Confortável",
+  "reader.spacing.wide": "Amplo", "reader.paper": "Papel", "reader.background": "Cor do papel", "reader.paper.pureWhite": "Branco puro",
+  "reader.paper.ivory": "Marfim", "reader.paper.softWhite": "Branco suave", "reader.paper.cream": "Creme",
+  "reader.paper.natural": "Natural", "reader.paper.sepia": "Sépia", "reader.paper.dark": "Escuro",
+  "reader.brightness": "Iluminação da tela", "reader.bookReal": "Sem brilho / Livro Real",
+  "reader.bookReal.help": "Simula papel/e-ink com vidro fumê visual, sem controlar o brilho físico do aparelho.",
+  "reader.layout": "Layout", "reader.pages": "Páginas", "reader.onePage": "Uma página", "reader.twoPages": "Duas páginas",
+  "reader.margins": "Margens", "reader.margin.narrow": "Estreita", "reader.margin.normal": "Normal", "reader.margin.wide": "Larga",
+  "reader.animation": "Animação", "reader.pageTurn": "Virada de página", "reader.animation.none": "Nenhuma",
+  "reader.animation.slide": "Deslize", "reader.animation.pageTurn": "Folhear", "reader.animation.carousel": "Carrossel",
+  "reader.image": "Imagem", "reader.imageProfile": "Perfil visual", "reader.language": "Idioma",
+  "selection.actions": "Ações para o texto selecionado", "selection.highlight": "Grifar", "selection.note": "Nota",
+  "selection.dictionary": "Significado", "selection.origin": "Origem", "selection.search": "Pesquisar", "selection.translate": "Traduzir",
+  "selection.more": "Mais", "selection.context": "Contexto", "selection.paragraph": "Parágrafo", "selection.copy": "Copiar",
+  "selection.bookmark": "Marcar trecho", "selection.addToSheet": "Adicionar ao fichário", "lookup.originNotFound": "Origem não encontrada.",
+  "lookup.retry": "Tentar novamente", "onboarding.language": "Idioma", "onboarding.languageHelp": "Escolha o idioma principal da interface. Você pode trocar depois.",
+  "settings.language": "Idioma", "settings.languageHelp": "Troque o idioma da interface sem sair da conta.",
+  "reader.imageMode.notice": "Texto não disponível nesta página. Modo imagem local ativado.", "reader.imageMode.renderError": "Não foi possível renderizar esta página.",
+  "reader.scan.preset": "Preset de imagem", "reader.scan.original": "Original", "reader.scan.scannedText": "Texto escaneado",
+  "reader.scan.oldDocument": "Documento antigo", "reader.scan.manga": "Mangá", "reader.scan.blackWhite": "Preto e branco",
+  "reader.scan.highContrast": "Contraste alto", "reader.scan.soft": "Suave", "reader.scan.normal": "Normal", "reader.manga.mode": "Modo mangá",
+  "reader.manga.direction": "Direção de leitura", "reader.ocr.textUnavailable": "Texto não reconhecido.", "reader.regionHighlight.markArea": "Marcar área",
+  "reader.progress.label": "Progresso de leitura", "reader.resume.continuing": "Continuando de onde você parou",
+  "reader.focus.enabled": "Modo foco ativado", "reader.focus.disabled": "Modo foco desativado",
+  "reader.fullscreen.enter": "Entrar em tela cheia", "reader.fullscreen.exit": "Sair da tela cheia", "reader.pagination.reflow": "Reflow", "reader.pagination.original": "Página original",
+  "pwa.install": "Instalar aplicativo", "offline.status": "Você está offline", "offline.reconnecting": "Reconectando…",
+  "offline.needsInternet": "Esta ação precisa de internet.", "offline.bookRemoteOnly": "Este livro ainda não está disponível offline.",
+  "storage.title": "Armazenamento", "storage.checking": "Verificando armazenamento…", "storage.used": "Usado", "storage.available": "Disponível estimado",
+  "storage.books": "Livros", "storage.cache": "Cache temporário", "storage.study": "Notas e estudos", "storage.preferences": "Preferências",
+  "storage.clearTemporary": "Limpar cache temporário", "storage.temporaryCleared": "Cache temporário limpo.", "storage.lowSpace": "Seu dispositivo está com pouco espaço disponível.",
+  "storage.local": "Local", "storage.persistent": "Persistente", "backup.light": "Backup leve", "backup.full": "Backup completo",
+  "recovery.repair": "Tentar reparar", "update.available": "Nova versão disponível", "update.now": "Atualizar agora", "update.later": "Depois",
+  "diagnostics.title": "Diagnóstico", "diagnostics.copy": "Copiar diagnóstico", "recovery.startupFailed": "Não foi possível iniciar o Lumeo",
+  "recovery.startupFailedHelp": "Tente recarregar. Se persistir, abra o diagnóstico ou use a recuperação local.",
+  "library.deleteBook": "Excluir livro", "library.deleteConfirm": "Excluir este livro deste dispositivo? O arquivo, a capa, o progresso e os dados vinculados somente a ele serão removidos.",
+  "library.duplicateBook": "Este livro já está na sua biblioteca.", "library.versionConflict": "Já existe outra versão deste livro na biblioteca.",
+  "library.versionPrompt": "Já existe outra versão deste livro na biblioteca. Digite: manter, substituir ou cancelar.",
+  "library.versionKeep": "manter", "library.versionReplace": "substituir", "library.versionCancel": "cancelar",
+  "error.auth.invalidCredentials": "E-mail ou senha inválidos.", "error.epub.invalid": "O arquivo EPUB é inválido.",
+  "error.auth.required": "Autenticação necessária.", "error.network": "Não foi possível conectar ao servidor.", "error.request": "Falha na requisição.", "error.license.required": "Esta conta não possui uma licença ativa.",
+  "error.indexedDb.saveFailed": "Não foi possível salvar os dados neste dispositivo.", "error.download.failed": "Não foi possível baixar o livro.",
+  "format.pageOf": "Página {current} de {total}", "format.books": "{count} livro|{count} livros",
+} as const;
+
+export type TranslationKey = keyof typeof PT_BR;
+export type TranslationCatalog = Record<TranslationKey, string>;

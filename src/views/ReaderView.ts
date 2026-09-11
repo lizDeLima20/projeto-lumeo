@@ -15,6 +15,7 @@ import { FontSettingsController } from "../reader/settings/FontSettingsControlle
 import { PaperSettingsController } from "../reader/settings/PaperSettingsController";
 import { LayoutSettingsController } from "../reader/settings/LayoutSettingsController";
 import { AnimationSettingsController } from "../reader/settings/AnimationSettingsController";
+import { ImageSettingsController } from "../reader/settings/ImageSettingsController";
 import { IndexedDbService } from "../services/IndexedDbService";
 import { HighlightRepository } from "../repositories/HighlightRepository";
 import { AnnotationRepository } from "../repositories/AnnotationRepository";
@@ -57,6 +58,7 @@ export class ReaderView extends BaseView {
   private readonly anchors=new ReadingAnchorService();private readonly selections=new TextSelectionManager();private readonly selectionMenu=new SelectionContextMenu();private readonly studyPanel=new StudyPanel();private selectedAnchor:TextAnchor|null=null;
   private readonly lookup:StudyLookupManager;private readonly lookupPanel=new StudyLookupPanel();private sourceLanguage:StudyLanguage="pt-BR";
   private readonly i18n=I18nManager.shared;private readonly interactions=new ReaderInteractionController();
+  private stopLocaleWatch:()=>void=()=>undefined;
   private chrome:ReaderChromeController|null=null;private readonly focusMode=new FocusReadingMode();private progressBar:ReaderProgressBar|null=null;
   private limaDocument:LimaDocument|null=null;private navigationPanel:NavigationPanel|null=null;private readonly navigationHistory=new BookNavigationHistory();
   private readonly notebookService:StudyNotebookService;private notebookView:StudyNotebookView|null=null;private readonly annotationRepository:AnnotationRepository;
@@ -73,13 +75,13 @@ export class ReaderView extends BaseView {
     const loading = this.createElement("div", "reader-loading", this.i18n.t("reader.loading")); loading.setAttribute("role", "status");
     this.stage.append(this.canvas, loading, this.tapZones()); reader.append(this.stage);
     this.chrome=new ReaderChromeController(state=>{reader.classList.toggle("reader--controls-visible",state.visible);reader.classList.toggle("reader--focus-mode",state.focusMode);this.progressBar?.setVisible(state.progressVisible);});this.progressBar=new ReaderProgressBar();reader.append(this.progressBar.render());
-    document.body.classList.add("reader-mode"); queueMicrotask(() => void this.initialize()); return reader;
+    document.body.classList.add("reader-mode"); this.stopLocaleWatch=this.i18n.subscribe(locale=>{this.element?.setAttribute("lang",locale);this.settingsPanel?.refresh();}); queueMicrotask(() => void this.initialize()); return reader;
   }
 
   public override unmount(): void {
     window.clearTimeout(this.controlsTimer); window.clearTimeout(this.resizeTimer);
     document.removeEventListener("keydown", this.handleKeydown); window.removeEventListener("resize", this.handleResize);
-    this.chrome?.destroy();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();void this.reflow?.close();void this.manager.close(); super.unmount();
+    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();void this.reflow?.close();void this.manager.close(); super.unmount();
   }
 
   private async initialize(): Promise<void> {
@@ -132,7 +134,7 @@ export class ReaderView extends BaseView {
     const service=this.manager.settings.preferencesService;
     this.settingsPanel = new ReaderSettingsPanel(() => service.preferences, Boolean(this.reflow),
       new FontSettingsController(service), new PaperSettingsController(service), new LayoutSettingsController(service),
-      new AnimationSettingsController(service), (repaginate) => void this.applyPreferences(repaginate), (open) => this.toolbar?.setSettingsOpen(open));
+      new AnimationSettingsController(service), new ImageSettingsController(service), (repaginate) => void this.applyPreferences(repaginate), (open) => this.toolbar?.setSettingsOpen(open));
     this.element.append(this.settingsPanel.render(),this.studyPanel.render(),this.lookupPanel.render());if(this.limaDocument){this.navigationPanel=new NavigationPanel(this.limaDocument,()=>this.currentLimaAnchor(),()=>this.navigationStudyData(),(anchor,focus)=>this.navigateToAnchor(anchor,focus),()=>this.navigationBack());this.notebookView=new StudyNotebookView(this.bookId,this.limaDocument,this.notebookService,entry=>this.navigateNotebookEntry(entry),entry=>void this.editNotebookEntry(entry),entry=>void this.deleteNotebookEntry(entry));this.chapterStudyView=new ChapterStudyView(this.chapterStudyController,async chapterId=>(await this.notebookService.load(this.bookId,this.limaDocument!)).entries.filter(entry=>entry.chapterId===chapterId),(anchor,text)=>{this.chapterStudyView?.close();this.navigateToAnchor(anchor,text)});const notebookElement=this.notebookView.render(),sheetElement=this.chapterStudyView.render(),openSheet=this.createElement("button","chapter-study-open","Abrir fichário");openSheet.type="button";openSheet.addEventListener("click",()=>{const chapter=this.currentChapter();if(chapter){this.notebookView?.close();void this.chapterStudyView?.open(chapter);}});notebookElement.querySelector("header")?.append(openSheet);this.element.append(this.navigationPanel.render(),notebookElement,sheetElement);}
     this.toolbar.update(this.currentPage, this.totalPages, this.manager.settings.settings.zoom);this.chrome?.show(true);this.showResumeHint();
   }
@@ -263,7 +265,7 @@ export class ReaderView extends BaseView {
   }
 
   private animatePage(direction: "next" | "previous"): void {
-    if (!this.canvas) return; const animation = this.manager.settings.settings.animation; if (animation === "none") return;
+    if (!this.canvas) return; const animation = this.manager.settings.settings.animation; if (animation === "carousel") return;
     this.canvas.classList.remove("reader-page--slide-next", "reader-page--slide-previous", "reader-page--turn-next", "reader-page--turn-previous");
     void this.canvas.offsetWidth; this.canvas.classList.add(`reader-page--${animation === "slide" ? "slide" : "turn"}-${direction}`);
   }
