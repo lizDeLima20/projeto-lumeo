@@ -33,7 +33,8 @@ describe("CatalogApplicationService", () => {
     const download = await new CatalogApplicationService(store, () => driveStub()).download(item().bookId);
     assert.equal(download.bookId, item().bookId);
     assert.equal(download.driveFileId, item().driveFileId);
-    assert.match(download.downloadUrl, /^https:\/\/drive\.usercontent\.google\.com\/download\?/);
+    assert.match(download.downloadUrl, /^https:\/\/drive\.google\.com\/uc\?/);
+    assert.equal(download.downloadUrls.length, 2);
     assert.equal("body" in download, false);
   });
   it("requires a backend-admin decision before synchronization", async () => {

@@ -21,12 +21,12 @@ export class CatalogBookView extends BaseView {
   private detail(book: CatalogBookData): HTMLElement {
     const root = this.createElement("article", "catalog-detail__content"); const cover = this.createElement("div", "catalog-detail__cover");
     this.appendCover(cover, book);
-    const copy = this.createElement("div", "catalog-detail__copy"); const back = this.createElement("button", "link-button", this.t("ui.common.back")); back.type = "button"; back.addEventListener("click", this.onBack);
+    const copy = this.createElement("div", "catalog-detail__copy"); const back = this.createElement("button", "link-button catalog-detail__back", this.t("ui.common.back")); back.type = "button"; back.addEventListener("click", this.onBack);
     copy.append(back, this.createElement("h1", "page-title", book.title), this.createElement("p", "page-subtitle", book.author));
     const metadata = this.createElement("dl", "catalog-detail__metadata"); this.meta(metadata, this.t("ui.catalog.genre"), book.genreName); this.meta(metadata, this.t("ui.catalog.format"), book.format.toUpperCase());
     if (book.fileSize) this.meta(metadata, this.t("ui.catalog.size"), this.formatSize(book.fileSize)); if (book.collection) this.meta(metadata, this.t("ui.catalog.collection"), book.collection); if (book.volume) this.meta(metadata, this.t("ui.catalog.volumeLabel"), book.volume);
     copy.append(metadata); if (book.description) copy.append(this.createElement("p", "catalog-detail__description", book.description));
-    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary", local ? this.t("ui.catalog.open") : this.t("ui.catalog.add")); action.type = "button";
+    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary catalog-detail__action", local ? this.t("ui.catalog.open") : this.t("ui.catalog.add")); action.type = "button";
     const progress = this.createElement("p", "catalog__status"); progress.setAttribute("role", "status");
     if (local) action.addEventListener("click", () => this.onOpenLocal(local.id)); else action.addEventListener("click", () => void this.add(book, action, progress)); copy.append(action, progress); root.append(cover, copy); return root;
   }

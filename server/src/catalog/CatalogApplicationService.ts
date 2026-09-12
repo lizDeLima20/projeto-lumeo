@@ -22,6 +22,7 @@ export class CatalogApplicationService {
       bookId: book.bookId,
       driveFileId: info.driveFileId,
       downloadUrl: info.downloadUrl,
+      downloadUrls: info.downloadUrls,
       title: book.title,
       author: book.author,
       genreId: book.genreId,

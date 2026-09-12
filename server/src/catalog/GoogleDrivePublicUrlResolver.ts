@@ -4,6 +4,7 @@ import type { CatalogFormat } from "./types.js";
 export interface GoogleDrivePublicDownloadInfo {
   driveFileId: string;
   downloadUrl: string;
+  downloadUrls: readonly string[];
   coverUrl: string;
   expectedFormat: CatalogFormat;
 }
@@ -16,16 +17,21 @@ export interface GoogleDrivePublicDownloadInfo {
 export class GoogleDrivePublicUrlResolver {
   public resolve(fileIdOrUrl: string, expectedFormat: CatalogFormat): GoogleDrivePublicDownloadInfo {
     const driveFileId = this.extractFileId(fileIdOrUrl);
-    const download = new URL("https://drive.usercontent.google.com/download");
-    download.searchParams.set("id", driveFileId);
+    // Google documents https://drive.google.com/uc as its public-download
+    // endpoint. It redirects to the current content host and avoids forcing a
+    // confirmation token that can be rejected by mobile browsers.
+    const download = new URL("https://drive.google.com/uc");
     download.searchParams.set("export", "download");
-    download.searchParams.set("confirm", "t");
+    download.searchParams.set("id", driveFileId);
+    const contentDownload = new URL("https://drive.usercontent.google.com/download");
+    contentDownload.searchParams.set("id", driveFileId);
+    contentDownload.searchParams.set("export", "download");
     const thumbnail = new URL("https://drive.google.com/thumbnail");
     thumbnail.searchParams.set("id", driveFileId);
     // Drive creates this lightweight preview from the document itself. It is
     // cached by Drive and does not make Explore download the book file.
     thumbnail.searchParams.set("sz", "w480-h640");
-    return { driveFileId, downloadUrl: download.toString(), coverUrl: thumbnail.toString(), expectedFormat };
+    return { driveFileId, downloadUrl: download.toString(), downloadUrls: [download.toString(), contentDownload.toString()], coverUrl: thumbnail.toString(), expectedFormat };
   }
 
   public extractFileId(fileIdOrUrl: string): string {

@@ -30,6 +30,7 @@ export interface CatalogDownloadLink {
   bookId: string;
   driveFileId: string;
   downloadUrl: string;
+  downloadUrls: readonly string[];
   title: string;
   author: string;
   genreId: string;

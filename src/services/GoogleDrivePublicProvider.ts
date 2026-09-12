@@ -29,11 +29,26 @@ export function catalogDownloadCode(error: unknown): CatalogDownloadErrorCode | 
  */
 export class GoogleDrivePublicProvider {
   public async download(download: CatalogDownloadLink, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
-    this.log("DIRECT_DOWNLOAD_REQUEST", { bookId: download.bookId, driveFileId: download.driveFileId, downloadUrl: download.downloadUrl, environment: this.environment() });
-    this.assertDownloadUrl(download.downloadUrl);
+    const urls = [...new Set([download.downloadUrl, ...(download.downloadUrls ?? [])])];
+    let latest: CatalogDirectDownloadError | null = null;
+    for (const [attempt, downloadUrl] of urls.entries()) {
+      try { return await this.downloadFromUrl(download, downloadUrl, attempt, onProgress, signal); }
+      catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        if (!(error instanceof CatalogDirectDownloadError)) throw error;
+        latest = error;
+        this.log("DIRECT_DOWNLOAD_FAILED", { bookId: download.bookId, driveFileId: download.driveFileId, code: error.code, attempt: attempt + 1, hasFallback: attempt < urls.length - 1 });
+      }
+    }
+    throw latest ?? new CatalogDirectDownloadError("DOWNLOAD_NETWORK_FAILED");
+  }
+
+  private async downloadFromUrl(download: CatalogDownloadLink, downloadUrl: string, attempt: number, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
+    this.log("DIRECT_DOWNLOAD_REQUEST", { bookId: download.bookId, driveFileId: download.driveFileId, downloadUrl, attempt: attempt + 1, environment: this.environment() });
+    this.assertDownloadUrl(downloadUrl);
     let response: Response;
     try {
-      response = await fetch(download.downloadUrl, { signal, credentials: "omit", redirect: "follow" });
+      response = await fetch(downloadUrl, { signal, credentials: "omit", redirect: "follow" });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") throw error;
       const code = error instanceof TypeError && navigator.onLine ? "GOOGLE_DRIVE_CORS_BLOCKED" : "DOWNLOAD_NETWORK_FAILED";

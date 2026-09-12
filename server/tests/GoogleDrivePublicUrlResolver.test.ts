@@ -8,7 +8,8 @@ describe("GoogleDrivePublicUrlResolver", () => {
   it("normalizes a Drive file id into direct download and lightweight cover URLs", () => {
     const value = resolver.resolve("1mftT_jgci_WcUvJkVyEXswchizAJHvgS", "pdf");
     assert.equal(value.driveFileId, "1mftT_jgci_WcUvJkVyEXswchizAJHvgS");
-    assert.match(value.downloadUrl, /^https:\/\/drive\.usercontent\.google\.com\/download\?.*export=download/);
+    assert.match(value.downloadUrl, /^https:\/\/drive\.google\.com\/uc\?.*export=download/);
+    assert.match(value.downloadUrls[1] ?? "", /^https:\/\/drive\.usercontent\.google\.com\/download\?/);
     assert.match(value.coverUrl, /^https:\/\/drive\.google\.com\/thumbnail\?.*sz=w480-h640/);
   });
   it("extracts a file id from supported public Drive links", () => {
