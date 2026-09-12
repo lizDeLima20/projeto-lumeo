@@ -25,7 +25,7 @@ export class GoogleDriveAuthorizationProvider {
   }
   private async browserRequestToken(prompt: "consent" | ""): Promise<GoogleDriveTokenReply> {
     await this.loadGsi();
-    const google = (window as Window & { google?: { accounts?: { oauth2?: { initTokenClient(config: { client_id: string; scope: string; prompt: string; callback(value: GoogleDriveTokenReply): void; error_callback(): void }): { requestAccessToken(): void } } } }).google;
+    const google = (window as Window & { google?: { accounts?: { oauth2?: { initTokenClient(config: { client_id: string; scope: string; prompt: string; callback(value: GoogleDriveTokenReply): void; error_callback(): void }): { requestAccessToken(): void } } } } }).google;
     if (!google?.accounts?.oauth2) throw new GoogleDriveAuthorizationError("GOOGLE_DRIVE_TOKEN_EXPIRED");
     return new Promise((resolve, reject) => google.accounts.oauth2!.initTokenClient({ client_id: this.clientId, scope: GOOGLE_DRIVE_FILE_SCOPE, prompt, callback: resolve,
       error_callback: () => reject(new GoogleDriveAuthorizationError("GOOGLE_DRIVE_CONSENT_DENIED")), }).requestAccessToken());
