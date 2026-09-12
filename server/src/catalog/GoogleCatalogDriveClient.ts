@@ -1,6 +1,7 @@
 import { createHash, createSign } from "node:crypto";
 import { ApiError } from "../errors/ApiError.js";
 import type { CatalogFormat } from "./types.js";
+import { GoogleDrivePublicUrlResolver } from "./GoogleDrivePublicUrlResolver.js";
 
 interface ServiceAccount { client_email: string; private_key: string; token_uri?: string; }
 interface DriveFile { id: string; name: string; mimeType: string; size?: string; modifiedTime: string; }
@@ -45,12 +46,7 @@ export class GoogleCatalogDriveClient {
   }
   /** Public files are downloaded browser-to-Drive, never through the BFF. */
   public static publicDownloadUrl(fileId: string): string {
-    if (!/^[a-zA-Z0-9_-]{10,}$/.test(fileId)) throw new ApiError(422, "CATALOG_FILE_INVALID", "Identificador de arquivo do catálogo inválido.");
-    const url = new URL("https://drive.usercontent.google.com/download");
-    url.searchParams.set("id", fileId);
-    url.searchParams.set("export", "download");
-    url.searchParams.set("confirm", "t");
-    return url.toString();
+    return new GoogleDrivePublicUrlResolver().resolve(fileId, "pdf").downloadUrl;
   }
   private async media(fileId: string): Promise<Response> {
     const token = await this.accessToken(); const response = await fetch(this.fileUrl(fileId), { headers: { Authorization: `Bearer ${token}` } });

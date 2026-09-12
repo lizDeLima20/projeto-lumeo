@@ -1,9 +1,10 @@
-const SW_VERSION = "v11";
+const SW_VERSION = "v12";
 const SHELL_CACHE = `lumeo-shell-${SW_VERSION}`;
 const ASSET_CACHE = `lumeo-assets-${SW_VERSION}`;
 const RUNTIME_CACHE = `lumeo-runtime-${SW_VERSION}`;
 const LOOKUP_CACHE = `lumeo-lookup-${SW_VERSION}`;
-const LUMEO_CACHES = [SHELL_CACHE, ASSET_CACHE, RUNTIME_CACHE, LOOKUP_CACHE];
+const CATALOG_COVER_CACHE = `lumeo-catalog-covers-${SW_VERSION}`;
+const LUMEO_CACHES = [SHELL_CACHE, ASSET_CACHE, RUNTIME_CACHE, LOOKUP_CACHE, CATALOG_COVER_CACHE];
 // Only what the shell needs to boot offline. The 890 KB source logo used to be precached
 // here on every install; the sized icons below are a few KB each.
 const APP_SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/favicon-48.png"];
@@ -51,6 +52,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // These are lightweight Drive-generated previews, keyed by Drive file id.
+  // Never cache the PDF/EPUB itself in Cache Storage: ImportManager owns it.
+  if ((url.hostname === "drive.google.com" && url.pathname === "/thumbnail") || url.hostname === "lh3.googleusercontent.com") {
+    event.respondWith(cacheFirst(request, CATALOG_COVER_CACHE));
+    return;
+  }
+
   if (url.origin === self.location.origin) event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
 });
 
@@ -58,7 +66,7 @@ async function cacheFirst(request, cacheName) {
   const cached = await caches.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok) {
+  if (response.ok || response.type === "opaque") {
     const cache = await caches.open(cacheName);
     await cache.put(request, response.clone());
   }

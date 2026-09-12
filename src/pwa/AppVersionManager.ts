@@ -9,7 +9,7 @@ export interface AppVersionInfo {
 
 export class AppVersionManager {
   public static readonly APP_VERSION = "0.1.0";
-  public static readonly SERVICE_WORKER_VERSION = "v11";
+  public static readonly SERVICE_WORKER_VERSION = "v12";
   public static readonly MINIMUM_COMPATIBLE_SCHEMA_VERSION = 8;
 
   public info(): AppVersionInfo {

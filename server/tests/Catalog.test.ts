@@ -5,7 +5,7 @@ import type { CatalogStore } from "../src/catalog/CatalogRepository.js";
 import type { CatalogBookRecord, CatalogPage, CatalogQuery } from "../src/catalog/types.js";
 import { ApiError } from "../src/errors/ApiError.js";
 
-const item = (bookId = "10000000-0000-4000-8000-000000000001"): CatalogBookRecord => ({ bookId, title: "Livro autorizado", author: "Autora", genreId: "romance", genreName: "Romance", coverUrl: null, description: null, format: "epub", fileSize: 42, driveFileId: "drive-file", storageAccountId: "google-drive-default", sha256: "a".repeat(64), volume: null, collection: null, language: "pt-BR", createdAt: "2026-09-12T00:00:00.000Z", updatedAt: "2026-09-12T00:00:00.000Z", status: "ACTIVE" });
+const item = (bookId = "10000000-0000-4000-8000-000000000001"): CatalogBookRecord => ({ bookId, title: "Livro autorizado", author: "Autora", genreId: "romance", genreName: "Romance", coverUrl: null, description: null, format: "epub", fileSize: 42, driveFileId: "drive-file-123", storageAccountId: "google-drive-default", sha256: "a".repeat(64), volume: null, collection: null, language: "pt-BR", createdAt: "2026-09-12T00:00:00.000Z", updatedAt: "2026-09-12T00:00:00.000Z", status: "ACTIVE" });
 
 class MemoryCatalogStore implements CatalogStore {
   public readonly rows = new Map<string, CatalogBookRecord>(); public admin = false;
@@ -32,6 +32,7 @@ describe("CatalogApplicationService", () => {
     const store = new MemoryCatalogStore(); await store.save(item());
     const download = await new CatalogApplicationService(store, () => driveStub()).download(item().bookId);
     assert.equal(download.bookId, item().bookId);
+    assert.equal(download.driveFileId, item().driveFileId);
     assert.match(download.downloadUrl, /^https:\/\/drive\.usercontent\.google\.com\/download\?/);
     assert.equal("body" in download, false);
   });

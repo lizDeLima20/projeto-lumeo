@@ -4,6 +4,7 @@ import { CatalogService } from "../services/CatalogService";
 import type { CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { BaseView } from "./BaseView";
 import { CatalogGenreDialog } from "./CatalogGenreDialog";
+import { catalogDownloadCode } from "../services/GoogleDrivePublicProvider";
 
 export class CatalogBookView extends BaseView {
   public constructor(private readonly catalog: CatalogService, private readonly state: AppState, private readonly bookId: string,
@@ -19,8 +20,7 @@ export class CatalogBookView extends BaseView {
   }
   private detail(book: CatalogBookData): HTMLElement {
     const root = this.createElement("article", "catalog-detail__content"); const cover = this.createElement("div", "catalog-detail__cover");
-    if (book.coverUrl) { const image = this.createElement("img", "") as HTMLImageElement; image.src = book.coverUrl; image.alt = this.t("ui.catalog.coverOf", { title: book.title }); cover.append(image); }
-    else cover.append(this.createElement("span", "catalog-card__placeholder", book.title.slice(0, 1).toLocaleUpperCase()));
+    this.appendCover(cover, book);
     const copy = this.createElement("div", "catalog-detail__copy"); const back = this.createElement("button", "link-button", this.t("ui.common.back")); back.type = "button"; back.addEventListener("click", this.onBack);
     copy.append(back, this.createElement("h1", "page-title", book.title), this.createElement("p", "page-subtitle", book.author));
     const metadata = this.createElement("dl", "catalog-detail__metadata"); this.meta(metadata, this.t("ui.catalog.genre"), book.genreName); this.meta(metadata, this.t("ui.catalog.format"), book.format.toUpperCase());
@@ -37,7 +37,12 @@ export class CatalogBookView extends BaseView {
       if (!confirmed) { action.disabled = false; return; }
       await this.onAdd(confirmed, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal);
     }
-    catch (error) { action.disabled = false; progress.textContent = error instanceof Error ? error.message : this.t("ui.catalog.failed"); }
+    catch (error) { action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = catalogDownloadCode(error); progress.textContent = `${this.t("ui.catalog.downloadFailed")}${code ? ` (${code})` : ""}`; }
+  }
+  private appendCover(root: HTMLElement, book: CatalogBookData): void {
+    const fallback = (): void => root.replaceChildren(this.createElement("span", "catalog-card__placeholder", "📖"));
+    if (!book.coverUrl) { fallback(); return; }
+    const image = this.createElement("img", "") as HTMLImageElement; image.src = book.coverUrl; image.alt = this.t("ui.catalog.coverOf", { title: book.title }); image.addEventListener("error", fallback, { once: true }); root.append(image);
   }
   private meta(root: HTMLElement, label: string, value: string): void { root.append(this.createElement("dt", "", label), this.createElement("dd", "", value)); }
   private formatSize(bytes: number): string { return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(bytes / 1024 / 1024) + " MB"; }

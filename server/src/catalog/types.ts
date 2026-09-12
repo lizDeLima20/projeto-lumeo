@@ -28,6 +28,7 @@ export interface CatalogQuery { offset: number; limit: number; query?: string; g
  * The BFF deliberately never proxies PDF or EPUB bytes. */
 export interface CatalogDownloadLink {
   bookId: string;
+  driveFileId: string;
   downloadUrl: string;
   title: string;
   author: string;

@@ -4,6 +4,7 @@ import { CatalogService } from "../services/CatalogService";
 import type { CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { BaseView } from "./BaseView";
 import { CatalogGenreDialog } from "./CatalogGenreDialog";
+import { catalogDownloadCode } from "../services/GoogleDrivePublicProvider";
 
 export class CatalogExplorerView extends BaseView {
   private readonly catalog: CatalogService;
@@ -53,8 +54,7 @@ export class CatalogExplorerView extends BaseView {
   }
   private card(book: CatalogBookData): HTMLElement {
     const card = this.createElement("article", "catalog-card"); card.tabIndex = 0; card.addEventListener("click", () => this.onOpen(book.bookId)); card.addEventListener("keydown", (event) => { if (event.key === "Enter") this.onOpen(book.bookId); }); const cover = this.createElement("div", "catalog-card__cover");
-    if (book.coverUrl) { const image = this.createElement("img", "") as HTMLImageElement; image.src = book.coverUrl; image.alt = this.t("ui.catalog.coverOf", { title: book.title }); image.loading = "lazy"; cover.append(image); }
-    else cover.append(this.createElement("span", "catalog-card__placeholder", book.title.slice(0, 1).toLocaleUpperCase()));
+    this.appendCover(cover, book);
     const title = this.createElement("h2", "catalog-card__title", book.title); const author = this.createElement("p", "catalog-card__author", book.author);
     const info = this.createElement("div", "catalog-card__info"); info.append(title, author, this.createElement("small", "catalog-card__genre", book.genreName || this.t("ui.catalog.unclassified")));
     if (book.volume) info.append(this.createElement("small", "catalog-card__volume", this.t("ui.catalog.volume", { volume: book.volume })));
@@ -72,7 +72,19 @@ export class CatalogExplorerView extends BaseView {
       if (!confirmed) { action.disabled = false; return; }
       await this.onAdd(confirmed, (stage, percent) => { action.textContent = `${this.t(`ui.catalog.${stage}` as never)}${percent == null ? "" : ` ${percent}%`}`; });
     }
-    catch (error) { action.disabled = false; action.textContent = error instanceof Error ? error.message : this.t("ui.catalog.failed"); }
+    catch (error) {
+      action.disabled = false; action.textContent = this.t("ui.common.retry");
+      const code = catalogDownloadCode(error);
+      const prior = action.parentElement?.querySelector(".catalog-card__error"); prior?.remove();
+      const message = this.createElement("p", "catalog-card__error", `${this.t("ui.catalog.downloadFailed")}${code ? ` (${code})` : ""}`);
+      action.after(message);
+    }
+  }
+  private appendCover(root: HTMLElement, book: CatalogBookData): void {
+    const fallback = (): void => root.replaceChildren(this.createElement("span", "catalog-card__placeholder", "📖"));
+    if (!book.coverUrl) { fallback(); return; }
+    const image = this.createElement("img", "") as HTMLImageElement; image.src = book.coverUrl; image.alt = this.t("ui.catalog.coverOf", { title: book.title }); image.loading = "lazy";
+    image.addEventListener("error", fallback, { once: true }); root.append(image);
   }
   private isUnclassified(book: CatalogBookData): boolean { return !book.genreId || book.genreId === "sem-genero" || /^sem gênero$/i.test(book.genreName.trim()); }
 }

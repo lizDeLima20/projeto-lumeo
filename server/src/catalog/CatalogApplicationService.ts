@@ -2,10 +2,12 @@ import { ApiError } from "../errors/ApiError.js";
 import type { CatalogStore } from "./CatalogRepository.js";
 import { CatalogSyncService } from "./CatalogSyncService.js";
 import { GoogleCatalogDriveClient } from "./GoogleCatalogDriveClient.js";
+import { GoogleDrivePublicUrlResolver } from "./GoogleDrivePublicUrlResolver.js";
 import { PublicGoogleDriveCatalog } from "./PublicGoogleDriveCatalog.js";
 import type { CatalogBookRecord, CatalogDownloadLink, CatalogPage, CatalogQuery, CatalogSyncReport } from "./types.js";
 
 export class CatalogApplicationService {
+  private readonly urls = new GoogleDrivePublicUrlResolver();
   public constructor(private readonly store: CatalogStore, private readonly createDrive: () => GoogleCatalogDriveClient, private readonly publicCatalog?: PublicGoogleDriveCatalog) {}
   public list(query: CatalogQuery): Promise<CatalogPage> { return this.publicCatalog ? this.publicCatalog.list(query) : this.store.list(query); }
   public async get(bookId: string): Promise<CatalogBookRecord> {
@@ -13,16 +15,20 @@ export class CatalogApplicationService {
   }
   public async download(bookId: string): Promise<CatalogDownloadLink> {
     const book = await this.get(bookId);
+    const info = this.urls.resolve(book.driveFileId, book.format);
+    console.info(JSON.stringify({ event: "CATALOG_DOWNLOAD_REQUEST", bookId: book.bookId, driveFileId: info.driveFileId }));
+    console.info(JSON.stringify({ event: "CATALOG_DOWNLOAD_INFO", bookId: book.bookId, driveFileId: info.driveFileId, downloadUrl: info.downloadUrl, expectedFormat: info.expectedFormat }));
     return {
       bookId: book.bookId,
-      downloadUrl: GoogleCatalogDriveClient.publicDownloadUrl(book.driveFileId),
+      driveFileId: info.driveFileId,
+      downloadUrl: info.downloadUrl,
       title: book.title,
       author: book.author,
       genreId: book.genreId,
       genreName: book.genreName,
       format: book.format,
       sha256: book.sha256,
-      coverUrl: book.coverUrl,
+      coverUrl: book.coverUrl ?? info.coverUrl,
       fileSize: book.fileSize,
     };
   }

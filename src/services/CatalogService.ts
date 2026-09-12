@@ -3,6 +3,7 @@ import type { CatalogBookData, CatalogPage } from "../models/CatalogBook";
 
 export interface CatalogDownloadLink {
   bookId: string;
+  driveFileId: string;
   downloadUrl: string;
   title: string;
   author: string;

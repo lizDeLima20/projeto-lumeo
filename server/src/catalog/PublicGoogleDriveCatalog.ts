@@ -1,8 +1,10 @@
 import type { CatalogBookRecord, CatalogPage, CatalogQuery } from "./types.js";
+import { GoogleDrivePublicUrlResolver } from "./GoogleDrivePublicUrlResolver.js";
 
 /** Reads only the public HTML representation of a shared Drive folder. */
 export class PublicGoogleDriveCatalog {
   private cache: { expiresAt: number; books: readonly CatalogBookRecord[] } | null = null;
+  private readonly urls = new GoogleDrivePublicUrlResolver();
   public constructor(private readonly folderId: string, private readonly locale = "pt-BR") {}
 
   public async list(query: CatalogQuery): Promise<CatalogPage> {
@@ -21,7 +23,8 @@ export class PublicGoogleDriveCatalog {
     for (let match; (match = pattern.exec(html));) {
       const driveFileId = match[1]!; if (seen.has(driveFileId)) continue; seen.add(driveFileId);
       const name = this.decode(match[2]!); const format = match[3]!.toLowerCase() as "pdf" | "epub"; const parsed = this.parseName(name);
-      rows.push({ bookId: driveFileId, title: parsed.title, author: parsed.author, genreId: "sem-genero", genreName: "Sem gênero", coverUrl: null, description: null,
+      const publicInfo = this.urls.resolve(driveFileId, format);
+      rows.push({ bookId: driveFileId, title: parsed.title, author: parsed.author, genreId: "sem-genero", genreName: "Sem gênero", coverUrl: publicInfo.coverUrl, description: null,
         format, fileSize: null, driveFileId, storageAccountId: `google-drive-${this.locale}`, sha256: null, volume: null, collection: null, language: "pt", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), status: "ACTIVE" });
     }
     this.cache = { expiresAt: Date.now() + 5 * 60_000, books: rows }; return rows;
