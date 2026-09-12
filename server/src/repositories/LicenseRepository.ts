@@ -15,7 +15,9 @@ export class LicenseRepository implements LicenseStore {
     return data ? { id: data.id, userId: data.user_id, status: data.status as LicenseStatus, purchasedAt: data.purchased_at } : null;
   }
   public async createDevelopmentLicense(userId: string): Promise<LicenseRecord> {
-    const { data, error } = await this.database.from("licenses").insert({ user_id: userId, status: "active" })
+    // The explicit temporary development switch must also release accounts
+    // that were created before it was enabled, not only brand-new accounts.
+    const { data, error } = await this.database.from("licenses").upsert({ user_id: userId, status: "active" }, { onConflict: "user_id" })
       .select("id,user_id,status,purchased_at").single();
     if (error) throw error;
     return { id: data.id, userId: data.user_id, status: data.status as LicenseStatus, purchasedAt: data.purchased_at };

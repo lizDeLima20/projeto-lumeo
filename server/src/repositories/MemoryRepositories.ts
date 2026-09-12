@@ -30,7 +30,8 @@ export class MemoryLicenseRepository implements LicenseStore {
   private readonly records = new Map<string, LicenseRecord>();
   public async findByUser(userId: string): Promise<LicenseRecord | null> { return this.records.get(userId) ?? null; }
   public async createDevelopmentLicense(userId: string): Promise<LicenseRecord> {
-    const license: LicenseRecord = { id: randomUUID(), userId, status: "active", purchasedAt: new Date().toISOString() };
+    const previous = this.records.get(userId);
+    const license: LicenseRecord = { id: previous?.id ?? randomUUID(), userId, status: "active", purchasedAt: previous?.purchasedAt ?? new Date().toISOString() };
     this.records.set(userId, license); return license;
   }
 }

@@ -27,7 +27,10 @@ export class Config {
       supabasePublishableKey: environment.SUPABASE_PUBLISHABLE_KEY ?? environment.SUPABASE_ANON_KEY ?? "",
       supabaseSecretKey: environment.SUPABASE_SECRET_KEY ?? environment.SUPABASE_SERVICE_ROLE_KEY ?? "",
       deviceHashSecret: environment.DEVICE_HASH_SECRET ?? "",
-      autoActivateDevLicense: nodeEnv !== "production" && environment.AUTO_ACTIVATE_DEV_LICENSE === "true",
+      // This is intentionally opt-in. It may be enabled in a temporary test
+      // deployment, including Vercel Production, but is never inferred from
+      // NODE_ENV and must be turned off before paid licensing is enabled.
+      autoActivateDevLicense: environment.AUTO_ACTIVATE_DEV_LICENSE === "true",
       nodeEnv,
       appEnv: environment.APP_ENV ?? nodeEnv,
       appVersion: environment.APP_VERSION ?? "0.1.0",
