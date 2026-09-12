@@ -1,6 +1,19 @@
 import type { ApiClient } from "./ApiClient";
 import type { CatalogBookData, CatalogPage } from "../models/CatalogBook";
 
+export interface CatalogDownloadLink {
+  bookId: string;
+  downloadUrl: string;
+  title: string;
+  author: string;
+  genreId: string;
+  genreName: string;
+  format: CatalogBookData["format"];
+  sha256?: string | null;
+  coverUrl?: string | null;
+  fileSize?: number | null;
+}
+
 export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; }
 
 export interface CatalogQuery {
@@ -27,8 +40,10 @@ export class CatalogService {
     return this.api.get<CatalogBookData>(`/catalog/books/${encodeURIComponent(bookId)}`);
   }
 
-  public download(bookId: string, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
-    return this.api.download(`/catalog/books/${encodeURIComponent(bookId)}/download`, onProgress, signal);
+  /** The authenticated BFF authorizes the item, then the browser downloads it
+   * directly from the public Google Drive URL returned here. */
+  public downloadLink(bookId: string): Promise<CatalogDownloadLink> {
+    return this.api.get<CatalogDownloadLink>(`/catalog/books/${encodeURIComponent(bookId)}/download`);
   }
   public adminStatus(): Promise<{ isAdmin: boolean }> { return this.api.get("/catalog/admin/status"); }
   public sync(): Promise<CatalogSyncReport> { return this.api.post("/catalog/sync", {}); }

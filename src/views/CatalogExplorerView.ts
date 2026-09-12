@@ -3,13 +3,15 @@ import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
 import type { CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { BaseView } from "./BaseView";
+import { CatalogGenreDialog } from "./CatalogGenreDialog";
 
 export class CatalogExplorerView extends BaseView {
   private readonly catalog: CatalogService;
   private cursor: string | null = null;
   private loading = false;
   private readonly loaded = new Set<string>();
-  private list: HTMLElement | null = null;
+  private readonly classified: HTMLElement = document.createElement("div");
+  private readonly unclassified: HTMLElement = document.createElement("div");
   private status: HTMLElement | null = null;
   public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void,
     private readonly onAdd: (book: CatalogBookData, progress: (stage: CatalogImportStage, percent?: number | null) => void) => Promise<void>) { super(); this.catalog = api; }
@@ -19,20 +21,30 @@ export class CatalogExplorerView extends BaseView {
     const controls = this.createElement("div", "catalog__controls");
     const search = this.createElement("input", "input") as HTMLInputElement; search.type = "search"; search.placeholder = this.t("ui.catalog.search"); search.setAttribute("aria-label", this.t("ui.catalog.search"));
     const genre = this.createElement("select", "input") as HTMLSelectElement; genre.append(new Option(this.t("ui.catalog.allGenres"), "")); this.state.genres.forEach((value) => genre.append(new Option(value.name, value.id)));
-    controls.append(search, genre); const list = this.createElement("div", "catalog__grid"); this.list = list;
+    controls.append(search, genre);
+    const list = this.createElement("div", "catalog__sections");
+    this.classified.className = "catalog__grid"; this.unclassified.className = "catalog__grid";
+    const classifiedSection = this.createElement("section", "catalog__section"); classifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.allGenres")), this.classified);
+    const unclassifiedSection = this.createElement("section", "catalog__section catalog__section--unclassified"); unclassifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.unclassified")), this.unclassified);
+    list.append(classifiedSection, unclassifiedSection);
     const status = this.createElement("p", "catalog__status"); status.setAttribute("role", "status"); this.status = status;
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
     let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, genre.value, more); }, 250); };
     search.addEventListener("input", reload); genre.addEventListener("change", reload); more.addEventListener("click", () => void this.load(search.value, genre.value, more));
     section.append(heading, controls, list, status, more); void this.load("", "", more); return section;
   }
-  private reset(): void { this.cursor = null; this.loaded.clear(); this.list?.replaceChildren(); }
+  private reset(): void { this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); this.unclassified.replaceChildren(); }
   private async load(query: string, genreId: string, more: HTMLButtonElement): Promise<void> {
     if (this.loading || this.cursor === "end") return; this.loading = true; more.disabled = true; this.status!.textContent = this.t("ui.common.loading");
     try {
       const page = await this.catalog.list({ cursor: this.cursor ?? undefined, query: query.trim() || undefined, genreId: genreId || undefined });
-      page.items.filter((book) => !this.loaded.has(book.bookId)).forEach((book) => { this.loaded.add(book.bookId); this.list?.append(this.card(book)); });
+      page.items.filter((book) => !this.loaded.has(book.bookId)).forEach((book) => {
+        this.loaded.add(book.bookId);
+        (this.isUnclassified(book) ? this.unclassified : this.classified).append(this.card(book));
+      });
       this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end"; this.status!.textContent = this.loaded.size ? "" : this.t("ui.catalog.empty");
+      this.unclassified.closest<HTMLElement>(".catalog__section")!.hidden = this.unclassified.childElementCount === 0;
+      this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
     } catch (error) { this.status!.textContent = error instanceof Error ? error.message : this.t("ui.catalog.offline"); }
     finally { this.loading = false; more.disabled = false; }
   }
@@ -41,7 +53,7 @@ export class CatalogExplorerView extends BaseView {
     if (book.coverUrl) { const image = this.createElement("img", "") as HTMLImageElement; image.src = book.coverUrl; image.alt = this.t("ui.catalog.coverOf", { title: book.title }); image.loading = "lazy"; cover.append(image); }
     else cover.append(this.createElement("span", "catalog-card__placeholder", book.title.slice(0, 1).toLocaleUpperCase()));
     const title = this.createElement("h2", "catalog-card__title", book.title); const author = this.createElement("p", "catalog-card__author", book.author);
-    const info = this.createElement("div", "catalog-card__info"); info.append(title, author);
+    const info = this.createElement("div", "catalog-card__info"); info.append(title, author, this.createElement("small", "catalog-card__genre", book.genreName || this.t("ui.catalog.unclassified")));
     if (book.volume) info.append(this.createElement("small", "catalog-card__volume", this.t("ui.catalog.volume", { volume: book.volume })));
     const action = this.createElement("button", "button button--secondary", this.isLocal(book) ? this.t("ui.catalog.inLibrary") : this.t("ui.catalog.add")); action.type = "button";
     action.addEventListener("click", (event) => { event.stopPropagation(); void this.addFromCard(book, action); });
@@ -52,7 +64,12 @@ export class CatalogExplorerView extends BaseView {
     const local = this.state.books.find((item) => item.catalogBookId === book.bookId);
     if (local) { this.onOpen(book.bookId); return; }
     action.disabled = true;
-    try { await this.onAdd(book, (stage, percent) => { action.textContent = `${this.t(`ui.catalog.${stage}` as never)}${percent == null ? "" : ` ${percent}%`}`; }); }
+    try {
+      const confirmed = await new CatalogGenreDialog(this.state, book).open();
+      if (!confirmed) { action.disabled = false; return; }
+      await this.onAdd(confirmed, (stage, percent) => { action.textContent = `${this.t(`ui.catalog.${stage}` as never)}${percent == null ? "" : ` ${percent}%`}`; });
+    }
     catch (error) { action.disabled = false; action.textContent = error instanceof Error ? error.message : this.t("ui.catalog.failed"); }
   }
+  private isUnclassified(book: CatalogBookData): boolean { return !book.genreId || book.genreId === "sem-genero" || /^sem gênero$/i.test(book.genreName.trim()); }
 }

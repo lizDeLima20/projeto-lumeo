@@ -1,8 +1,8 @@
 import { ApiError } from "../errors/ApiError.js";
 import type { CatalogStore } from "./CatalogRepository.js";
 import { CatalogSyncService } from "./CatalogSyncService.js";
-import { GoogleCatalogDriveClient, type CatalogDriveFile } from "./GoogleCatalogDriveClient.js";
-import type { CatalogBookRecord, CatalogDownload, CatalogPage, CatalogQuery, CatalogSyncReport } from "./types.js";
+import { GoogleCatalogDriveClient } from "./GoogleCatalogDriveClient.js";
+import type { CatalogBookRecord, CatalogDownloadLink, CatalogPage, CatalogQuery, CatalogSyncReport } from "./types.js";
 
 export class CatalogApplicationService {
   public constructor(private readonly store: CatalogStore, private readonly createDrive: () => GoogleCatalogDriveClient) {}
@@ -10,10 +10,20 @@ export class CatalogApplicationService {
   public async get(bookId: string): Promise<CatalogBookRecord> {
     const book = await this.store.getActive(bookId); if (!book) throw new ApiError(404, "CATALOG_BOOK_NOT_FOUND", "Livro não encontrado no catálogo."); return book;
   }
-  public async download(bookId: string): Promise<CatalogDownload> {
+  public async download(bookId: string): Promise<CatalogDownloadLink> {
     const book = await this.get(bookId);
-    const file: CatalogDriveFile = { id: book.driveFileId, name: `${book.title}.${book.format}`, format: book.format, mimeType: book.format === "pdf" ? "application/pdf" : "application/epub+zip", size: book.fileSize, modifiedAt: book.updatedAt };
-    return this.createDrive().download(file);
+    return {
+      bookId: book.bookId,
+      downloadUrl: GoogleCatalogDriveClient.publicDownloadUrl(book.driveFileId),
+      title: book.title,
+      author: book.author,
+      genreId: book.genreId,
+      genreName: book.genreName,
+      format: book.format,
+      sha256: book.sha256,
+      coverUrl: book.coverUrl,
+      fileSize: book.fileSize,
+    };
   }
   public async sync(userId: string): Promise<CatalogSyncReport> {
     if (!await this.store.isAdmin(userId)) throw new ApiError(403, "CATALOG_ADMIN_REQUIRED", "Esta conta não pode sincronizar o catálogo.");

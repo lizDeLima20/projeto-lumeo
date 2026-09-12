@@ -6,6 +6,7 @@ interface BottomNavigationItem { labelKey: TranslationKey; icon: string; route: 
 export class MobileBottomNavigation {
   private readonly items: readonly BottomNavigationItem[] = [
     { labelKey: "ui.navigation.library", icon: "⌂", route: "library" },
+    { labelKey: "ui.catalog.title", icon: "⌕", route: "explore" },
     { labelKey: "ui.navigation.home", icon: "⌕", route: "home" },
     { labelKey: "ui.navigation.add", icon: "+", route: "import" },
     { labelKey: "ui.navigation.settings", icon: "♙", route: "settings" },

@@ -3,6 +3,7 @@ import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
 import type { CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { BaseView } from "./BaseView";
+import { CatalogGenreDialog } from "./CatalogGenreDialog";
 
 export class CatalogBookView extends BaseView {
   public constructor(private readonly catalog: CatalogService, private readonly state: AppState, private readonly bookId: string,
@@ -31,7 +32,11 @@ export class CatalogBookView extends BaseView {
   }
   private async add(book: CatalogBookData, action: HTMLButtonElement, progress: HTMLElement): Promise<void> {
     action.disabled = true; const controller = new AbortController();
-    try { await this.onAdd(book, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal); }
+    try {
+      const confirmed = await new CatalogGenreDialog(this.state, book).open();
+      if (!confirmed) { action.disabled = false; return; }
+      await this.onAdd(confirmed, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal);
+    }
     catch (error) { action.disabled = false; progress.textContent = error instanceof Error ? error.message : this.t("ui.catalog.failed"); }
   }
   private meta(root: HTMLElement, label: string, value: string): void { root.append(this.createElement("dt", "", label), this.createElement("dd", "", value)); }

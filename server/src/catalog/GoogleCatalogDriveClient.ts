@@ -1,6 +1,6 @@
 import { createHash, createSign } from "node:crypto";
 import { ApiError } from "../errors/ApiError.js";
-import type { CatalogDownload, CatalogFormat } from "./types.js";
+import type { CatalogFormat } from "./types.js";
 
 interface ServiceAccount { client_email: string; private_key: string; token_uri?: string; }
 interface DriveFile { id: string; name: string; mimeType: string; size?: string; modifiedTime: string; }
@@ -43,20 +43,14 @@ export class GoogleCatalogDriveClient {
     }
     this.assertSignature(file.format, prefix); return hash.digest("hex");
   }
-  public async download(file: CatalogDriveFile): Promise<CatalogDownload> {
-    this.assertSize(file.size);
-    // Revalidates magic bytes immediately before every user download. The full
-    // stream is only opened after this succeeds, so an updated Drive file cannot
-    // bypass the sync validation.
-    const prefix = await this.readPrefix(file.id); this.assertSignature(file.format, prefix);
-    const response = await this.media(file.id);
-    if (!response.body) throw new ApiError(503, "CATALOG_SOURCE_UNAVAILABLE", "Não foi possível abrir o arquivo do catálogo.");
-    const expectedMime = file.format === "pdf" ? "application/pdf" : "application/epub+zip";
-    return { fileName: file.name, mimeType: expectedMime, contentLength: file.size, body: response.body };
-  }
-  private async readPrefix(fileId: string): Promise<Uint8Array> {
-    const token = await this.accessToken(); const response = await fetch(this.fileUrl(fileId), { headers: { Authorization: `Bearer ${token}`, Range: "bytes=0-7" } });
-    if (!response.ok) throw this.driveError(response.status); return new Uint8Array(await response.arrayBuffer());
+  /** Public files are downloaded browser-to-Drive, never through the BFF. */
+  public static publicDownloadUrl(fileId: string): string {
+    if (!/^[a-zA-Z0-9_-]{10,}$/.test(fileId)) throw new ApiError(422, "CATALOG_FILE_INVALID", "Identificador de arquivo do catálogo inválido.");
+    const url = new URL("https://drive.usercontent.google.com/download");
+    url.searchParams.set("id", fileId);
+    url.searchParams.set("export", "download");
+    url.searchParams.set("confirm", "t");
+    return url.toString();
   }
   private async media(fileId: string): Promise<Response> {
     const token = await this.accessToken(); const response = await fetch(this.fileUrl(fileId), { headers: { Authorization: `Bearer ${token}` } });

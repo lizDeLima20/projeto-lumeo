@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { CatalogApplicationService } from "../src/catalog/CatalogApplicationService.js";
 import type { CatalogStore } from "../src/catalog/CatalogRepository.js";
-import type { CatalogBookRecord, CatalogDownload, CatalogPage, CatalogQuery } from "../src/catalog/types.js";
+import type { CatalogBookRecord, CatalogPage, CatalogQuery } from "../src/catalog/types.js";
 import { ApiError } from "../src/errors/ApiError.js";
 
 const item = (bookId = "10000000-0000-4000-8000-000000000001"): CatalogBookRecord => ({ bookId, title: "Livro autorizado", author: "Autora", genreId: "romance", genreName: "Romance", coverUrl: null, description: null, format: "epub", fileSize: 42, driveFileId: "drive-file", storageAccountId: "google-drive-default", sha256: "a".repeat(64), volume: null, collection: null, language: "pt-BR", createdAt: "2026-09-12T00:00:00.000Z", updatedAt: "2026-09-12T00:00:00.000Z", status: "ACTIVE" });
@@ -28,6 +28,13 @@ describe("CatalogApplicationService", () => {
     const store = new MemoryCatalogStore(); await store.save({ ...item(), status: "UNAVAILABLE" }); const service = new CatalogApplicationService(store, () => driveStub());
     await assert.rejects(() => service.download(item().bookId), (error: unknown) => error instanceof ApiError && error.code === "CATALOG_BOOK_NOT_FOUND");
   });
+  it("returns a public Drive URL and never a file stream", async () => {
+    const store = new MemoryCatalogStore(); await store.save(item());
+    const download = await new CatalogApplicationService(store, () => driveStub()).download(item().bookId);
+    assert.equal(download.bookId, item().bookId);
+    assert.match(download.downloadUrl, /^https:\/\/drive\.usercontent\.google\.com\/download\?/);
+    assert.equal("body" in download, false);
+  });
   it("requires a backend-admin decision before synchronization", async () => {
     const store = new MemoryCatalogStore(); const service = new CatalogApplicationService(store, () => driveStub());
     await assert.rejects(() => service.sync("user"), (error: unknown) => error instanceof ApiError && error.code === "CATALOG_ADMIN_REQUIRED");
@@ -35,5 +42,5 @@ describe("CatalogApplicationService", () => {
 });
 
 function driveStub(): never {
-  return { download: async (): Promise<CatalogDownload> => ({ fileName: "book.epub", mimeType: "application/epub+zip", contentLength: 4, body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([0x50, 0x4b, 3, 4])); controller.close(); } }) }) } as never;
+  return {} as never;
 }

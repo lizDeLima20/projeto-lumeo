@@ -24,5 +24,18 @@ export interface CatalogBookRecord {
 
 export interface CatalogPage { items: readonly CatalogBookRecord[]; nextCursor: string | null; }
 export interface CatalogQuery { offset: number; limit: number; query?: string; genreId?: string; author?: string; format?: CatalogFormat; collection?: string; }
-export interface CatalogDownload { fileName: string; mimeType: string; contentLength: number | null; body: ReadableStream<Uint8Array>; }
+/** Metadata needed by the browser to download a public Drive file directly.
+ * The BFF deliberately never proxies PDF or EPUB bytes. */
+export interface CatalogDownloadLink {
+  bookId: string;
+  downloadUrl: string;
+  title: string;
+  author: string;
+  genreId: string;
+  genreName: string;
+  format: CatalogFormat;
+  sha256: string | null;
+  coverUrl: string | null;
+  fileSize: number | null;
+}
 export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; }

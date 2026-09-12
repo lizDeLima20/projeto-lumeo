@@ -54,7 +54,7 @@ export class ApiController {
       const catalogDownload = path.match(/^\/api\/catalog\/books\/([^/]+)\/download$/);
       if (catalogDownload && request.method === "GET") {
         await this.assertCatalogLicense(user.id);
-        return await this.download(response, await this.requiredCatalog().download(decodeURIComponent(catalogDownload[1]!)));
+        return this.json(response, 200, await this.requiredCatalog().download(decodeURIComponent(catalogDownload[1]!)));
       }
       if (path === "/api/catalog/sync" && request.method === "POST") {
         await this.assertCatalogLicense(user.id);
@@ -169,13 +169,6 @@ export class ApiController {
     const offset = Math.max(0, Number.parseInt(value("cursor") ?? "0", 10) || 0); const format = value("format");
     if (format && format !== "pdf" && format !== "epub") throw new ApiError(400, "INVALID_CATALOG_FILTER", "Filtro de catálogo inválido.");
     return { offset, limit: 24, query: value("query"), genreId: value("genreId"), author: value("author"), collection: value("collection"), format: format as "pdf" | "epub" | undefined };
-  }
-  private async download(response: ApiResponse, file: import("../catalog/types.js").CatalogDownload): Promise<void> {
-    response.statusCode = 200; response.setHeader("Content-Type", file.mimeType); response.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
-    if (file.contentLength !== null) response.setHeader("Content-Length", String(file.contentLength)); response.setHeader("Cache-Control", "private, no-store");
-    const reader = file.body.getReader();
-    try { while (true) { const { done, value } = await reader.read(); if (done) break; if (value && !response.write(Buffer.from(value))) await new Promise<void>((resolve) => response.once("drain", resolve)); } }
-    finally { reader.releaseLock(); response.end(); }
   }
 
   private async ensureProfile(action: "signup" | "login", userId: string, email: string): Promise<void> {

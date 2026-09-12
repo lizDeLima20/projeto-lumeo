@@ -1,8 +1,9 @@
 # Catálogo “Explorar livros”
 
 O catálogo é remoto; a biblioteca do leitor continua local-first. A BFF guarda
-somente metadados no Supabase e abre o arquivo no Google Drive exclusivamente
-quando o leitor escolhe **Adicionar à biblioteca**. O PDF/EPUB então passa pelo
+somente metadados no Supabase e, quando o leitor escolhe **Adicionar à biblioteca**,
+retorna a URL pública do arquivo no Google Drive. O navegador baixa o PDF/EPUB
+diretamente do Drive; a BFF nunca faz streaming do arquivo. O PDF/EPUB então passa pelo
 mesmo `ImportManager`, validação, capa extraída e IndexedDB usados pela importação
 do dispositivo. Depois disso, ele funciona offline e não depende mais do Drive.
 
@@ -26,8 +27,8 @@ mostrada em logs. O cliente só chama `/api/catalog/*` com o token da sessão.
 
 - `GET /api/catalog/books`: lista paginada e filtrável por metadados.
 - `GET /api/catalog/books/:bookId`: detalhe.
-- `GET /api/catalog/books/:bookId/download`: valida a assinatura PDF/EPUB e
-  transmite o arquivo sem revelar o Drive.
+- `GET /api/catalog/books/:bookId/download`: devolve JSON com metadados e a URL
+  pública de download do Drive; não transmite bytes do PDF/EPUB.
 - `POST /api/catalog/sync`: ação explícita, autenticada e restrita a
   `profiles.is_admin = true`. Nunca é executada no carregamento da aplicação.
 

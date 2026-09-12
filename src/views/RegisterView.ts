@@ -4,7 +4,7 @@ import { BaseView } from "./BaseView";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 
 export class RegisterView extends BaseView {
-  public constructor(private readonly auth: AuthManager, private readonly onSuccess: () => void, private readonly onLogin: () => void) { super(); }
+  public constructor(private readonly auth: AuthManager, private readonly onSuccess: () => void | Promise<void>, private readonly onLogin: () => void) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "auth-page page-shell");
     const form = this.createElement("form", "auth-card");
@@ -16,7 +16,13 @@ export class RegisterView extends BaseView {
     const submit = this.createElement("button", "button button--primary", this.t("ui.auth.register")); submit.type = "submit";
     const login = this.createElement("button", "text-button", this.t("ui.auth.haveAccount")); login.type = "button"; login.addEventListener("click", this.onLogin);
     form.append(email.wrapper, password.wrapper, confirmation.wrapper, message, submit, new GoogleAuthButton("signup_with", async (credential, nonce) => {
-      message.textContent = ""; await this.auth.loginWithGoogle(credential, nonce); this.onSuccess();
+      message.textContent = "";
+      try {
+        await this.auth.loginWithGoogle(credential, nonce);
+        await this.onSuccess();
+      } catch (caught) {
+        message.textContent = caught instanceof ApiError ? caught.message : this.t("ui.auth.registerFailed");
+      }
     }, (text) => { message.textContent = text; }).render(), login);
     form.addEventListener("submit", async (event) => {
       event.preventDefault(); message.textContent = "";
@@ -26,7 +32,7 @@ export class RegisterView extends BaseView {
       try {
         const result = await this.auth.signup(email.input.value, password.input.value);
         if ("requiresEmailConfirmation" in result) message.textContent = this.t("ui.auth.confirmEmail");
-        else this.onSuccess();
+        else await this.onSuccess();
       } catch (caught) { message.textContent = caught instanceof ApiError ? caught.message : this.t("ui.auth.registerFailed"); }
       finally { submit.disabled = false; }
     });

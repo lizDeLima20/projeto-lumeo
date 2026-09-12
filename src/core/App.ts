@@ -114,13 +114,16 @@ export class App {
     this.connectivity.subscribe((status)=>{if(status==="OFFLINE")this.showToast(I18nManager.shared.t("offline.status"));if(status==="RECONNECTING")this.showToast(I18nManager.shared.t("offline.reconnecting"));});
     await this.devices.initialize();
     await this.auth.initialize();
-    if (this.state.authStatus === "authenticated" || this.state.authStatus === "AUTHENTICATED") await this.resolveDevice();
+    if (this.state.authStatus === "authenticated" || this.state.authStatus === "AUTHENTICATED") {
+      try { await this.resolveDevice(); }
+      catch (error) { this.showToast(error instanceof ApiError ? error.message : "Não foi possível restaurar sua sessão."); }
+    }
     this.router.start(this.isAuthenticated() ? this.nextProtectedRoute() : "login");
   }
 
   private registerRoutes(): void {
-    this.router.register("login", () => new LoginView(this.auth, () => void this.afterAuthentication(), () => this.router.navigate("register")));
-    this.router.register("register", () => new RegisterView(this.auth, () => void this.afterAuthentication(), () => this.router.navigate("login")));
+    this.router.register("login", () => new LoginView(this.auth, () => this.afterAuthentication(), () => this.router.navigate("register")));
+    this.router.register("register", () => new RegisterView(this.auth, () => this.afterAuthentication(), () => this.router.navigate("login")));
     this.router.register("device-conflict", () => new DeviceConflictView(
       this.state, this.auth, this.devices, () => void this.afterAuthentication(), () => void this.logout(),
     ));
@@ -164,6 +167,9 @@ export class App {
 
   private async afterAuthentication(): Promise<void> {
     await this.resolveDevice();
+    if (!this.isAuthenticated()) {
+      throw new ApiError(403, "LICENSE_REQUIRED", "Esta conta não possui uma licença ativa.");
+    }
     this.router.navigate(this.nextProtectedRoute());
   }
 
@@ -177,12 +183,17 @@ export class App {
           this.configureLocalLibrary(this.state.currentUser.id);
           await this.hydrateLibrary();
         }
-        else { await this.auth.logout(); this.showToast("Esta conta ainda não possui uma licença ativa."); }
+        else {
+          await this.auth.logout();
+          throw new ApiError(403, "LICENSE_REQUIRED", "Esta conta não possui uma licença ativa.");
+        }
       }
     } catch (error) {
       if (error instanceof ApiError && error.code === "DEVICE_REVOKED") {
-        await this.auth.logout(); this.showToast("Este aparelho foi revogado. Entre novamente em um aparelho autorizado.");
-      } else this.showToast(error instanceof ApiError ? error.message : "Não foi possível validar este aparelho.");
+        await this.auth.logout();
+        throw new ApiError(403, "DEVICE_REVOKED", "Este aparelho foi revogado. Entre novamente em um aparelho autorizado.");
+      }
+      throw error instanceof ApiError ? error : new ApiError(500, "DEVICE_VALIDATION_FAILED", "Não foi possível validar este aparelho.");
     }
   }
 

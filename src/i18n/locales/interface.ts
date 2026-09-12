@@ -1,6 +1,7 @@
 /** Shared, reviewed interface copy. Book titles, author names and book text never belong here. */
 export const INTERFACE_PT = {
   "ui.brand.tagline": "Leia · Evolua · Transforme",
+  "ui.catalog.unclassified": "Sem gênero",
   "ui.navigate.home": "Ir para o início", "ui.navigation.main": "Navegação principal", "ui.navigation.mobile": "Navegação mobile", "ui.navigation.bottom": "Navegação inferior",
   "ui.navigation.closeMenu": "Fechar menu", "ui.navigation.menu": "Menu principal", "ui.navigation.library": "Biblioteca", "ui.navigation.home": "Início", "ui.navigation.add": "Adicionar", "ui.navigation.settings": "Ajustes", "ui.navigation.logout": "Sair",
   "ui.greeting.hello": "Olá, {name}!", "ui.greeting.goodReading": "Boa leitura", "ui.auth.waiting": "Sua biblioteca espera", "ui.auth.startNow": "Comece agora",

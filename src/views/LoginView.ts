@@ -4,7 +4,7 @@ import { BaseView } from "./BaseView";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 
 export class LoginView extends BaseView {
-  public constructor(private readonly auth: AuthManager, private readonly onSuccess: () => void, private readonly onRegister: () => void) { super(); }
+  public constructor(private readonly auth: AuthManager, private readonly onSuccess: () => void | Promise<void>, private readonly onRegister: () => void) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "auth-page page-shell");
     const form = this.createElement("form", "auth-card");
@@ -16,14 +16,20 @@ export class LoginView extends BaseView {
     const register = this.createElement("button", "text-button", this.t("ui.auth.register")); register.type = "button";
     register.addEventListener("click", this.onRegister);
     form.append(email.wrapper, password.wrapper, error, submit, new GoogleAuthButton("signin_with", async (credential, nonce) => {
-      error.textContent = ""; await this.auth.loginWithGoogle(credential, nonce); this.onSuccess();
+      error.textContent = "";
+      try {
+        await this.auth.loginWithGoogle(credential, nonce);
+        await this.onSuccess();
+      } catch (caught) {
+        error.textContent = caught instanceof ApiError ? caught.message : this.t("ui.auth.loginFailed");
+      }
     }, (message) => { error.textContent = message; }).render(), register);
     form.addEventListener("submit", async (event) => {
       event.preventDefault(); submit.disabled = true; error.textContent = "";
       try {
         const localDemo = import.meta.env.DEV && !email.input.value && !password.input.value;
         await this.auth.login(localDemo ? "local@lumeo.test" : email.input.value, localDemo ? "lumeo-local" : password.input.value);
-        this.onSuccess();
+        await this.onSuccess();
       }
       catch (caught) { error.textContent = caught instanceof ApiError ? caught.message : this.t("ui.auth.loginFailed"); }
       finally { submit.disabled = false; }
