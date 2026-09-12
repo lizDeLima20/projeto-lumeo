@@ -34,7 +34,8 @@ export class BookEditView extends BaseView {
         this.onSave(new Book({ id: this.book.id, title: title.input.value.trim(), author: author.input.value.trim(), genreId: genre.value,
           cover: chosenCover, fileType: this.book.fileType, fileName: this.book.fileName, fileSize: this.book.fileSize,
           mimeType: this.book.mimeType, readingStatus: status.value as ReadingStatus, createdAt: this.book.createdAt,
-          updatedAt: new Date(), currentLocation: this.book.currentLocation, progressPercent: this.book.progressPercent, collectionId: this.book.collectionId }));
+          updatedAt: new Date(), currentLocation: this.book.currentLocation, progressPercent: this.book.progressPercent, collectionId: this.book.collectionId,
+          conversionStatus:this.book.conversionStatus,availability:this.book.availability,volume:this.book.volume,summary:this.book.summary,description:this.book.description,publicationYear:this.book.publicationYear,series:this.book.series,documentMode:this.book.documentMode,textCapability:this.book.textCapability,limaCapability:this.book.limaCapability,offlineAvailability:this.book.offlineAvailability,catalogBookId:this.book.catalogBookId,source:this.book.source }));
       } catch (caught) { error.textContent = caught instanceof Error ? caught.message : this.t("ui.edit.saveFailed"); }
       finally { save.disabled = false; }
     }); section.append(form); return section;

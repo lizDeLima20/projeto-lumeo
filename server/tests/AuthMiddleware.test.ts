@@ -54,6 +54,35 @@ describe("AuthService", () => {
   });
 });
 
+describe("AuthService com Google", () => {
+  it("troca o ID token pela mesma sessao do login, repassando provedor e nonce", async () => {
+    let received: unknown;
+    const client = { auth: { signInWithIdToken: async (args: unknown) => { received = args; return { data: {
+      session: { access_token: "access-token-value", refresh_token: "refresh-token-value", expires_at: 123 },
+      user: { id: "00000000-0000-4000-8000-000000000001", email: "leitor@gmail.com" } }, error: null }; } } } as never;
+    const session = await new AuthService(client).google("google-id-token", "raw-nonce-value-0000");
+    assert.deepEqual(received, { provider: "google", token: "google-id-token", nonce: "raw-nonce-value-0000" });
+    assert.deepEqual(session, { accessToken: "access-token-value", refreshToken: "refresh-token-value", expiresAt: 123, user: { id: "00000000-0000-4000-8000-000000000001", email: "leitor@gmail.com" } });
+  });
+
+  it("provedor desligado no Supabase vira 'nao configurado', nao 'senha errada'", async () => {
+    const auth = new AuthService(authClientWithGoogleError({ code: "provider_disabled", message: "Provider (issuer \"https://accounts.google.com\") is not enabled", status: 400 }));
+    await assert.rejects(() => auth.google("google-id-token", "raw-nonce-value-0000"),
+      (error: unknown) => error instanceof ApiError && error.status === 503 && error.code === "GOOGLE_AUTH_NOT_CONFIGURED");
+  });
+
+  it("token ou nonce recusado e 401, e queda do Supabase e 503", async () => {
+    await assert.rejects(() => new AuthService(authClientWithGoogleError({ message: "Nonces mismatch", status: 400 })).google("google-id-token", "raw-nonce-value-0000"),
+      (error: unknown) => error instanceof ApiError && error.status === 401 && error.code === "GOOGLE_TOKEN_INVALID");
+    await assert.rejects(() => new AuthService(authClientWithGoogleError({ message: "fetch failed", status: 503 })).google("google-id-token", "raw-nonce-value-0000"),
+      (error: unknown) => error instanceof ApiError && error.status === 503 && error.code === "SUPABASE_UNAVAILABLE");
+  });
+});
+
+function authClientWithGoogleError(error: { code?: string; message?: string; status?: number }): never {
+  return { auth: { signInWithIdToken: async () => ({ data: {}, error }) } } as never;
+}
+
 function authClientWithLoginError(error: { code?: string; message?: string; status?: number }): never {
   return { auth: { signInWithPassword: async () => ({ data: {}, error }) } } as never;
 }

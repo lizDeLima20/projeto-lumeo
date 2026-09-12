@@ -1,13 +1,35 @@
-import { CatalogBook } from "../models/CatalogBook";
+import type { ApiClient } from "./ApiClient";
+import type { CatalogBookData, CatalogPage } from "../models/CatalogBook";
 
-// Somente conteúdos com direito de redistribuição poderão fazer parte do catálogo distribuído com o produto.
+export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; }
+
+export interface CatalogQuery {
+  cursor?: string;
+  query?: string;
+  genreId?: string;
+  author?: string;
+  format?: "pdf" | "epub";
+  collection?: string;
+}
+
+/** Browser-facing API. Google credentials are intentionally not part of this class. */
 export class CatalogService {
-  public getPreview(): readonly CatalogBook[] {
-    return [
-      new CatalogBook({ id: "catalog-1", title: "A Cartomante", author: "Machado de Assis", genre: "Ficção",
-        coverUrl: "", fileUrl: "", format: "epub", description: "Obra em domínio público.", licenseType: "Domínio público", source: "Biblioteca pública" }),
-      new CatalogBook({ id: "catalog-2", title: "O Alienista", author: "Machado de Assis", genre: "Ficção",
-        coverUrl: "", fileUrl: "", format: "epub", description: "Obra em domínio público.", licenseType: "Domínio público", source: "Biblioteca pública" }),
-    ];
+  public constructor(private readonly api: ApiClient) {}
+
+  public async list(query: CatalogQuery = {}): Promise<CatalogPage> {
+    const parameters = new URLSearchParams();
+    Object.entries(query).forEach(([key, value]) => { if (value) parameters.set(key, value); });
+    const suffix = parameters.size ? `?${parameters}` : "";
+    return this.api.get<CatalogPage>(`/catalog/books${suffix}`);
   }
+
+  public get(bookId: string): Promise<CatalogBookData> {
+    return this.api.get<CatalogBookData>(`/catalog/books/${encodeURIComponent(bookId)}`);
+  }
+
+  public download(bookId: string, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
+    return this.api.download(`/catalog/books/${encodeURIComponent(bookId)}/download`, onProgress, signal);
+  }
+  public adminStatus(): Promise<{ isAdmin: boolean }> { return this.api.get("/catalog/admin/status"); }
+  public sync(): Promise<CatalogSyncReport> { return this.api.post("/catalog/sync", {}); }
 }

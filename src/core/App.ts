@@ -6,7 +6,9 @@ import { OneDriveImportCoordinator } from "../external/OneDriveImportCoordinator
 import { OperationRecoveryJournal } from "../recovery/OperationRecoveryJournal";
 import { GoogleDriveImporter, type GoogleDriveConfig } from "../importers/GoogleDriveImporter";
 import { UrlImporter } from "../importers/UrlImporter";
-import type { Book } from "../models/Book";
+import { Book } from "../models/Book";
+import { Genre } from "../models/Genre";
+import { Collection } from "../models/Collection";
 import { ReaderManager } from "../reader/ReaderManager";
 import { ReadingProgressService } from "../reader/ReadingProgressService";
 import { ReaderSettingsManager } from "../reader/ReaderSettingsManager";
@@ -17,6 +19,9 @@ import { ReadingProgressRepository } from "../repositories/ReadingProgressReposi
 import { CollectionRepository } from "../repositories/CollectionRepository";
 import { BookMetadataExtractor } from "../metadata/BookMetadataExtractor";
 import { ApiClient, ApiError } from "../services/ApiClient";
+import { CatalogService } from "../services/CatalogService";
+import { CatalogImportCoordinator, type CatalogImportStage } from "../services/CatalogImportCoordinator";
+import type { CatalogBookData } from "../models/CatalogBook";
 import { AuthManager } from "../services/AuthManager";
 import { CoverService } from "../services/CoverService";
 import { DeviceManager } from "../services/DeviceManager";
@@ -51,6 +56,9 @@ import { OnboardingView } from "../views/OnboardingView";
 import { ReaderView } from "../views/ReaderView";
 import { RegisterView } from "../views/RegisterView";
 import { SettingsView } from "../views/SettingsView";
+import { CatalogExplorerView } from "../views/CatalogExplorerView";
+import { CatalogBookView } from "../views/CatalogBookView";
+import { CatalogAdminView } from "../views/CatalogAdminView";
 import { MobileBottomNavigation } from "../views/MobileBottomNavigation";
 import { I18nManager } from "../i18n/I18nManager";
 import { AppState } from "./AppState";
@@ -76,6 +84,7 @@ export class App {
   private readerManager = new ReaderManager(this.books, new LocalBookFileStore(this.files),
     new ReadingProgressService(this.progress, this.books), this.readerSettings,this.limaDocuments);
   private readonly api = new ApiClient(new EnvironmentConfig().read().bffBaseUrl);
+  private readonly catalog = new CatalogService(this.api);
   private readonly auth = new AuthManager(this.api, this.storage, this.state);
   private readonly devices = new DeviceManager(this.api, this.storage, this.state);
   private readonly router: Router;
@@ -120,6 +129,12 @@ export class App {
       () => this.router.navigate("library"), () => this.router.navigate("import")));
     this.router.register("library", () => new LibraryView(this.state,
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.router.navigate("reader", { id: bookId }), (bookId) => void this.deleteBook(bookId, false)));
+    this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }),
+      (book, progress) => this.addCatalogBook(book, progress)));
+    this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
+      () => this.router.navigate("explore"), (bookId) => this.router.navigate("reader", { id: bookId }),
+      (book, progress, signal) => this.addCatalogBook(book, progress, signal)));
+    this.router.register("catalog-admin", () => new CatalogAdminView(this.catalog, () => this.router.navigate("explore")));
     this.router.register("genre", (params) => new GenreView(this.state, params.get("id") ?? "",
       () => this.router.navigate("library"), (bookId) => this.router.navigate("reader", { id: bookId })));
     this.router.register("import", (params) => {
@@ -216,6 +231,28 @@ export class App {
     this.state.library.addBook(book); this.state.notify();
     void new StoragePersistenceService().requestAfterImport();
     this.router.navigate("book", { id: book.id }); this.showToast("Livro adicionado à biblioteca.");
+  }
+
+  private async addCatalogBook(catalogBook: CatalogBookData, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal): Promise<void> {
+    const local = this.state.books.find((book) => book.catalogBookId === catalogBook.bookId);
+    if (local) { this.router.navigate("reader", { id: local.id }); return; }
+    let genre = this.state.genres.find((item) => item.id === catalogBook.genreId);
+    if (!genre) { genre = new Genre(catalogBook.genreId || crypto.randomUUID(), catalogBook.genreName || "Sem gênero"); await this.genres.save(genre); this.state.library.addGenre(genre); }
+    let collectionId: string | undefined;
+    if (catalogBook.collection) {
+      const collection = await this.collections.findByName(catalogBook.collection);
+      if (collection) collectionId = collection.id;
+      else { const created = new Collection(crypto.randomUUID(), catalogBook.collection, "custom"); await this.collections.save(created); collectionId = created.id; }
+    }
+    const coordinator = new CatalogImportCoordinator(this.catalog, this.imports, this.covers);
+    const saved = await coordinator.add({ ...catalogBook, genreId: genre.id }, progress, signal);
+    // Catalog collection metadata is optional; ImportManager already saved the original file,
+    // cover and LIMA document locally. Keep library state authoritative for the shelf.
+    if (collectionId) {
+      const adjusted = new Book({ ...saved, collectionId }); await this.libraryService.saveBook(adjusted); this.state.library.addBook(adjusted);
+    } else this.state.library.addBook(saved);
+    this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
+    this.router.navigate("library");
   }
 
   private async updateBook(book: Book): Promise<void> {

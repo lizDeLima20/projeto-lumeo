@@ -14,6 +14,9 @@ export interface ServerConfig {
   port: number;
   allowedOrigins: readonly string[];
   localAuthMode: boolean;
+  googleCatalogFolderId: string;
+  googleCatalogServiceAccountJson: string;
+  catalogSyncMaxFileBytes: number;
 }
 
 export class Config {
@@ -35,6 +38,10 @@ export class Config {
         .split(",").map((origin) => origin.trim()).filter(Boolean),
       localAuthMode: nodeEnv !== "production" && environment.LOCAL_AUTH_MODE !== "false"
         && !environment.SUPABASE_URL,
+      googleCatalogFolderId: environment.GOOGLE_CATALOG_FOLDER_ID ?? "",
+      // JSON or base64 JSON are accepted only in backend environment variables.
+      googleCatalogServiceAccountJson: environment.GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON ?? "",
+      catalogSyncMaxFileBytes: Number(environment.CATALOG_SYNC_MAX_FILE_BYTES ?? 104_857_600),
     };
   }
 

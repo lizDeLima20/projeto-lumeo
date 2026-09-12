@@ -1,6 +1,7 @@
 import { ApiError } from "../services/ApiClient";
 import { AuthManager } from "../services/AuthManager";
 import { BaseView } from "./BaseView";
+import { GoogleAuthButton } from "./GoogleAuthButton";
 
 export class LoginView extends BaseView {
   public constructor(private readonly auth: AuthManager, private readonly onSuccess: () => void, private readonly onRegister: () => void) { super(); }
@@ -14,7 +15,9 @@ export class LoginView extends BaseView {
     const submit = this.createElement("button", "button button--primary", this.t("ui.auth.login")); submit.type = "submit";
     const register = this.createElement("button", "text-button", this.t("ui.auth.register")); register.type = "button";
     register.addEventListener("click", this.onRegister);
-    form.append(email.wrapper, password.wrapper, error, submit, register);
+    form.append(email.wrapper, password.wrapper, error, submit, new GoogleAuthButton("signin_with", async (credential, nonce) => {
+      error.textContent = ""; await this.auth.loginWithGoogle(credential, nonce); this.onSuccess();
+    }, (message) => { error.textContent = message; }).render(), register);
     form.addEventListener("submit", async (event) => {
       event.preventDefault(); submit.disabled = true; error.textContent = "";
       try {

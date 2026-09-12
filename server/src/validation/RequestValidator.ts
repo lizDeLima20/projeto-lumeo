@@ -25,6 +25,13 @@ export class RequestValidator {
     return token;
   }
 
+  /** The raw nonce whose SHA-256 the browser gave Google. */
+  public nonce(value: unknown): string {
+    const nonce = this.string(value, "INVALID_NONCE").trim();
+    if (!/^[A-Za-z0-9_-]{16,256}$/.test(nonce)) throw new ApiError(400, "INVALID_NONCE", "Dados inválidos.");
+    return nonce;
+  }
+
   public installationId(value: unknown): string {
     const id = this.string(value, "INSTALLATION_ID_REQUIRED").trim();
     if (!/^[a-zA-Z0-9._:-]{8,128}$/.test(id)) throw new ApiError(400, "INVALID_INSTALLATION_ID", "Identificador de instalação inválido.");

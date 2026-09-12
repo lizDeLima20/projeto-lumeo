@@ -6,6 +6,7 @@ export type BookOfflineAvailability="AVAILABLE"|"PARTIAL"|"REMOTE_ONLY"|"ERROR";
 export type BookDocumentMode="native"|"mixed"|"scanned"|"unknown";
 export type BookTextCapability="full"|"partial"|"none";
 export type BookLimaCapability="full"|"limited"|"unavailable";
+export type BookSource="device"|"google-drive"|"onedrive"|"url"|"catalog";
 
 export interface BookData {
   id: string;
@@ -29,6 +30,9 @@ export interface BookData {
   summary?:string;description?:string;publicationYear?:number;series?:string;
   documentMode?:BookDocumentMode;textCapability?:BookTextCapability;limaCapability?:BookLimaCapability;
   offlineAvailability?:BookOfflineAvailability;
+  /** Remote catalogue identity, retained only after the original file is local. */
+  catalogBookId?: string;
+  source?: BookSource;
 }
 
 export class Book {
@@ -53,6 +57,8 @@ export class Book {
   public readonly summary?:string;public readonly description?:string;public readonly publicationYear?:number;public readonly series?:string;
   public documentMode:BookDocumentMode;public textCapability:BookTextCapability;public limaCapability:BookLimaCapability;
   public offlineAvailability:BookOfflineAvailability;
+  public readonly catalogBookId?:string;
+  public readonly source:BookSource;
 
   public constructor(data: BookData) {
     this.id = data.id;
@@ -76,5 +82,6 @@ export class Book {
     this.summary=data.summary;this.description=data.description;this.publicationYear=data.publicationYear;this.series=data.series;
     this.documentMode=data.documentMode??"unknown";this.textCapability=data.textCapability??"partial";this.limaCapability=data.limaCapability??"limited";
     this.offlineAvailability=data.offlineAvailability??(this.availability==="AVAILABLE"?"AVAILABLE":"ERROR");
+    this.catalogBookId=data.catalogBookId;this.source=data.source??"device";
   }
 }

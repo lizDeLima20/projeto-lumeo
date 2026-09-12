@@ -6,6 +6,7 @@ import { DeviceService } from "../services/DeviceService.js";
 import { LicenseService } from "../services/LicenseService.js";
 import type { ApiResponse, AuthenticatedRequest } from "../types/http.js";
 import { RequestValidator } from "../validation/RequestValidator.js";
+import { CatalogApplicationService } from "../catalog/CatalogApplicationService.js";
 
 export class ApiController {
   private readonly validator = new RequestValidator();
@@ -15,6 +16,7 @@ export class ApiController {
     private readonly devices: DeviceService,
     private readonly licenses: LicenseService,
     private readonly profiles: ProfileStore,
+    private readonly catalog?: CatalogApplicationService,
   ) {}
 
   public async handle(request: AuthenticatedRequest, response: ApiResponse, path: string): Promise<void> {
@@ -22,6 +24,7 @@ export class ApiController {
       if (request.method === "GET" && path === "/api/health") return this.json(response, 200, { status: "ok" });
       if (request.method === "POST" && path === "/api/auth/signup") return await this.signup(request, response);
       if (request.method === "POST" && path === "/api/auth/login") return await this.login(request, response);
+      if (request.method === "POST" && path === "/api/auth/google") return await this.google(request, response);
       if (request.method === "POST" && path === "/api/auth/refresh") return await this.refresh(request, response);
       await this.authMiddleware.requireAuth(request);
       const user = request.user;
@@ -34,6 +37,28 @@ export class ApiController {
       }
       if (request.method === "GET" && path === "/api/device") {
         return this.json(response, 200, await this.devices.getState(user.id, this.installationId(request)));
+      }
+      if (path === "/api/catalog/books" && request.method === "GET") {
+        await this.assertCatalogLicense(user.id);
+        return this.json(response, 200, await this.requiredCatalog().list(this.catalogQuery(request)));
+      }
+      if (path === "/api/catalog/admin/status" && request.method === "GET") {
+        await this.assertCatalogLicense(user.id);
+        return this.json(response, 200, await this.requiredCatalog().adminStatus(user.id));
+      }
+      const catalogBook = path.match(/^\/api\/catalog\/books\/([^/]+)$/);
+      if (catalogBook && request.method === "GET") {
+        await this.assertCatalogLicense(user.id);
+        return this.json(response, 200, await this.requiredCatalog().get(decodeURIComponent(catalogBook[1]!)));
+      }
+      const catalogDownload = path.match(/^\/api\/catalog\/books\/([^/]+)\/download$/);
+      if (catalogDownload && request.method === "GET") {
+        await this.assertCatalogLicense(user.id);
+        return await this.download(response, await this.requiredCatalog().download(decodeURIComponent(catalogDownload[1]!)));
+      }
+      if (path === "/api/catalog/sync" && request.method === "POST") {
+        await this.assertCatalogLicense(user.id);
+        return this.json(response, 200, await this.requiredCatalog().sync(user.id));
       }
       if (request.method === "POST" && path === "/api/device/register") {
         const body = await this.body(request);
@@ -82,6 +107,13 @@ export class ApiController {
     this.logAuthStep("login.response.sending");
     this.json(response, 200, result);
   }
+  private async google(request: AuthenticatedRequest, response: ApiResponse): Promise<void> {
+    const body = await this.body(request);
+    const result = await this.auth.google(this.validator.token(body.credential), this.validator.nonce(body.nonce));
+    this.logAuthStep("google.auth.completed", { hasUser: Boolean(result.user.id), hasEmail: Boolean(result.user.email) });
+    await this.ensureProfile("login", result.user.id, result.user.email);
+    this.json(response, 200, result);
+  }
   private async refresh(request: AuthenticatedRequest, response: ApiResponse): Promise<void> {
     const body = await this.body(request);
     this.json(response, 200, await this.auth.refresh(this.validator.token(body.refreshToken)));
@@ -123,6 +155,27 @@ export class ApiController {
     response.statusCode = status;
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.end(JSON.stringify(data));
+  }
+  private requiredCatalog(): CatalogApplicationService {
+    if (!this.catalog) throw new ApiError(503, "CATALOG_NOT_CONFIGURED", "O catálogo ainda não está configurado no servidor.");
+    return this.catalog;
+  }
+  private async assertCatalogLicense(userId: string): Promise<void> {
+    const license = await this.licenses.getForUser(userId);
+    if (license.status !== "active") throw new ApiError(403, "LICENSE_REQUIRED", "Esta conta não possui uma licença ativa.");
+  }
+  private catalogQuery(request: AuthenticatedRequest): { offset: number; limit: number; query?: string; genreId?: string; author?: string; format?: "pdf" | "epub"; collection?: string } {
+    const url = new URL(request.url ?? "/", "http://localhost"); const value = (name: string): string | undefined => url.searchParams.get(name)?.trim().slice(0, 120) || undefined;
+    const offset = Math.max(0, Number.parseInt(value("cursor") ?? "0", 10) || 0); const format = value("format");
+    if (format && format !== "pdf" && format !== "epub") throw new ApiError(400, "INVALID_CATALOG_FILTER", "Filtro de catálogo inválido.");
+    return { offset, limit: 24, query: value("query"), genreId: value("genreId"), author: value("author"), collection: value("collection"), format: format as "pdf" | "epub" | undefined };
+  }
+  private async download(response: ApiResponse, file: import("../catalog/types.js").CatalogDownload): Promise<void> {
+    response.statusCode = 200; response.setHeader("Content-Type", file.mimeType); response.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+    if (file.contentLength !== null) response.setHeader("Content-Length", String(file.contentLength)); response.setHeader("Cache-Control", "private, no-store");
+    const reader = file.body.getReader();
+    try { while (true) { const { done, value } = await reader.read(); if (done) break; if (value && !response.write(Buffer.from(value))) await new Promise<void>((resolve) => response.once("drain", resolve)); } }
+    finally { reader.releaseLock(); response.end(); }
   }
 
   private async ensureProfile(action: "signup" | "login", userId: string, email: string): Promise<void> {

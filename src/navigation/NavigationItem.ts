@@ -13,6 +13,7 @@ export const AUTHENTICATED_NAVIGATION: readonly NavigationItem[] = [
   { labelKey: "ui.import.title", route: "import", icon: "+", primary: true },
   { labelKey: "ui.navigation.home", route: "home", icon: "⌂" },
   { labelKey: "ui.navigation.library", route: "library", icon: "▤" },
+  { labelKey: "ui.catalog.title", route: "explore", icon: "⌕" },
   { labelKey: "ui.settings.title", route: "settings", icon: "⚙" },
   { labelKey: "ui.navigation.logout", action: "logout", icon: "↗" },
 ];

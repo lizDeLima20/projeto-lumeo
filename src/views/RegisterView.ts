@@ -1,6 +1,7 @@
 import { ApiError } from "../services/ApiClient";
 import { AuthManager } from "../services/AuthManager";
 import { BaseView } from "./BaseView";
+import { GoogleAuthButton } from "./GoogleAuthButton";
 
 export class RegisterView extends BaseView {
   public constructor(private readonly auth: AuthManager, private readonly onSuccess: () => void, private readonly onLogin: () => void) { super(); }
@@ -14,7 +15,9 @@ export class RegisterView extends BaseView {
     const message = this.createElement("p", "form-error"); message.setAttribute("role", "alert");
     const submit = this.createElement("button", "button button--primary", this.t("ui.auth.register")); submit.type = "submit";
     const login = this.createElement("button", "text-button", this.t("ui.auth.haveAccount")); login.type = "button"; login.addEventListener("click", this.onLogin);
-    form.append(email.wrapper, password.wrapper, confirmation.wrapper, message, submit, login);
+    form.append(email.wrapper, password.wrapper, confirmation.wrapper, message, submit, new GoogleAuthButton("signup_with", async (credential, nonce) => {
+      message.textContent = ""; await this.auth.loginWithGoogle(credential, nonce); this.onSuccess();
+    }, (text) => { message.textContent = text; }).render(), login);
     form.addEventListener("submit", async (event) => {
       event.preventDefault(); message.textContent = "";
       if (password.input.value !== confirmation.input.value) { message.textContent = this.t("ui.auth.passwordMismatch"); return; }

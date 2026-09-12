@@ -32,6 +32,11 @@ export class LocalAuthService implements AuthProvider {
     return this.createSession(account);
   }
 
+  /** Local mode has no Google to verify a token against. */
+  public async google(): Promise<AuthSessionResponse> {
+    throw new ApiError(501, "GOOGLE_AUTH_UNAVAILABLE", "O login com Google não está disponível no modo local.");
+  }
+
   public async refresh(refreshToken: string): Promise<AuthSessionResponse> {
     const userId = this.refreshTokens.get(refreshToken);
     const account = [...this.accounts.values()].find((item) => item.id === userId);

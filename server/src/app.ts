@@ -15,6 +15,9 @@ import { DeviceService } from "./services/DeviceService.js";
 import { LicenseService } from "./services/LicenseService.js";
 import { LocalAuthService } from "./services/LocalAuthService.js";
 import { SupabaseService } from "./services/SupabaseService.js";
+import { CatalogRepository } from "./catalog/CatalogRepository.js";
+import { CatalogApplicationService } from "./catalog/CatalogApplicationService.js";
+import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js";
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 
@@ -39,6 +42,7 @@ export class ServerApp {
         new DeviceService(new DeviceRepository(supabase.admin), config.deviceHashSecret),
         new LicenseService(new LicenseRepository(supabase.admin), config),
         new ProfileRepository(supabase.admin),
+        new CatalogApplicationService(new CatalogRepository(supabase.admin), () => new GoogleCatalogDriveClient(config.googleCatalogServiceAccountJson, config.googleCatalogFolderId, config.catalogSyncMaxFileBytes)),
       );
       return controller;
     };
@@ -47,10 +51,12 @@ export class ServerApp {
     const rateLimiter = new RateLimiter({
       "/api/auth/signup": { windowMs: 60_000, max: 5 },
       "/api/auth/login": { windowMs: 60_000, max: 8 },
+      "/api/auth/google": { windowMs: 60_000, max: 8 },
       "/api/auth/refresh": { windowMs: 60_000, max: 20 },
       "/api/device/register": { windowMs: 60_000, max: 10 },
       "/api/device/replace": { windowMs: 60_000, max: 5 },
       "/api/me": { windowMs: 60_000, max: 60 },
+      "/api/catalog/sync": { windowMs: 60_000, max: 2 },
     });
 
     return async (request, response) => {
@@ -75,7 +81,7 @@ export class ServerApp {
         return;
       }
       rateLimiter.assertAllowed(ServerApp.clientKey(request), path);
-      const publicPaths = ["/api/auth/signup", "/api/auth/login", "/api/auth/refresh"];
+      const publicPaths = ["/api/auth/signup", "/api/auth/login", "/api/auth/google", "/api/auth/refresh"];
       if (!publicPaths.includes(path) && !request.headers.authorization?.startsWith("Bearer ")) {
         response.statusCode = 401;
         response.setHeader("Content-Type", "application/json; charset=utf-8");

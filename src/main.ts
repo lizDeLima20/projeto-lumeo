@@ -9,6 +9,7 @@ import "./styles/book-physical.css";
 import "./styles/auth.css";
 import "./styles/home.css";
 import "./styles/reader.css";
+import "./styles/catalog.css";
 import { App } from "./core/App";
 import { GlobalErrorHandler } from "./errors/GlobalErrorHandler";
 import { ServiceWorkerRegistrationService } from "./pwa/ServiceWorkerRegistrationService";

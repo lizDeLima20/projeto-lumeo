@@ -3,6 +3,7 @@ import { ApiError } from "../services/ApiClient";
 import { AuthManager } from "../services/AuthManager";
 import { DeviceManager } from "../services/DeviceManager";
 import { BaseView } from "./BaseView";
+import { GoogleAuthButton } from "./GoogleAuthButton";
 
 export class DeviceConflictView extends BaseView {
   public constructor(private readonly state: AppState, private readonly auth: AuthManager, private readonly devices: DeviceManager,
@@ -21,7 +22,20 @@ export class DeviceConflictView extends BaseView {
     const error = this.createElement("p", "form-error"); error.setAttribute("role", "alert");
     const replace = this.createElement("button", "button button--primary", "Usar este aparelho"); replace.type = "submit";
     const cancel = this.createElement("button", "button button--secondary", "Cancelar"); cancel.type = "button"; cancel.addEventListener("click", this.onCancel);
-    card.append(label, error, replace, cancel);
+    /* A Google account has no password to confirm, so it confirms with Google instead. The
+       e-mail must be the one already signed in: confirming with a different Google account
+       would otherwise replace the device of the wrong account. */
+    const google = new GoogleAuthButton("continue_with", async (credential, nonce) => {
+      error.textContent = "";
+      const expected = this.state.currentUser?.email?.trim().toLowerCase();
+      await this.auth.loginWithGoogle(credential, nonce);
+      if (expected && this.state.currentUser?.email?.trim().toLowerCase() !== expected) {
+        await this.auth.logout();
+        throw new Error(this.t("ui.device.googleAccountMismatch"));
+      }
+      await this.devices.replace(); this.onResolved();
+    }, (message) => { error.textContent = message; }).render();
+    card.append(label, error, replace, google, cancel);
     card.addEventListener("submit", async (event) => {
       event.preventDefault(); replace.disabled = true;
       try { await this.auth.reauthenticate(password.value); await this.devices.replace(); this.onResolved(); }

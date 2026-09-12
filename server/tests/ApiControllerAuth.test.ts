@@ -21,6 +21,7 @@ describe("ApiController auth flow", () => {
       }),
       signup: async () => { throw new Error("not used"); },
       refresh: async () => { throw new Error("not used"); },
+      google: async () => { throw new Error("not used"); },
       verify: async () => { throw new Error("not used"); },
       requireRecentAuthentication: () => undefined,
     } satisfies AuthProvider;
@@ -59,6 +60,43 @@ describe("ApiController auth flow", () => {
 
     assert.equal(response.statusCode, 503);
     assert.equal(JSON.parse(response.body).code, "DATABASE_SCHEMA_NOT_READY");
+  });
+});
+
+describe("ApiController com Google", () => {
+  const config = { autoActivateDevLicense: false, supabaseUrl: "", supabasePublishableKey: "", supabaseSecretKey: "", deviceHashSecret: "device-secret",
+    nodeEnv: "test", appEnv: "test", appVersion: "0.1.0", appBaseUrl: "http://localhost:5173", bffBaseUrl: "http://127.0.0.1:3000/api", port: 3000, allowedOrigins: [], localAuthMode: false };
+  const call = async (body: unknown, auth: AuthProvider, ensured: string[]) => {
+    const profiles = { ensure: async (id: string, email: string) => { ensured.push(`${id}:${email}`); } } as unknown as ProfileStore;
+    const controller = new ApiController(auth, new AuthMiddleware(auth), new DeviceService(new MemoryDeviceRepository(), "device-secret"),
+      new LicenseService(new MemoryLicenseRepository(), config), profiles);
+    const request = Readable.from([JSON.stringify(body)]) as AuthenticatedRequest; request.method = "POST"; request.headers = {};
+    const response = new TestResponse();
+    await controller.handle(request, response as never as ApiResponse, "/api/auth/google");
+    return response;
+  };
+  const provider = (received: unknown[]): AuthProvider => ({
+    google: async (token: string, nonce: string) => { received.push({ token, nonce });
+      return { accessToken: "access-token-value", refreshToken: "refresh-token-value", expiresAt: 1, user: { id: "00000000-0000-4000-8000-000000000002", email: "leitor@gmail.com" } }; },
+    login: async () => { throw new Error("not used"); }, signup: async () => { throw new Error("not used"); },
+    refresh: async () => { throw new Error("not used"); }, verify: async () => { throw new Error("not used"); }, requireRecentAuthentication: () => undefined,
+  });
+
+  it("entra com o token do Google e prepara o perfil como no login", async () => {
+    const received: unknown[] = [], ensured: string[] = [];
+    const response = await call({ credential: "google-id-token-0123456789", nonce: "raw-nonce-value-0000" }, provider(received), ensured);
+    assert.equal(response.statusCode, 200);
+    assert.equal(JSON.parse(response.body).user.email, "leitor@gmail.com");
+    assert.deepEqual(received, [{ token: "google-id-token-0123456789", nonce: "raw-nonce-value-0000" }]);
+    assert.deepEqual(ensured, ["00000000-0000-4000-8000-000000000002:leitor@gmail.com"]);
+  });
+
+  it("recusa pedido sem nonce valido antes de falar com o Supabase", async () => {
+    const received: unknown[] = [];
+    const response = await call({ credential: "google-id-token-0123456789", nonce: "curto" }, provider(received), []);
+    assert.equal(response.statusCode, 400);
+    assert.equal(JSON.parse(response.body).code, "INVALID_NONCE");
+    assert.equal(received.length, 0);
   });
 });
 

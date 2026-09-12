@@ -44,6 +44,10 @@ export class AuthManager {
   public async login(email: string, password: string): Promise<void> {
     await this.applySession(await this.api.post<AuthSession>("/auth/login", { email, password }, false));
   }
+  /** Google Identity Services ID token plus the raw nonce whose hash Google saw. */
+  public async loginWithGoogle(credential: string, nonce: string): Promise<void> {
+    await this.applySession(await this.api.post<AuthSession>("/auth/google", { credential, nonce }, false));
+  }
   public async reauthenticate(password: string): Promise<void> {
     if (!this.state.currentUser) throw new Error("Usuário ausente.");
     await this.login(this.state.currentUser.email, password);

@@ -9,3 +9,4 @@ server-dist/
 !.env.example
 .vercel
 .env*
+supabase/.temp/

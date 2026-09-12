@@ -21,22 +21,59 @@ export class ApiClient {
     return this.request<T>(path, { method: "POST", body: JSON.stringify(body) }, authenticated);
   }
 
+  /** Streams a protected book download while keeping its credentials out of URLs. */
+  public async download(path: string, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
+    const headers = this.authHeaders(true);
+    let response: Response;
+    try { response = await fetch(`${this.baseUrl}${path}`, { headers, signal }); }
+    catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      throw new ApiError(0, "NETWORK_ERROR", I18nManager.shared.messageForErrorCode("NETWORK_ERROR")!);
+    }
+    if (!response.ok) await this.throwResponseError(response);
+    const contentLength = Number(response.headers.get("content-length")) || 0;
+    const chunks: BlobPart[] = []; let received = 0;
+    if (response.body) {
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) { chunks.push(new Uint8Array(value)); received += value.byteLength; onProgress(contentLength ? Math.round(received / contentLength * 100) : null); }
+      }
+    } else chunks.push(await response.blob());
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+    const name = encodedName ? decodeURIComponent(encodedName) : plainName ?? "livro";
+    return new File(chunks, name, { type: response.headers.get("content-type") ?? "application/octet-stream" });
+  }
+
   private async request<T>(path: string, init: RequestInit, authenticated: boolean): Promise<T> {
-    const headers = new Headers({ "Content-Type": "application/json" });
+    const headers = this.authHeaders(authenticated); headers.set("Content-Type", "application/json");
+    let response: Response;
+    try { response = await fetch(`${this.baseUrl}${path}`, { ...init, headers }); }
+    catch { throw new ApiError(0, "NETWORK_ERROR", I18nManager.shared.messageForErrorCode("NETWORK_ERROR")!); }
+    const data = await response.json() as T | ApiErrorBody;
+    if (!response.ok) this.throwBodyError(response.status, data as ApiErrorBody);
+    return data as T;
+  }
+
+  private authHeaders(authenticated: boolean): Headers {
+    const headers = new Headers();
     if (authenticated) {
       if (!this.accessToken) throw new ApiError(401, "AUTH_REQUIRED", I18nManager.shared.messageForErrorCode("AUTH_REQUIRED")!);
       headers.set("Authorization", `Bearer ${this.accessToken}`);
     }
     if (this.installationId) headers.set("X-Installation-Id", this.installationId);
-    let response: Response;
-    try { response = await fetch(`${this.baseUrl}${path}`, { ...init, headers }); }
-    catch { throw new ApiError(0, "NETWORK_ERROR", I18nManager.shared.messageForErrorCode("NETWORK_ERROR")!); }
-    const data = await response.json() as T | ApiErrorBody;
-    if (!response.ok) {
-      const error = (data as ApiErrorBody).error;
-      const code = error?.code ?? (data as ApiErrorBody).code ?? "API_ERROR";
-      throw new ApiError(response.status, code, I18nManager.shared.messageForErrorCode(code) ?? error?.message ?? (data as ApiErrorBody).message ?? I18nManager.shared.messageForErrorCode("API_ERROR")!);
-    }
-    return data as T;
+    return headers;
+  }
+  private async throwResponseError(response: Response): Promise<never> {
+    let body: ApiErrorBody = {};
+    try { body = await response.json() as ApiErrorBody; } catch { /* safe generic fallback */ }
+    return this.throwBodyError(response.status, body);
+  }
+  private throwBodyError(status: number, body: ApiErrorBody): never {
+    const error = body.error; const code = error?.code ?? body.code ?? "API_ERROR";
+    throw new ApiError(status, code, I18nManager.shared.messageForErrorCode(code) ?? error?.message ?? body.message ?? I18nManager.shared.messageForErrorCode("API_ERROR")!);
   }
 }
