@@ -31,6 +31,7 @@ export interface CatalogBookRecord {
   format: CatalogFormat;
   fileSize: number | null;
   driveFileId: string;
+  resourceKey?: string | null;
   storageAccountId: string;
   sha256: string | null;
   volume: string | null;
@@ -48,6 +49,7 @@ export interface CatalogQuery { offset: number; limit: number; locale?: string; 
 export interface CatalogDownloadLink {
   bookId: string;
   driveFileId: string;
+  resourceKey?: string | null;
   downloadUrl: string;
   downloadUrls: readonly string[];
   title: string;

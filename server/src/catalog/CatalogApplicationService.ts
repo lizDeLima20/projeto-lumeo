@@ -21,6 +21,7 @@ export class CatalogApplicationService {
     return {
       bookId: book.bookId,
       driveFileId: info.driveFileId,
+      resourceKey: book.resourceKey ?? null,
       downloadUrl: info.downloadUrl,
       downloadUrls: info.downloadUrls,
       title: book.title,

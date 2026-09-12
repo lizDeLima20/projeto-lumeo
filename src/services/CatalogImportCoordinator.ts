@@ -2,7 +2,7 @@ import type { CatalogBookData } from "../models/CatalogBook";
 import { LocalFileImporter } from "../importers/LocalFileImporter";
 import type { Book } from "../models/Book";
 import type { CatalogDownloadLink, CatalogService } from "./CatalogService";
-import { GoogleDrivePublicProvider } from "./GoogleDrivePublicProvider";
+import { GoogleDriveApiProvider } from "./GoogleDriveApiProvider";
 import type { CoverService } from "./CoverService";
 import type { ImportManager } from "./ImportManager";
 
@@ -11,8 +11,7 @@ export type CatalogImportStage = "preparing" | "downloading" | "validating" | "s
 /** Downloads a single selected catalogue item and commits it through ImportManager. */
 export class CatalogImportCoordinator {
   private readonly validator = new LocalFileImporter();
-  private readonly drive = new GoogleDrivePublicProvider();
-  public constructor(private readonly catalog: CatalogService, private readonly imports: ImportManager, private readonly covers: CoverService) {}
+  public constructor(private readonly catalog: CatalogService, private readonly imports: ImportManager, private readonly covers: CoverService, private readonly drive = new GoogleDriveApiProvider()) {}
   public async add(book: CatalogBookData, onStage: (stage: CatalogImportStage, progress?: number | null) => void, signal?: AbortSignal): Promise<Book> {
     onStage("preparing");
     const download = await this.catalog.downloadLink(book.bookId);
