@@ -1,5 +1,24 @@
 export type CatalogBookStatus = "ACTIVE" | "UNAVAILABLE" | "PROCESSING" | "INVALID" | "ERROR";
 export type CatalogFormat = "pdf" | "epub";
+export type CatalogSourceMode = "auto" | "legacy" | "structured";
+export type CatalogSourceProviderKind = Exclude<CatalogSourceMode, "auto">;
+
+/** A source contains metadata only. Book and cover bytes always remain in Drive. */
+export interface CatalogSourceConfig {
+  sourceId: string;
+  locale: string;
+  folderId: string;
+  mode: CatalogSourceMode;
+  enabled: boolean;
+  priority: number;
+}
+
+export interface CatalogSourceDiagnostic {
+  sourceId: string;
+  locale: string;
+  mode: CatalogSourceProviderKind;
+  provider: CatalogSourceProviderKind;
+}
 
 export interface CatalogBookRecord {
   bookId: string;
@@ -23,7 +42,7 @@ export interface CatalogBookRecord {
 }
 
 export interface CatalogPage { items: readonly CatalogBookRecord[]; nextCursor: string | null; }
-export interface CatalogQuery { offset: number; limit: number; query?: string; genreId?: string; author?: string; format?: CatalogFormat; collection?: string; }
+export interface CatalogQuery { offset: number; limit: number; locale?: string; query?: string; genreId?: string; author?: string; format?: CatalogFormat; collection?: string; }
 /** Metadata needed by the browser to download a public Drive file directly.
  * The BFF deliberately never proxies PDF or EPUB bytes. */
 export interface CatalogDownloadLink {

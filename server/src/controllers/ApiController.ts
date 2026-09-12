@@ -49,12 +49,12 @@ export class ApiController {
       const catalogBook = path.match(/^\/api\/catalog\/books\/([^/]+)$/);
       if (catalogBook && request.method === "GET") {
         await this.assertCatalogLicense(user.id);
-        return this.json(response, 200, await this.requiredCatalog().get(decodeURIComponent(catalogBook[1]!)));
+        return this.json(response, 200, await this.requiredCatalog().get(decodeURIComponent(catalogBook[1]!), this.catalogQuery(request).locale));
       }
       const catalogDownload = path.match(/^\/api\/catalog\/books\/([^/]+)\/download$/);
       if (catalogDownload && request.method === "GET") {
         await this.assertCatalogLicense(user.id);
-        return this.json(response, 200, await this.requiredCatalog().download(decodeURIComponent(catalogDownload[1]!)));
+        return this.json(response, 200, await this.requiredCatalog().download(decodeURIComponent(catalogDownload[1]!), this.catalogQuery(request).locale));
       }
       if (path === "/api/catalog/sync" && request.method === "POST") {
         await this.assertCatalogLicense(user.id);
@@ -164,11 +164,13 @@ export class ApiController {
     const license = await this.licenses.getForUser(userId);
     if (license.status !== "active") throw new ApiError(403, "LICENSE_REQUIRED", "Esta conta não possui uma licença ativa.");
   }
-  private catalogQuery(request: AuthenticatedRequest): { offset: number; limit: number; query?: string; genreId?: string; author?: string; format?: "pdf" | "epub"; collection?: string } {
+  private catalogQuery(request: AuthenticatedRequest): { offset: number; limit: number; locale?: string; query?: string; genreId?: string; author?: string; format?: "pdf" | "epub"; collection?: string } {
     const url = new URL(request.url ?? "/", "http://localhost"); const value = (name: string): string | undefined => url.searchParams.get(name)?.trim().slice(0, 120) || undefined;
     const offset = Math.max(0, Number.parseInt(value("cursor") ?? "0", 10) || 0); const format = value("format");
     if (format && format !== "pdf" && format !== "epub") throw new ApiError(400, "INVALID_CATALOG_FILTER", "Filtro de catálogo inválido.");
-    return { offset, limit: 24, query: value("query"), genreId: value("genreId"), author: value("author"), collection: value("collection"), format: format as "pdf" | "epub" | undefined };
+    const locale = value("locale");
+    if (locale && !/^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(locale)) throw new ApiError(400, "INVALID_CATALOG_FILTER", "Filtro de catálogo inválido.");
+    return { offset, limit: 24, locale, query: value("query"), genreId: value("genreId"), author: value("author"), collection: value("collection"), format: format as "pdf" | "epub" | undefined };
   }
 
   private async ensureProfile(action: "signup" | "login", userId: string, email: string): Promise<void> {

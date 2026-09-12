@@ -1,4 +1,6 @@
 import { ApiError } from "../errors/ApiError.js";
+import { catalogSourcesFromEnvironment } from "../catalog/CatalogSourceRegistry.js";
+import type { CatalogSourceConfig } from "../catalog/types.js";
 
 export interface ServerConfig {
   supabaseUrl: string;
@@ -15,6 +17,7 @@ export interface ServerConfig {
   allowedOrigins: readonly string[];
   localAuthMode: boolean;
   googleCatalogFolderId: string;
+  catalogSources: readonly CatalogSourceConfig[];
   googleCatalogServiceAccountJson: string;
   catalogSyncMaxFileBytes: number;
 }
@@ -22,6 +25,7 @@ export interface ServerConfig {
 export class Config {
   public static fromEnvironment(environment: NodeJS.ProcessEnv = process.env): ServerConfig {
     const nodeEnv = environment.NODE_ENV ?? "development";
+    const googleCatalogFolderId = environment.GOOGLE_CATALOG_FOLDER_ID ?? "1JUbxHjUzyYruG9LWyz1HRYv9matGU7ad";
     return {
       supabaseUrl: environment.SUPABASE_URL ?? "",
       supabasePublishableKey: environment.SUPABASE_PUBLISHABLE_KEY ?? environment.SUPABASE_ANON_KEY ?? "",
@@ -43,7 +47,9 @@ export class Config {
         && !environment.SUPABASE_URL,
       // Public pt-BR catalogue. The environment variable is the production
       // override; the default keeps this published public source usable locally.
-      googleCatalogFolderId: environment.GOOGLE_CATALOG_FOLDER_ID ?? "1JUbxHjUzyYruG9LWyz1HRYv9matGU7ad",
+      googleCatalogFolderId,
+      // Public metadata only. The fallback preserves the published legacy source.
+      catalogSources: catalogSourcesFromEnvironment(environment.GOOGLE_CATALOG_SOURCES_JSON, googleCatalogFolderId),
       // JSON or base64 JSON are accepted only in backend environment variables.
       googleCatalogServiceAccountJson: environment.GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON ?? "",
       catalogSyncMaxFileBytes: Number(environment.CATALOG_SYNC_MAX_FILE_BYTES ?? 104_857_600),

@@ -1,5 +1,6 @@
 import type { ApiClient } from "./ApiClient";
 import type { CatalogBookData, CatalogPage } from "../models/CatalogBook";
+import { I18nManager } from "../i18n/I18nManager";
 
 export interface CatalogDownloadLink {
   bookId: string;
@@ -33,19 +34,20 @@ export class CatalogService {
 
   public async list(query: CatalogQuery = {}): Promise<CatalogPage> {
     const parameters = new URLSearchParams();
+    parameters.set("locale", I18nManager.shared.locale);
     Object.entries(query).forEach(([key, value]) => { if (value) parameters.set(key, value); });
     const suffix = parameters.size ? `?${parameters}` : "";
     return this.api.get<CatalogPage>(`/catalog/books${suffix}`);
   }
 
   public get(bookId: string): Promise<CatalogBookData> {
-    return this.api.get<CatalogBookData>(`/catalog/books/${encodeURIComponent(bookId)}`);
+    return this.api.get<CatalogBookData>(`/catalog/books/${encodeURIComponent(bookId)}?locale=${encodeURIComponent(I18nManager.shared.locale)}`);
   }
 
   /** The authenticated BFF authorizes the item, then the browser downloads it
    * directly from the public Google Drive URL returned here. */
   public downloadLink(bookId: string): Promise<CatalogDownloadLink> {
-    return this.api.get<CatalogDownloadLink>(`/catalog/books/${encodeURIComponent(bookId)}/download`);
+    return this.api.get<CatalogDownloadLink>(`/catalog/books/${encodeURIComponent(bookId)}/download?locale=${encodeURIComponent(I18nManager.shared.locale)}`);
   }
   public adminStatus(): Promise<{ isAdmin: boolean }> { return this.api.get("/catalog/admin/status"); }
   public sync(): Promise<CatalogSyncReport> { return this.api.post("/catalog/sync", {}); }

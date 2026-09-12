@@ -34,6 +34,15 @@ export class GoogleDrivePublicUrlResolver {
     return { driveFileId, downloadUrl: download.toString(), downloadUrls: [download.toString(), contentDownload.toString()], coverUrl: thumbnail.toString(), expectedFormat };
   }
 
+  /** Public thumbnail for a separately prepared structured cover. */
+  public coverUrl(fileIdOrUrl: string): string {
+    const driveFileId = this.extractFileId(fileIdOrUrl);
+    const thumbnail = new URL("https://drive.google.com/thumbnail");
+    thumbnail.searchParams.set("id", driveFileId);
+    thumbnail.searchParams.set("sz", "w480-h640");
+    return thumbnail.toString();
+  }
+
   public extractFileId(fileIdOrUrl: string): string {
     const raw = fileIdOrUrl.trim();
     if (this.isFileId(raw)) return raw;
