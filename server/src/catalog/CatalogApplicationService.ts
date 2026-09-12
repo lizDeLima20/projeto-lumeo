@@ -2,13 +2,14 @@ import { ApiError } from "../errors/ApiError.js";
 import type { CatalogStore } from "./CatalogRepository.js";
 import { CatalogSyncService } from "./CatalogSyncService.js";
 import { GoogleCatalogDriveClient } from "./GoogleCatalogDriveClient.js";
+import { PublicGoogleDriveCatalog } from "./PublicGoogleDriveCatalog.js";
 import type { CatalogBookRecord, CatalogDownloadLink, CatalogPage, CatalogQuery, CatalogSyncReport } from "./types.js";
 
 export class CatalogApplicationService {
-  public constructor(private readonly store: CatalogStore, private readonly createDrive: () => GoogleCatalogDriveClient) {}
-  public list(query: CatalogQuery): Promise<CatalogPage> { return this.store.list(query); }
+  public constructor(private readonly store: CatalogStore, private readonly createDrive: () => GoogleCatalogDriveClient, private readonly publicCatalog?: PublicGoogleDriveCatalog) {}
+  public list(query: CatalogQuery): Promise<CatalogPage> { return this.publicCatalog ? this.publicCatalog.list(query) : this.store.list(query); }
   public async get(bookId: string): Promise<CatalogBookRecord> {
-    const book = await this.store.getActive(bookId); if (!book) throw new ApiError(404, "CATALOG_BOOK_NOT_FOUND", "Livro não encontrado no catálogo."); return book;
+    const book = this.publicCatalog ? await this.publicCatalog.get(bookId) : await this.store.getActive(bookId); if (!book) throw new ApiError(404, "CATALOG_BOOK_NOT_FOUND", "Livro não encontrado no catálogo."); return book;
   }
   public async download(bookId: string): Promise<CatalogDownloadLink> {
     const book = await this.get(bookId);

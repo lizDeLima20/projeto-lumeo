@@ -17,11 +17,14 @@ export class CatalogExplorerView extends BaseView {
     private readonly onAdd: (book: CatalogBookData, progress: (stage: CatalogImportStage, percent?: number | null) => void) => Promise<void>) { super(); this.catalog = api; }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog page-shell");
-    const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.title")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
+    const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
     const controls = this.createElement("div", "catalog__controls");
     const search = this.createElement("input", "input") as HTMLInputElement; search.type = "search"; search.placeholder = this.t("ui.catalog.search"); search.setAttribute("aria-label", this.t("ui.catalog.search"));
-    const genre = this.createElement("select", "input") as HTMLSelectElement; genre.append(new Option(this.t("ui.catalog.allGenres"), "")); this.state.genres.forEach((value) => genre.append(new Option(value.name, value.id)));
-    controls.append(search, genre);
+    const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = ""; const availableGenres = new Set<string>();
+    const selectGenre = (id: string): void => { selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
+    const addGenre = (id: string, label: string): void => { if (availableGenres.has(id)) return; availableGenres.add(id); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
+    addGenre("", "Todos"); addGenre("sem-genero", this.t("ui.catalog.unclassified")); this.state.genres.forEach((value) => addGenre(value.id, value.name));
+    controls.append(search, genres);
     const list = this.createElement("div", "catalog__sections");
     this.classified.className = "catalog__grid"; this.unclassified.className = "catalog__grid";
     const classifiedSection = this.createElement("section", "catalog__section"); classifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.allGenres")), this.classified);
@@ -29,8 +32,8 @@ export class CatalogExplorerView extends BaseView {
     list.append(classifiedSection, unclassifiedSection);
     const status = this.createElement("p", "catalog__status"); status.setAttribute("role", "status"); this.status = status;
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
-    let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, genre.value, more); }, 250); };
-    search.addEventListener("input", reload); genre.addEventListener("change", reload); more.addEventListener("click", () => void this.load(search.value, genre.value, more));
+    let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
+    search.addEventListener("input", reload); more.addEventListener("click", () => void this.load(search.value, selectedGenre, more));
     section.append(heading, controls, list, status, more); void this.load("", "", more); return section;
   }
   private reset(): void { this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); this.unclassified.replaceChildren(); }

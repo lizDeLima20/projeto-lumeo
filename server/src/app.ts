@@ -18,6 +18,7 @@ import { SupabaseService } from "./services/SupabaseService.js";
 import { CatalogRepository } from "./catalog/CatalogRepository.js";
 import { CatalogApplicationService } from "./catalog/CatalogApplicationService.js";
 import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js";
+import { PublicGoogleDriveCatalog } from "./catalog/PublicGoogleDriveCatalog.js";
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 
@@ -42,7 +43,7 @@ export class ServerApp {
         new DeviceService(new DeviceRepository(supabase.admin), config.deviceHashSecret),
         new LicenseService(new LicenseRepository(supabase.admin), config),
         new ProfileRepository(supabase.admin),
-        new CatalogApplicationService(new CatalogRepository(supabase.admin), () => new GoogleCatalogDriveClient(config.googleCatalogServiceAccountJson, config.googleCatalogFolderId, config.catalogSyncMaxFileBytes)),
+        new CatalogApplicationService(new CatalogRepository(supabase.admin), () => new GoogleCatalogDriveClient(config.googleCatalogServiceAccountJson, config.googleCatalogFolderId, config.catalogSyncMaxFileBytes), new PublicGoogleDriveCatalog(config.googleCatalogFolderId, "pt-BR")),
       );
       return controller;
     };
