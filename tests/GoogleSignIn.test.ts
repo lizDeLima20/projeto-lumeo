@@ -51,5 +51,10 @@ describe("entrar e cadastrar com Google", () => {
     assert.match(identity, /private static loading/, "SDK GIS deve carregar uma única vez");
     assert.match(drive, /private static readonly clients/, "TokenClient deve ser reutilizado por Client ID e escopo");
     assert.match(drive, /initTokenClient/, "Drive deve usar o token client OAuth2, não um ID token");
+    for (const source of ["src/importers/GoogleDriveImporter.ts", "src/external/GoogleDriveLibraryService.ts"]) {
+      const content = await readFile(source, "utf8");
+      assert.doesNotMatch(content, /initTokenClient|drive\.readonly/, `${source} deve reutilizar o provedor OAuth único`);
+      assert.match(content, /GoogleDriveAuthorizationProvider/, `${source} deve reutilizar a autorização Drive`);
+    }
   });
 });

@@ -2,6 +2,8 @@ import type { CloudImportProvider } from "./CloudImportProvider";
 import type { ImportedFile } from "./BookImporter";
 import { LocalFileImporter } from "./LocalFileImporter";
 import type { AuthenticatedDriveDownloader } from "./UrlImporter";
+import { GoogleDriveAuthorizationProvider } from "../services/GoogleDriveAuthorizationProvider";
+import { GoogleIdentityServices } from "../services/GoogleIdentityServices";
 
 export interface GoogleDriveConfig { clientId: string; apiKey: string; appId: string; }
 export interface DriveSelection { id: string; name: string; mimeType: string; size?: number; }
@@ -27,9 +29,10 @@ export class GoogleDriveImporter implements CloudImportProvider, AuthenticatedDr
 
 class BrowserGoogleDriveGateway implements GoogleDriveGateway {
   private token = "";
-  public constructor(private readonly config: GoogleDriveConfig) {}
+  private readonly authorization: GoogleDriveAuthorizationProvider;
+  public constructor(private readonly config: GoogleDriveConfig) { this.authorization = new GoogleDriveAuthorizationProvider(config.clientId); }
   public async selectFile(folderId?: string): Promise<DriveSelection | null> {
-    await Promise.all([this.loadScript("https://accounts.google.com/gsi/client", "google"), this.loadScript("https://apis.google.com/js/api.js", "gapi")]);
+    await Promise.all([GoogleIdentityServices.load(), this.loadScript("https://apis.google.com/js/api.js", "gapi")]);
     await this.authorize(); await this.loadPicker();
     return new Promise((resolve, reject) => {
       const host = window as GoogleWindow; const google = host.google; const view = new google.picker.DocsView().setIncludeFolders(false).setSelectFolderEnabled(false).setMimeTypes("application/pdf,application/epub+zip");
@@ -41,20 +44,14 @@ class BrowserGoogleDriveGateway implements GoogleDriveGateway {
     });
   }
   public async downloadFile(fileId: string, onProgress?: (percent: number | null) => void): Promise<File> {
-    if (!this.token) { await this.loadScript("https://accounts.google.com/gsi/client", "google"); await this.authorize(); }
+    if (!this.token) await this.authorize();
     const metadata = await this.request(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=name,mimeType,size`, "json") as { name: string; mimeType: string };
     const blob = await this.request(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, "blob", onProgress) as Blob;
     return new File([blob], metadata.name, { type: metadata.mimeType || blob.type });
   }
-  private authorize(): Promise<void> {
-    const google = (window as GoogleWindow).google;
-    return new Promise((resolve, reject) => { const client = google.accounts.oauth2.initTokenClient({ client_id: this.config.clientId,
-      scope: "https://www.googleapis.com/auth/drive.file", prompt: "select_account",
-      callback: (response: { access_token?: string; error?: string }) => response.access_token ? (this.token = response.access_token, resolve()) : reject(new Error(response.error === "access_denied" ? "Acesso ao Google Drive negado." : "Login Google cancelado.")),
-      error_callback: () => reject(new Error("Login Google cancelado.")) }); client.requestAccessToken(); });
-  }
+  private async authorize(): Promise<void> { this.token = await this.authorization.accessToken(); }
   private loadPicker(): Promise<void> { return new Promise((resolve, reject) => (window as GoogleWindow).gapi.load("picker", { callback: resolve, onerror: () => reject(new Error("Não foi possível carregar o seletor do Google Drive.")) })); }
-  private loadScript(src: string, globalName: "google" | "gapi"): Promise<void> {
+  private loadScript(src: string, globalName: "gapi"): Promise<void> {
     if ((window as GoogleWindow)[globalName]) return Promise.resolve();
     return new Promise((resolve, reject) => { const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`); const script = existing ?? document.createElement("script");
       script.addEventListener("load", () => resolve(), { once: true }); script.addEventListener("error", () => reject(new Error("Não foi possível carregar o acesso ao Google Drive.")), { once: true });
