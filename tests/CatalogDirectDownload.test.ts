@@ -12,10 +12,14 @@ const metadata = (value: object = {}) => new Response(JSON.stringify({ name: "Li
 
 describe("GoogleDriveApiProvider", () => {
   it("downloads a PDF through the official Drive API with an in-memory OAuth token", async () => {
-    const calls: RequestInfo[] = []; const authorizations: string[] = [];
-    const provider = new GoogleDriveApiProvider(token(), async (input, init) => { calls.push(input); authorizations.push(new Headers(init?.headers).get("Authorization") ?? ""); return calls.length === 1 ? metadata() : new Response("%PDF-1.7 bytes", { status: 200, headers: { "content-type": "application/pdf" } }); });
+    const calls: RequestInfo[] = []; const authorizations: string[] = []; const options: RequestInit[] = [];
+    const provider = new GoogleDriveApiProvider(token(), async (input, init) => { calls.push(input); options.push(init ?? {}); authorizations.push(new Headers(init?.headers).get("Authorization") ?? ""); return calls.length === 1 ? metadata() : new Response("%PDF-1.7 bytes", { status: 200, headers: { "content-type": "application/pdf" } }); });
     const file = await provider.download(item(), () => undefined);
-    assert.match(await file.text(), /^%PDF-/); assert.match(String(calls[0]), /fields=name/); assert.match(String(calls[1]), /alt=media/); assert.deepEqual(authorizations, ["Bearer temporary", "Bearer temporary"]);
+    assert.match(await file.text(), /^%PDF-/); assert.match(String(calls[0]), /fields=id,name/); assert.match(String(calls[1]), /alt=media/); assert.deepEqual(authorizations, ["Bearer temporary", "Bearer temporary"]);
+    assert.deepEqual(options.map(({ method, mode, credentials, redirect, cache }) => ({ method, mode, credentials, redirect, cache })), [
+      { method: "GET", mode: "cors", credentials: "omit", redirect: "follow", cache: "no-store" },
+      { method: "GET", mode: "cors", credentials: "omit", redirect: "follow", cache: "no-store" },
+    ]);
   });
   it("keeps a resource key in the official API request", async () => {
     let headers: Headers | undefined;

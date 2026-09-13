@@ -33,6 +33,8 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== "GET") return;
+  // Authenticated Drive API requests are browser-only and must never enter Cache Storage.
+  if (url.hostname === "www.googleapis.com") return;
   // OAuth callbacks must never receive the offline app shell or be cached.
   if (url.origin === self.location.origin && url.pathname === "/onedrive-auth.html") return;
   if (BOOK_FILE_PATTERN.test(url.pathname)) return;

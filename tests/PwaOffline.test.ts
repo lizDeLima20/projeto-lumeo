@@ -51,6 +51,12 @@ describe("PWA offline e armazenamento robusto", () => {
     assert.match(sw, /lumeo-shell-\$\{SW_VERSION\}/);
   });
 
+  it("authenticatedDriveApiRequestsBypassCacheStorage", async () => {
+    const sw = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
+    assert.match(sw, /url\.hostname === "www\.googleapis\.com"/);
+    assert.match(sw, /Authenticated Drive API requests are browser-only/);
+  });
+
   it("aVersaoDoServiceWorkerEUmaSo", async () => {
     // sw.js estava em v10 enquanto o app declarava v9: a tela de versao mentia sobre o
     // cache em uso. As duas pontas precisam dizer a mesma coisa.

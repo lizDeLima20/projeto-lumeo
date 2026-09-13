@@ -17,16 +17,18 @@ interface GoogleErrorDetails { reason: string | null; message: string | null; }
 
 /** Official Drive API downloader. Book bytes always go directly to the browser. */
 export class GoogleDriveApiProvider {
+  private static cspObserverInstalled = false;
   public constructor(private readonly authorization = new GoogleDriveAuthorizationProvider(), private readonly fetcher: typeof fetch = fetch) {}
   public clearAuthorization(): void { this.authorization.clear(); }
 
   public async download(download: CatalogDownloadLink, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
     try {
       const token = await this.authorization.accessToken();
+      this.observeCsp();
       this.log("DRIVE_API_DOWNLOAD_REQUEST", { bookId: download.bookId, driveFileId: download.driveFileId, endpointHost: "www.googleapis.com" });
       const metadata = await this.metadata(download, token, signal);
       if (metadata.capabilities?.canDownload === false) throw new CatalogDirectDownloadError("GOOGLE_DRIVE_FILE_NOT_DOWNLOADABLE");
-      const response = await this.request(download, token, "?alt=media&supportsAllDrives=true", metadata.resourceKey ?? undefined, signal);
+      const response = await this.request(download, token, "?alt=media&supportsAllDrives=true", metadata.resourceKey ?? undefined, "media", signal);
       const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
       this.log("DRIVE_API_DOWNLOAD_RESPONSE", { bookId: download.bookId, driveFileId: download.driveFileId, endpointHost: "www.googleapis.com", httpStatus: response.status, contentType: contentType || null });
       if (!response.ok) throw await this.httpError(response);
@@ -44,17 +46,38 @@ export class GoogleDriveApiProvider {
   }
 
   private async metadata(download: CatalogDownloadLink, token: string, signal?: AbortSignal): Promise<DriveMetadata> {
-    const response = await this.request(download, token, "?fields=name,mimeType,size,resourceKey,capabilities(canDownload)&supportsAllDrives=true", download.resourceKey ?? undefined, signal);
+    this.log("DRIVE_API_METADATA_REQUEST", { bookId: download.bookId, driveFileId: download.driveFileId, endpointHost: "www.googleapis.com" });
+    const response = await this.request(download, token, "?fields=id,name,mimeType,size,resourceKey,capabilities(canDownload)&supportsAllDrives=true", download.resourceKey ?? undefined, "metadata", signal);
     this.log("DRIVE_API_METADATA_RESPONSE", { bookId: download.bookId, driveFileId: download.driveFileId, endpointHost: "www.googleapis.com", httpStatus: response.status, contentType: response.headers.get("content-type") ?? null });
     if (!response.ok) throw await this.httpError(response);
     return response.json() as Promise<DriveMetadata>;
   }
 
-  private request(download: CatalogDownloadLink, token: string, query: string, resourceKey?: string, signal?: AbortSignal): Promise<Response> {
+  private async request(download: CatalogDownloadLink, token: string, query: string, resourceKey: string | undefined, operation: "metadata" | "media", signal?: AbortSignal): Promise<Response> {
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
     const key = resourceKey || download.resourceKey;
     if (key) headers["X-Goog-Drive-Resource-Keys"] = `${download.driveFileId}/${key}`;
-    return this.fetcher(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(download.driveFileId)}${query}`, { headers, signal, credentials: "omit", referrerPolicy: "no-referrer" });
+    try {
+      return await this.fetcher(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(download.driveFileId)}${query}`, {
+        method: "GET", headers, signal, mode: "cors", credentials: "omit", redirect: "follow", cache: "no-store", referrerPolicy: "no-referrer",
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error : new Error(String(error));
+      this.log("DRIVE_API_FETCH_EXCEPTION", {
+        bookId: download.bookId, driveFileId: download.driveFileId, operation, endpointHost: "www.googleapis.com",
+        name: this.safeDetail(detail.name), message: this.safeDetail(detail.message), type: this.safeDetail(detail.constructor.name),
+      });
+      throw error;
+    }
+  }
+
+  private observeCsp(): void {
+    if (GoogleDriveApiProvider.cspObserverInstalled || typeof window === "undefined") return;
+    GoogleDriveApiProvider.cspObserverInstalled = true;
+    window.addEventListener("securitypolicyviolation", (event) => {
+      if (event.blockedURI.includes("www.googleapis.com")) this.log("DRIVE_CSP_CONNECT_BLOCKED", { allowed: false, endpointHost: "www.googleapis.com", directive: event.effectiveDirective });
+    });
+    this.log("DRIVE_CSP_CONNECT_ALLOWED", { allowed: true, endpointHost: "www.googleapis.com" });
   }
 
   private async httpError(response: Response): Promise<CatalogDirectDownloadError> {
