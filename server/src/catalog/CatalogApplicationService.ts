@@ -33,6 +33,7 @@ export class CatalogApplicationService {
       coverUrl: book.coverUrl ?? info.coverUrl,
       fileSize: book.fileSize,
       filename: `${book.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "livro"}.${book.format}`,
+      expectedFilename: `${book.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "livro"}.${book.format}`,
       // Public Drive links are resolved by the browser; no OAuth token or BFF
       // byte proxy is involved in this catalogue flow.
       expiresAt: null,

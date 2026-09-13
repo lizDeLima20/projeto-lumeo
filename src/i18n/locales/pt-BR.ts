@@ -57,6 +57,7 @@ export const PT_BR = {
   "library.duplicateBook": "Este livro já está na sua biblioteca.", "library.versionConflict": "Já existe outra versão deste livro na biblioteca.",
   "library.versionPrompt": "Já existe outra versão deste livro na biblioteca. Digite: manter, substituir ou cancelar.",
   "library.versionKeep": "manter", "library.versionReplace": "substituir", "library.versionCancel": "cancelar",
+  "catalog.findBook": "Procurar livro", "catalog.searching": "Procurando livro…", "catalog.found": "Livro encontrado.", "catalog.downloadBook": "Baixar livro", "catalog.downloadStarted": "Livro baixado. Agora adicione à sua biblioteca.", "catalog.addToLibrary": "Adicionar à biblioteca", "catalog.chooseLumeoFolder": "Escolha a pasta Lumeo dentro de Downloads.", "catalog.selectExpectedFile": "Selecione: {filename}", "catalog.fileMismatch": "O arquivo selecionado não corresponde ao livro do catálogo.",
   "error.auth.invalidCredentials": "E-mail ou senha inválidos.", "error.epub.invalid": "O arquivo EPUB é inválido.",
   "error.auth.required": "Autenticação necessária.", "error.network": "Não foi possível conectar ao servidor.", "error.request": "Falha na requisição.", "error.license.required": "Esta conta não possui uma licença ativa.",
   "error.indexedDb.saveFailed": "Não foi possível salvar os dados neste dispositivo.", "error.download.failed": "Não foi possível baixar o livro.",

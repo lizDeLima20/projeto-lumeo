@@ -17,6 +17,7 @@ export interface CatalogDownloadLink {
   fileSize?: number | null;
   resourceKey?: string | null;
   filename: string;
+  expectedFilename: string;
   expiresAt: string | null;
 }
 

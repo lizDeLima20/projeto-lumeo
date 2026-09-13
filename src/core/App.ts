@@ -20,7 +20,9 @@ import { CollectionRepository } from "../repositories/CollectionRepository";
 import { BookMetadataExtractor } from "../metadata/BookMetadataExtractor";
 import { ApiClient, ApiError } from "../services/ApiClient";
 import { CatalogService } from "../services/CatalogService";
+import type { CatalogDownloadLink } from "../services/CatalogService";
 import { CatalogImportCoordinator, type CatalogImportStage } from "../services/CatalogImportCoordinator";
+import { FileSystemFolderManager } from "../services/FileSystemFolderManager";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { AuthManager } from "../services/AuthManager";
 import { CoverService } from "../services/CoverService";
@@ -58,6 +60,7 @@ import { RegisterView } from "../views/RegisterView";
 import { SettingsView } from "../views/SettingsView";
 import { CatalogExplorerView } from "../views/CatalogExplorerView";
 import { CatalogBookView } from "../views/CatalogBookView";
+import { CatalogGenreDialog } from "../views/CatalogGenreDialog";
 import { CatalogAdminView } from "../views/CatalogAdminView";
 import { MobileBottomNavigation } from "../views/MobileBottomNavigation";
 import { I18nManager } from "../i18n/I18nManager";
@@ -135,7 +138,8 @@ export class App {
     this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId })));
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
       () => this.router.navigate("explore"), (bookId) => this.router.navigate("reader", { id: bookId }),
-      (book, progress, signal) => this.addCatalogBook(book, progress, signal)));
+      (book, link) => this.prepareCatalogDownload(book, link),
+      (book, link, progress, signal) => this.addCatalogBook(book, link, progress, signal)));
     this.router.register("catalog-admin", () => new CatalogAdminView(this.catalog, () => this.router.navigate("explore")));
     this.router.register("genre", (params) => new GenreView(this.state, params.get("id") ?? "",
       () => this.router.navigate("library"), (bookId) => this.router.navigate("reader", { id: bookId })));
@@ -243,21 +247,33 @@ export class App {
     this.router.navigate("book", { id: book.id }); this.showToast("Livro adicionado à biblioteca.");
   }
 
-  private async addCatalogBook(catalogBook: CatalogBookData, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal): Promise<void> {
+  private async prepareCatalogDownload(catalogBook: CatalogBookData, link: CatalogDownloadLink): Promise<void> {
+    const folders = new FileSystemFolderManager(this.database);
+    await folders.savePending({ bookId: catalogBook.bookId, driveFileId: link.driveFileId, title: link.title, author: link.author,
+      format: link.format, expectedFilename: link.expectedFilename, coverUrl: link.coverUrl ?? null, catalogGenre: link.genreName, sha256: link.sha256 ?? null });
+    if (!folders.supportsDirectoryPicker) return;
+    try { await folders.chooseLumeoFolder(); }
+    catch { this.showToast(I18nManager.shared.t("catalog.chooseLumeoFolder")); }
+  }
+
+  private async addCatalogBook(catalogBook: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal): Promise<void> {
     const local = this.state.books.find((book) => book.catalogBookId === catalogBook.bookId);
     if (local) { this.router.navigate("reader", { id: local.id }); return; }
-    let genre = this.state.genres.find((item) => item.id === catalogBook.genreId);
-    if (!genre) { genre = new Genre(catalogBook.genreId || crypto.randomUUID(), catalogBook.genreName || "Sem gênero"); await this.genres.save(genre); this.state.library.addGenre(genre); }
-    let collectionId: string | undefined;
-    if (catalogBook.collection) {
-      const collection = await this.collections.findByName(catalogBook.collection);
-      if (collection) collectionId = collection.id;
-      else { const created = new Collection(crypto.randomUUID(), catalogBook.collection, "custom"); await this.collections.save(created); collectionId = created.id; }
-    }
-    const file = await this.pickCatalogFile();
+    const folders = new FileSystemFolderManager(this.database);
+    const file = await folders.selectDownloadedBook();
     if (!file) return;
+    const confirmed = await new CatalogGenreDialog(this.state, catalogBook).open();
+    if (!confirmed) return;
+    let genre = this.state.genres.find((item) => item.id === confirmed.genreId);
+    if (!genre) { genre = new Genre(confirmed.genreId || crypto.randomUUID(), confirmed.genreName || "Sem gênero"); await this.genres.save(genre); this.state.library.addGenre(genre); }
+    let collectionId: string | undefined;
+    if (confirmed.collection) {
+      const collection = await this.collections.findByName(confirmed.collection);
+      if (collection) collectionId = collection.id;
+      else { const created = new Collection(crypto.randomUUID(), confirmed.collection, "custom"); await this.collections.save(created); collectionId = created.id; }
+    }
     const coordinator = new CatalogImportCoordinator(this.imports, this.covers);
-    const saved = await coordinator.addDownloadedFile({ ...catalogBook, genreId: genre.id }, file, progress, signal);
+    const saved = await coordinator.addDownloadedFile({ ...confirmed, genreId: genre.id }, link, file, progress, signal);
     // Catalog collection metadata is optional; ImportManager already saved the original file,
     // cover and LIMA document locally. Keep library state authoritative for the shelf.
     if (collectionId) {
@@ -265,14 +281,6 @@ export class App {
     } else this.state.library.addBook(saved);
     this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
     this.router.navigate("library");
-  }
-
-  private pickCatalogFile(): Promise<File | null> {
-    return new Promise((resolve) => {
-      const input = document.createElement("input"); input.type = "file";
-      input.accept = ".epub,.mobi,.pdf,application/epub+zip,application/x-mobipocket-ebook,application/pdf";
-      input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true }); input.click();
-    });
   }
 
   private async updateBook(book: Book): Promise<void> {

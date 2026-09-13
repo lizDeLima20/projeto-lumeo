@@ -36,6 +36,7 @@ describe("CatalogApplicationService", () => {
     assert.match(download.downloadUrl, /^https:\/\/drive\.google\.com\/uc\?/);
     assert.equal(download.downloadUrls.length, 2);
     assert.equal(download.filename, "Livro autorizado.epub");
+    assert.equal(download.expectedFilename, "Livro autorizado.epub");
     assert.equal(download.expiresAt, null);
     assert.equal("body" in download, false);
   });

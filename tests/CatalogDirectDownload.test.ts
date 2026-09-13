@@ -5,7 +5,7 @@ import { GoogleDriveAuthorizationProvider } from "../src/services/GoogleDriveAut
 import type { CatalogDownloadLink } from "../src/services/CatalogService";
 
 const item = (overrides: Partial<CatalogDownloadLink> = {}): CatalogDownloadLink => ({
-  bookId: "book-1", driveFileId: "1mftT_jgci_WcUvJkVyEXswchizAJHvgS", downloadUrl: "https://drive.google.com/unused", title: "Livro", author: "Autora", genreId: "sem-genero", genreName: "Sem gênero", format: "pdf", ...overrides,
+  bookId: "book-1", driveFileId: "1mftT_jgci_WcUvJkVyEXswchizAJHvgS", downloadUrl: "https://drive.google.com/unused", title: "Livro", author: "Autora", genreId: "sem-genero", genreName: "Sem gênero", format: "pdf", filename: "Livro.pdf", expectedFilename: "Livro.pdf", expiresAt: null, ...overrides,
 });
 const token = (reply: { access_token?: string; expires_in?: number; error?: string } = { access_token: "temporary", expires_in: 3600 }) => new GoogleDriveAuthorizationProvider("public-client", async () => reply);
 const metadata = (value: object = {}) => new Response(JSON.stringify({ name: "Livro.pdf", mimeType: "application/pdf", capabilities: { canDownload: true }, ...value }), { status: 200, headers: { "content-type": "application/json" } });

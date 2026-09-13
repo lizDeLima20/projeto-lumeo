@@ -2,15 +2,16 @@ import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
 import type { CatalogDownloadLink } from "../services/CatalogService";
-import type { CatalogImportStage } from "../services/CatalogImportCoordinator";
+import { CatalogImportFileMismatchError, type CatalogImportStage } from "../services/CatalogImportCoordinator";
+import { ApiError } from "../services/ApiClient";
+import { UnsupportedFileError } from "../importers/LocalFileImporter";
 import { BaseView } from "./BaseView";
-import { CatalogGenreDialog } from "./CatalogGenreDialog";
-import { catalogDownloadCode } from "../services/GoogleDrivePublicProvider";
 
 export class CatalogBookView extends BaseView {
   public constructor(private readonly catalog: CatalogService, private readonly state: AppState, private readonly bookId: string,
     private readonly onBack: () => void, private readonly onOpenLocal: (bookId: string) => void,
-    private readonly onAdd: (book: CatalogBookData, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal) => Promise<void>) { super(); }
+    private readonly onPrepareDownload: (book: CatalogBookData, link: CatalogDownloadLink) => Promise<void>,
+    private readonly onAdd: (book: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal) => Promise<void>) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog-detail page-shell"); const status = this.createElement("p", "catalog__status", this.t("ui.common.loading")); section.append(status);
     void this.load(section, status); return section;
@@ -27,7 +28,7 @@ export class CatalogBookView extends BaseView {
     const metadata = this.createElement("dl", "catalog-detail__metadata"); this.meta(metadata, this.t("ui.catalog.genre"), book.genreName); this.meta(metadata, this.t("ui.catalog.format"), book.format.toUpperCase());
     if (book.fileSize) this.meta(metadata, this.t("ui.catalog.size"), this.formatSize(book.fileSize)); if (book.collection) this.meta(metadata, this.t("ui.catalog.collection"), book.collection); if (book.volume) this.meta(metadata, this.t("ui.catalog.volumeLabel"), book.volume);
     copy.append(metadata); if (book.description) copy.append(this.createElement("p", "catalog-detail__description", book.description));
-    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary catalog-detail__action", local ? this.t("ui.catalog.open") : "Buscar livro"); action.type = "button";
+    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary catalog-detail__action", local ? this.t("ui.catalog.open") : this.t("catalog.findBook")); action.type = "button";
     const progress = this.createElement("p", "catalog__status"); progress.setAttribute("role", "status");
     if (local) action.addEventListener("click", () => this.onOpenLocal(local.id)); else this.configureDownloadFlow(book, action, progress);
     copy.append(action, progress); root.append(cover, copy); return root;
@@ -37,30 +38,35 @@ export class CatalogBookView extends BaseView {
     action.addEventListener("click", () => void (async () => {
       try {
         if (!link) {
-          action.disabled = true; action.textContent = this.t("ui.catalog.preparing"); progress.textContent = "";
+          action.disabled = true; action.textContent = this.t("catalog.searching"); progress.textContent = "";
           link = await this.catalog.downloadLink(book.bookId);
-          action.disabled = false; action.textContent = "Baixar livro"; progress.textContent = "Livro localizado. Agora faça o download."; return;
+          action.disabled = false; action.textContent = this.t("catalog.downloadBook"); progress.textContent = this.t("catalog.found"); return;
         }
         if (action.dataset.downloadStarted !== "true") {
-          this.startBrowserDownload(link); action.dataset.downloadStarted = "true";
-          action.textContent = "Importar para biblioteca"; progress.textContent = "Quando o download terminar, toque em Importar para biblioteca."; return;
+          await this.onPrepareDownload(book, link); this.startBrowserDownload(link); action.dataset.downloadStarted = "true";
+          action.textContent = this.t("catalog.addToLibrary"); progress.textContent = `${this.t("catalog.downloadStarted")} ${this.t("catalog.selectExpectedFile", { filename: link.expectedFilename })}`; return;
         }
-        await this.importSelectedFile(book, action, progress);
+        await this.importSelectedFile(book, link, action, progress);
       } catch (error) {
-        action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = catalogDownloadCode(error);
-        progress.textContent = `${this.t("ui.catalog.downloadFailed")}${code ? ` (${code})` : ""}`;
+        action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = this.technicalCode(error);
+        const message = code === "IMPORT_FILE_INVALID" ? this.t("catalog.fileMismatch") : this.t("ui.catalog.downloadFailed");
+        progress.textContent = `${message}${code ? ` (${code})` : ""}`;
       }
     })());
   }
   private startBrowserDownload(link: CatalogDownloadLink): void {
-    const anchor = document.createElement("a"); anchor.href = link.downloadUrl; anchor.download = link.filename;
+    const anchor = document.createElement("a"); anchor.href = link.downloadUrl; anchor.download = link.expectedFilename;
     anchor.rel = "noreferrer"; anchor.style.display = "none"; document.body.append(anchor); anchor.click(); anchor.remove();
   }
-  private async importSelectedFile(book: CatalogBookData, action: HTMLButtonElement, progress: HTMLElement): Promise<void> {
+  private async importSelectedFile(book: CatalogBookData, link: CatalogDownloadLink, action: HTMLButtonElement, progress: HTMLElement): Promise<void> {
     action.disabled = true; const controller = new AbortController();
-    const confirmed = await new CatalogGenreDialog(this.state, book).open();
-    if (!confirmed) { action.disabled = false; return; }
-    await this.onAdd(confirmed, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal);
+    await this.onAdd(book, link, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal);
+  }
+  private technicalCode(error: unknown): string | null {
+    if (error instanceof CatalogImportFileMismatchError) return error.code;
+    if (error instanceof UnsupportedFileError) return "IMPORT_FORMAT_UNSUPPORTED";
+    if (error instanceof ApiError) return error.code;
+    return null;
   }
   private appendCover(root: HTMLElement, book: CatalogBookData): void {
     const fallback = (): void => root.replaceChildren(this.createElement("span", "catalog-card__placeholder", "📖"));

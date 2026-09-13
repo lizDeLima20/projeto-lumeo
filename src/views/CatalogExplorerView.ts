@@ -54,7 +54,7 @@ export class CatalogExplorerView extends BaseView {
     const title = this.createElement("h2", "catalog-card__title", book.title); const author = this.createElement("p", "catalog-card__author", book.author);
     const info = this.createElement("div", "catalog-card__info"); info.append(title, author, this.createElement("small", "catalog-card__genre", book.genreName || this.t("ui.catalog.unclassified")));
     if (book.volume) info.append(this.createElement("small", "catalog-card__volume", this.t("ui.catalog.volume", { volume: book.volume })));
-    const action = this.createElement("button", "button button--secondary", this.isLocal(book) ? this.t("ui.catalog.inLibrary") : "Buscar livro"); action.type = "button";
+    const action = this.createElement("button", "button button--secondary", this.isLocal(book) ? this.t("ui.catalog.inLibrary") : this.t("catalog.findBook")); action.type = "button";
     action.addEventListener("click", (event) => { event.stopPropagation(); this.onOpen(book.bookId); });
     card.append(cover, info, action); return card;
   }

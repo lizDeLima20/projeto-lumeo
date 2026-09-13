@@ -13,6 +13,13 @@ export class CatalogGenreDialog {
       const dialog = document.createElement("section"); dialog.className = "catalog-genre-dialog__panel"; dialog.setAttribute("role", "dialog"); dialog.setAttribute("aria-modal", "true");
       const title = document.createElement("h2"); title.textContent = `${i18n.t("ui.common.confirm")} · ${i18n.t("ui.catalog.genre")}`;
       const bookName = document.createElement("p"); bookName.className = "catalog-genre-dialog__book"; bookName.textContent = this.book.title;
+      const details = document.createElement("div"); details.className = "catalog-genre-dialog__details";
+      if (this.book.coverUrl) { const cover = document.createElement("img"); cover.className = "catalog-genre-dialog__cover"; cover.src = this.book.coverUrl; cover.alt = i18n.t("ui.catalog.coverOf", { title: this.book.title }); details.append(cover); }
+      const metadata = document.createElement("div"); metadata.append(
+        bookName,
+        this.text("catalog-genre-dialog__author", this.book.author),
+        this.text("catalog-genre-dialog__format", `${i18n.t("ui.catalog.format")}: ${this.book.format.toUpperCase()}`),
+      ); details.append(metadata);
       const label = document.createElement("label"); label.className = "field";
       const labelText = document.createElement("span"); labelText.className = "field__label"; labelText.textContent = i18n.t("ui.catalog.genre");
       const select = document.createElement("select"); select.className = "input";
@@ -28,7 +35,7 @@ export class CatalogGenreDialog {
       select.addEventListener("change", () => { custom.hidden = select.value !== customValue; if (!custom.hidden) custom.focus(); });
       label.append(labelText, select); const actions = document.createElement("div"); actions.className = "catalog-genre-dialog__actions";
       const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "button button--secondary"; cancel.textContent = i18n.t("ui.common.cancel");
-      const confirm = document.createElement("button"); confirm.type = "button"; confirm.className = "button button--primary"; confirm.textContent = "Importar para biblioteca";
+      const confirm = document.createElement("button"); confirm.type = "button"; confirm.className = "button button--primary"; confirm.textContent = i18n.t("catalog.addToLibrary");
       const close = (result: CatalogBookData | null): void => { overlay.remove(); resolve(result); };
       cancel.addEventListener("click", () => close(null));
       overlay.addEventListener("click", (event) => { if (event.target === overlay) close(null); });
@@ -41,7 +48,8 @@ export class CatalogGenreDialog {
         }
         close({ ...this.book, genreId, genreName });
       });
-      actions.append(cancel, confirm); dialog.append(title, bookName, label, custom, error, actions); overlay.append(dialog); document.body.append(overlay); select.focus();
+      actions.append(cancel, confirm); dialog.append(title, details, label, custom, error, actions); overlay.append(dialog); document.body.append(overlay); select.focus();
     });
   }
+  private text(className: string, value: string): HTMLElement { const element = document.createElement("p"); element.className = className; element.textContent = value; return element; }
 }
