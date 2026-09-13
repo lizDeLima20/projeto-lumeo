@@ -2,7 +2,7 @@ import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { I18nManager } from "../i18n/I18nManager";
 
-/** A small, local-only confirmation step before a remote catalog file is downloaded. */
+/** A small, local-only genre step before a user-selected downloaded file is imported. */
 export class CatalogGenreDialog {
   public constructor(private readonly state: AppState, private readonly book: CatalogBookData) {}
 
@@ -28,7 +28,7 @@ export class CatalogGenreDialog {
       select.addEventListener("change", () => { custom.hidden = select.value !== customValue; if (!custom.hidden) custom.focus(); });
       label.append(labelText, select); const actions = document.createElement("div"); actions.className = "catalog-genre-dialog__actions";
       const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "button button--secondary"; cancel.textContent = i18n.t("ui.common.cancel");
-      const confirm = document.createElement("button"); confirm.type = "button"; confirm.className = "button button--primary"; confirm.textContent = i18n.t("ui.catalog.add");
+      const confirm = document.createElement("button"); confirm.type = "button"; confirm.className = "button button--primary"; confirm.textContent = "Importar para biblioteca";
       const close = (result: CatalogBookData | null): void => { overlay.remove(); resolve(result); };
       cancel.addEventListener("click", () => close(null));
       overlay.addEventListener("click", (event) => { if (event.target === overlay) close(null); });

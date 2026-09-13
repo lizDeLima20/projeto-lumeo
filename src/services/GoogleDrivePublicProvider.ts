@@ -1,3 +1,3 @@
-/** Compatibility exports. Catalog downloads now exclusively use Google Drive API v3. */
+/** Compatibility exports for administrative Drive tooling. Catalogue downloads use browser navigation links. */
 export { CatalogDirectDownloadError, catalogDownloadCode, GoogleDriveApiProvider as GoogleDrivePublicProvider } from "./GoogleDriveApiProvider";
 export type { CatalogDownloadErrorCode } from "./GoogleDriveApiProvider";
