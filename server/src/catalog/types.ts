@@ -1,7 +1,7 @@
 export type CatalogBookStatus = "ACTIVE" | "UNAVAILABLE" | "PROCESSING" | "INVALID" | "ERROR";
 export type CatalogFormat = "pdf" | "epub";
 export type CatalogSourceMode = "auto" | "legacy" | "structured";
-export type CatalogSourceProviderKind = Exclude<CatalogSourceMode, "auto">;
+export type CatalogSourceProviderKind = Exclude<CatalogSourceMode, "auto"> | "authorized";
 
 /** A source contains metadata only. Book and cover bytes always remain in Drive. */
 export interface CatalogSourceConfig {
@@ -18,6 +18,13 @@ export interface CatalogSourceDiagnostic {
   locale: string;
   mode: CatalogSourceProviderKind;
   provider: CatalogSourceProviderKind;
+  audit?: CatalogSourceAudit;
+}
+
+export interface CatalogSourceAudit {
+  foldersVisited: number; pagesFetched: number; rawItemsFound: number; filesSeen: number;
+  supportedFiles: number; pdfCount: number; epubCount: number; shortcutCount: number;
+  unsupportedCount: number; duplicates: number; parseFailures: number; finalCatalogCount: number;
 }
 
 export interface CatalogBookRecord {
@@ -61,4 +68,4 @@ export interface CatalogDownloadLink {
   coverUrl: string | null;
   fileSize: number | null;
 }
-export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; }
+export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; audit?: CatalogSourceAudit; }

@@ -20,6 +20,7 @@ import { CatalogApplicationService } from "./catalog/CatalogApplicationService.j
 import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js";
 import { CatalogSourceRegistry } from "./catalog/CatalogSourceRegistry.js";
 import { HybridCatalogSourceProvider } from "./catalog/HybridCatalogSourceProvider.js";
+import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalogProvider.js";
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 
@@ -39,13 +40,20 @@ export class ServerApp {
       const supabase = new SupabaseService(config);
       const auth = new AuthService(supabase.auth);
       const catalogSources = new CatalogSourceRegistry(config.catalogSources);
+      const createDrive = (folderId = config.googleCatalogFolderId) => new GoogleCatalogDriveClient(config.googleCatalogServiceAccountJson, folderId, config.catalogSyncMaxFileBytes);
+      // Public Drive HTML exposes only its initially rendered rows. When the
+      // server account is configured, every catalogue source is read through
+      // the paginated Drive API instead.
+      const authorizedSources = config.googleCatalogServiceAccountJson.trim()
+        ? config.catalogSources.map((source) => new AuthorizedDriveCatalogProvider(source, () => createDrive(source.folderId)))
+        : null;
       controller = new ApiController(
         auth,
         new AuthMiddleware(auth),
         new DeviceService(new DeviceRepository(supabase.admin), config.deviceHashSecret),
         new LicenseService(new LicenseRepository(supabase.admin), config),
         new ProfileRepository(supabase.admin),
-        new CatalogApplicationService(new CatalogRepository(supabase.admin), () => new GoogleCatalogDriveClient(config.googleCatalogServiceAccountJson, config.googleCatalogFolderId, config.catalogSyncMaxFileBytes), new HybridCatalogSourceProvider((locale) => catalogSources.providers(locale))),
+        new CatalogApplicationService(new CatalogRepository(supabase.admin), () => createDrive(), new HybridCatalogSourceProvider(async (locale) => authorizedSources ? authorizedSources.filter((source) => !locale || source.source.locale === locale) : catalogSources.providers(locale))),
       );
       return controller;
     };
