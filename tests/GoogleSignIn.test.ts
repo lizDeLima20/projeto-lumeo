@@ -38,15 +38,18 @@ describe("entrar e cadastrar com Google", () => {
     assert.ok(saved.get("auth-session"), "a sessao e guardada como no login por senha");
   });
 
-  it("login, cadastro e troca de aparelho oferecem o Google, e a CSP deixa o botao carregar", async () => {
-    for (const view of ["LoginView", "RegisterView", "DeviceConflictView"]) {
-      assert.match(await readFile(`src/views/${view}.ts`, "utf8"), /new GoogleAuthButton\(/, `${view} sem opcao Google`);
-    }
+  it("login, cadastro e troca de aparelho oferecem um único Google Identity, e a CSP deixa o SDK carregar", async () => {
+    for (const view of ["LoginView", "RegisterView", "DeviceConflictView"]) assert.match(await readFile(`src/views/${view}.ts`, "utf8"), /new GoogleAuthButton\(/, `${view} sem opcao Google`);
     const conflict = await readFile("src/views/DeviceConflictView.ts", "utf8");
     assert.match(conflict, /googleAccountMismatch/, "trocar aparelho com outra conta Google tem que ser recusado");
     const vercel = await readFile("vercel.json", "utf8");
     assert.match(vercel, /script-src[^;]*https:\/\/accounts\.google\.com\/gsi\/client/);
     assert.match(vercel, /style-src[^;]*https:\/\/accounts\.google\.com\/gsi\/style/);
     assert.match(vercel, /frame-src[^;]*https:\/\/accounts\.google\.com/);
+    const identity = await readFile("src/services/GoogleIdentityServices.ts", "utf8");
+    const drive = await readFile("src/services/GoogleDriveAuthorizationProvider.ts", "utf8");
+    assert.match(identity, /private static loading/, "SDK GIS deve carregar uma única vez");
+    assert.match(drive, /private static readonly clients/, "TokenClient deve ser reutilizado por Client ID e escopo");
+    assert.match(drive, /initTokenClient/, "Drive deve usar o token client OAuth2, não um ID token");
   });
 });
