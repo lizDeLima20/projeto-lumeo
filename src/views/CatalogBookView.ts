@@ -1,6 +1,7 @@
 import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
+import type { CatalogDownloadLink } from "../services/CatalogService";
 import type { CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { BaseView } from "./BaseView";
 import { CatalogGenreDialog } from "./CatalogGenreDialog";
@@ -26,18 +27,40 @@ export class CatalogBookView extends BaseView {
     const metadata = this.createElement("dl", "catalog-detail__metadata"); this.meta(metadata, this.t("ui.catalog.genre"), book.genreName); this.meta(metadata, this.t("ui.catalog.format"), book.format.toUpperCase());
     if (book.fileSize) this.meta(metadata, this.t("ui.catalog.size"), this.formatSize(book.fileSize)); if (book.collection) this.meta(metadata, this.t("ui.catalog.collection"), book.collection); if (book.volume) this.meta(metadata, this.t("ui.catalog.volumeLabel"), book.volume);
     copy.append(metadata); if (book.description) copy.append(this.createElement("p", "catalog-detail__description", book.description));
-    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary catalog-detail__action", local ? this.t("ui.catalog.open") : this.t("ui.catalog.add")); action.type = "button";
+    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary catalog-detail__action", local ? this.t("ui.catalog.open") : "Buscar livro"); action.type = "button";
     const progress = this.createElement("p", "catalog__status"); progress.setAttribute("role", "status");
-    if (local) action.addEventListener("click", () => this.onOpenLocal(local.id)); else action.addEventListener("click", () => void this.add(book, action, progress)); copy.append(action, progress); root.append(cover, copy); return root;
+    if (local) action.addEventListener("click", () => this.onOpenLocal(local.id)); else this.configureDownloadFlow(book, action, progress);
+    copy.append(action, progress); root.append(cover, copy); return root;
   }
-  private async add(book: CatalogBookData, action: HTMLButtonElement, progress: HTMLElement): Promise<void> {
+  private configureDownloadFlow(book: CatalogBookData, action: HTMLButtonElement, progress: HTMLElement): void {
+    let link: CatalogDownloadLink | null = null;
+    action.addEventListener("click", () => void (async () => {
+      try {
+        if (!link) {
+          action.disabled = true; action.textContent = this.t("ui.catalog.preparing"); progress.textContent = "";
+          link = await this.catalog.downloadLink(book.bookId);
+          action.disabled = false; action.textContent = "Baixar livro"; progress.textContent = "Livro localizado. Agora faça o download."; return;
+        }
+        if (action.dataset.downloadStarted !== "true") {
+          this.startBrowserDownload(link); action.dataset.downloadStarted = "true";
+          action.textContent = "Importar para biblioteca"; progress.textContent = "Quando o download terminar, toque em Importar para biblioteca."; return;
+        }
+        await this.importSelectedFile(book, action, progress);
+      } catch (error) {
+        action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = catalogDownloadCode(error);
+        progress.textContent = `${this.t("ui.catalog.downloadFailed")}${code ? ` (${code})` : ""}`;
+      }
+    })());
+  }
+  private startBrowserDownload(link: CatalogDownloadLink): void {
+    const anchor = document.createElement("a"); anchor.href = link.downloadUrl; anchor.download = link.filename;
+    anchor.rel = "noreferrer"; anchor.style.display = "none"; document.body.append(anchor); anchor.click(); anchor.remove();
+  }
+  private async importSelectedFile(book: CatalogBookData, action: HTMLButtonElement, progress: HTMLElement): Promise<void> {
     action.disabled = true; const controller = new AbortController();
-    try {
-      const confirmed = await new CatalogGenreDialog(this.state, book).open();
-      if (!confirmed) { action.disabled = false; return; }
-      await this.onAdd(confirmed, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal);
-    }
-    catch (error) { action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = catalogDownloadCode(error); progress.textContent = `${this.t("ui.catalog.downloadFailed")}${code ? ` (${code})` : ""}`; }
+    const confirmed = await new CatalogGenreDialog(this.state, book).open();
+    if (!confirmed) { action.disabled = false; return; }
+    await this.onAdd(confirmed, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal);
   }
   private appendCover(root: HTMLElement, book: CatalogBookData): void {
     const fallback = (): void => root.replaceChildren(this.createElement("span", "catalog-card__placeholder", "📖"));

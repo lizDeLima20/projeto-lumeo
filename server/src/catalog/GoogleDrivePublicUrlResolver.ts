@@ -9,12 +9,17 @@ export interface GoogleDrivePublicDownloadInfo {
   expectedFormat: CatalogFormat;
 }
 
+/** Resolves a browser-download link without transferring a book through the BFF. */
+export interface CatalogDownloadLinkProvider {
+  resolve(fileIdOrUrl: string, expectedFormat: CatalogFormat): GoogleDrivePublicDownloadInfo;
+}
+
 /**
  * The one place where public Google Drive file links are interpreted.
  * It deliberately returns URLs only: book bytes always travel from Drive to
  * the reader's browser, never through the BFF.
  */
-export class GoogleDrivePublicUrlResolver {
+export class GoogleDrivePublicUrlResolver implements CatalogDownloadLinkProvider {
   public resolve(fileIdOrUrl: string, expectedFormat: CatalogFormat): GoogleDrivePublicDownloadInfo {
     const driveFileId = this.extractFileId(fileIdOrUrl);
     // Google documents https://drive.google.com/uc as its public-download

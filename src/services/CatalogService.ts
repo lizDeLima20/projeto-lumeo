@@ -16,6 +16,8 @@ export interface CatalogDownloadLink {
   coverUrl?: string | null;
   fileSize?: number | null;
   resourceKey?: string | null;
+  filename: string;
+  expiresAt: string | null;
 }
 
 export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; }

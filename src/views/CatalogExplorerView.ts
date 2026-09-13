@@ -1,10 +1,7 @@
 import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
-import type { CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { BaseView } from "./BaseView";
-import { CatalogGenreDialog } from "./CatalogGenreDialog";
-import { catalogDownloadCode } from "../services/GoogleDrivePublicProvider";
 
 export class CatalogExplorerView extends BaseView {
   private readonly catalog: CatalogService;
@@ -14,8 +11,7 @@ export class CatalogExplorerView extends BaseView {
   private readonly classified: HTMLElement = document.createElement("div");
   private readonly unclassified: HTMLElement = document.createElement("div");
   private status: HTMLElement | null = null;
-  public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void,
-    private readonly onAdd: (book: CatalogBookData, progress: (stage: CatalogImportStage, percent?: number | null) => void) => Promise<void>) { super(); this.catalog = api; }
+  public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void) { super(); this.catalog = api; }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog page-shell");
     const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
@@ -58,28 +54,11 @@ export class CatalogExplorerView extends BaseView {
     const title = this.createElement("h2", "catalog-card__title", book.title); const author = this.createElement("p", "catalog-card__author", book.author);
     const info = this.createElement("div", "catalog-card__info"); info.append(title, author, this.createElement("small", "catalog-card__genre", book.genreName || this.t("ui.catalog.unclassified")));
     if (book.volume) info.append(this.createElement("small", "catalog-card__volume", this.t("ui.catalog.volume", { volume: book.volume })));
-    const action = this.createElement("button", "button button--secondary", this.isLocal(book) ? this.t("ui.catalog.inLibrary") : this.t("ui.catalog.add")); action.type = "button";
-    action.addEventListener("click", (event) => { event.stopPropagation(); void this.addFromCard(book, action); });
+    const action = this.createElement("button", "button button--secondary", this.isLocal(book) ? this.t("ui.catalog.inLibrary") : "Buscar livro"); action.type = "button";
+    action.addEventListener("click", (event) => { event.stopPropagation(); this.onOpen(book.bookId); });
     card.append(cover, info, action); return card;
   }
   private isLocal(book: CatalogBookData): boolean { return this.state.books.some((item) => item.catalogBookId === book.bookId); }
-  private async addFromCard(book: CatalogBookData, action: HTMLButtonElement): Promise<void> {
-    const local = this.state.books.find((item) => item.catalogBookId === book.bookId);
-    if (local) { this.onOpen(book.bookId); return; }
-    action.disabled = true;
-    try {
-      const confirmed = await new CatalogGenreDialog(this.state, book).open();
-      if (!confirmed) { action.disabled = false; return; }
-      await this.onAdd(confirmed, (stage, percent) => { action.textContent = `${this.t(`ui.catalog.${stage}` as never)}${percent == null ? "" : ` ${percent}%`}`; });
-    }
-    catch (error) {
-      action.disabled = false; action.textContent = this.t("ui.common.retry");
-      const code = catalogDownloadCode(error);
-      const prior = action.parentElement?.querySelector(".catalog-card__error"); prior?.remove();
-      const message = this.createElement("p", "catalog-card__error", `${this.t("ui.catalog.downloadFailed")}${code ? ` (${code})` : ""}`);
-      action.after(message);
-    }
-  }
   private appendCover(root: HTMLElement, book: CatalogBookData): void {
     const fallback = (): void => root.replaceChildren(this.createElement("span", "catalog-card__placeholder", "📖"));
     if (!book.coverUrl) { fallback(); return; }

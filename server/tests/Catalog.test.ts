@@ -35,6 +35,8 @@ describe("CatalogApplicationService", () => {
     assert.equal(download.driveFileId, item().driveFileId);
     assert.match(download.downloadUrl, /^https:\/\/drive\.google\.com\/uc\?/);
     assert.equal(download.downloadUrls.length, 2);
+    assert.equal(download.filename, "Livro autorizado.epub");
+    assert.equal(download.expiresAt, null);
     assert.equal("body" in download, false);
   });
   it("requires a backend-admin decision before synchronization", async () => {

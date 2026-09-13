@@ -21,8 +21,6 @@ import { BookMetadataExtractor } from "../metadata/BookMetadataExtractor";
 import { ApiClient, ApiError } from "../services/ApiClient";
 import { CatalogService } from "../services/CatalogService";
 import { CatalogImportCoordinator, type CatalogImportStage } from "../services/CatalogImportCoordinator";
-import { GoogleDriveAuthorizationProvider } from "../services/GoogleDriveAuthorizationProvider";
-import { GoogleDriveApiProvider } from "../services/GoogleDriveApiProvider";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { AuthManager } from "../services/AuthManager";
 import { CoverService } from "../services/CoverService";
@@ -87,8 +85,6 @@ export class App {
     new ReadingProgressService(this.progress, this.books), this.readerSettings,this.limaDocuments);
   private readonly api = new ApiClient(new EnvironmentConfig().read().bffBaseUrl);
   private readonly catalog = new CatalogService(this.api);
-  private readonly catalogDriveAuthorization = new GoogleDriveAuthorizationProvider(this.driveConfig.clientId);
-  private readonly catalogDrive = new GoogleDriveApiProvider(this.catalogDriveAuthorization);
   private readonly auth = new AuthManager(this.api, this.storage, this.state);
   private readonly devices = new DeviceManager(this.api, this.storage, this.state);
   private readonly router: Router;
@@ -136,8 +132,7 @@ export class App {
       () => this.router.navigate("library"), () => this.router.navigate("import")));
     this.router.register("library", () => new LibraryView(this.state,
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.router.navigate("reader", { id: bookId }), (bookId) => void this.deleteBook(bookId, false)));
-    this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }),
-      (book, progress) => this.addCatalogBook(book, progress)));
+    this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId })));
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
       () => this.router.navigate("explore"), (bookId) => this.router.navigate("reader", { id: bookId }),
       (book, progress, signal) => this.addCatalogBook(book, progress, signal)));
@@ -259,8 +254,10 @@ export class App {
       if (collection) collectionId = collection.id;
       else { const created = new Collection(crypto.randomUUID(), catalogBook.collection, "custom"); await this.collections.save(created); collectionId = created.id; }
     }
-    const coordinator = new CatalogImportCoordinator(this.catalog, this.imports, this.covers, this.catalogDrive);
-    const saved = await coordinator.add({ ...catalogBook, genreId: genre.id }, progress, signal);
+    const file = await this.pickCatalogFile();
+    if (!file) return;
+    const coordinator = new CatalogImportCoordinator(this.imports, this.covers);
+    const saved = await coordinator.addDownloadedFile({ ...catalogBook, genreId: genre.id }, file, progress, signal);
     // Catalog collection metadata is optional; ImportManager already saved the original file,
     // cover and LIMA document locally. Keep library state authoritative for the shelf.
     if (collectionId) {
@@ -268,6 +265,14 @@ export class App {
     } else this.state.library.addBook(saved);
     this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
     this.router.navigate("library");
+  }
+
+  private pickCatalogFile(): Promise<File | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement("input"); input.type = "file";
+      input.accept = ".epub,.mobi,.pdf,application/epub+zip,application/x-mobipocket-ebook,application/pdf";
+      input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true }); input.click();
+    });
   }
 
   private async updateBook(book: Book): Promise<void> {
@@ -334,7 +339,7 @@ export class App {
   private hasUsableLicense(): boolean { return this.state.licenseStatus === "active" || this.state.licenseStatus === "offline_grace" || this.state.licenseStatus === "grace"; }
 
   private async logout(): Promise<void> {
-    this.catalogDrive.clearAuthorization(); await this.auth.logout(); this.state.library.replaceBooks([]); this.state.library.replaceGenres([]);
+    await this.auth.logout(); this.state.library.replaceBooks([]); this.state.library.replaceGenres([]);
     this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
   }
   private showToast(message: string): void {

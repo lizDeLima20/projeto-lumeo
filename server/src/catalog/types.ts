@@ -67,5 +67,7 @@ export interface CatalogDownloadLink {
   sha256: string | null;
   coverUrl: string | null;
   fileSize: number | null;
+  filename: string;
+  expiresAt: string | null;
 }
 export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; audit?: CatalogSourceAudit; }

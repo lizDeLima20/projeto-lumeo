@@ -2,13 +2,13 @@ import { ApiError } from "../errors/ApiError.js";
 import type { CatalogStore } from "./CatalogRepository.js";
 import { CatalogSyncService } from "./CatalogSyncService.js";
 import { GoogleCatalogDriveClient } from "./GoogleCatalogDriveClient.js";
-import { GoogleDrivePublicUrlResolver } from "./GoogleDrivePublicUrlResolver.js";
+import { GoogleDrivePublicUrlResolver, type CatalogDownloadLinkProvider } from "./GoogleDrivePublicUrlResolver.js";
 import { HybridCatalogSourceProvider } from "./HybridCatalogSourceProvider.js";
 import type { CatalogBookRecord, CatalogDownloadLink, CatalogPage, CatalogQuery, CatalogSyncReport } from "./types.js";
 
 export class CatalogApplicationService {
-  private readonly urls = new GoogleDrivePublicUrlResolver();
-  public constructor(private readonly store: CatalogStore, private readonly createDrive: () => GoogleCatalogDriveClient, private readonly publicCatalog?: HybridCatalogSourceProvider) {}
+  private readonly urls: CatalogDownloadLinkProvider;
+  public constructor(private readonly store: CatalogStore, private readonly createDrive: () => GoogleCatalogDriveClient, private readonly publicCatalog?: HybridCatalogSourceProvider, urls: CatalogDownloadLinkProvider = new GoogleDrivePublicUrlResolver()) { this.urls = urls; }
   public list(query: CatalogQuery): Promise<CatalogPage> { return this.publicCatalog ? this.publicCatalog.list(query) : this.store.list(query); }
   public async get(bookId: string, locale?: string): Promise<CatalogBookRecord> {
     const book = this.publicCatalog ? await this.publicCatalog.get(bookId, locale) : await this.store.getActive(bookId); if (!book) throw new ApiError(404, "CATALOG_BOOK_NOT_FOUND", "Livro não encontrado no catálogo."); return book;
@@ -32,6 +32,10 @@ export class CatalogApplicationService {
       sha256: book.sha256,
       coverUrl: book.coverUrl ?? info.coverUrl,
       fileSize: book.fileSize,
+      filename: `${book.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "livro"}.${book.format}`,
+      // Public Drive links are resolved by the browser; no OAuth token or BFF
+      // byte proxy is involved in this catalogue flow.
+      expiresAt: null,
     };
   }
   public async sync(userId: string): Promise<CatalogSyncReport> {
