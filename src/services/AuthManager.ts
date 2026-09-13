@@ -14,7 +14,10 @@ export class AuthManager {
     const saved = await this.storage.load<AuthSession>(AuthManager.SESSION_KEY);
     if (!saved || !saved.user?.id || !saved.user?.email || !saved.accessToken) return this.clearSession();
     const expired = !!saved.expiresAt && saved.expiresAt * 1000 < Date.now() + 30_000;
-    if (expired && !saved.refreshToken?.trim()) return this.clearSession();
+    // Supabase refresh tokens are opaque but always substantially larger than
+    // the request validator's minimum. A short/stale persisted value cannot
+    // be refreshed and used to create a noisy /auth/refresh 400 on startup.
+    if (expired && saved.refreshToken.trim().length < 16) return this.clearSession();
     if(import.meta.env?.DEV)await this.rememberDevUser(saved.user);
     try {
       const session = expired

@@ -69,9 +69,15 @@ it("expiredSessionWithoutRefreshClearsWithoutRequest", async () => {
 });
 it("invalidRefresh400ClearsSessionWithoutThrowingIntoImportUI", async () => {
   const storage = new Memory(), state = new AppState(); let calls = 0;
-  await storage.save<AuthSession>("auth-session", { user: { id: "u", email: "test@example.com" }, accessToken: "fake", refreshToken: "invalid", expiresAt: 1 });
+  await storage.save<AuthSession>("auth-session", { user: { id: "u", email: "test@example.com" }, accessToken: "fake", refreshToken: "invalid-refresh-token", expiresAt: 1 });
   const auth = new AuthManager({ post: async () => { calls++; throw new ApiError(400, "INVALID", "invalid"); }, setAccessToken: () => undefined } as never, storage as never, state);
   await auth.initialize(); assert.equal(calls, 1); assert.equal(state.authStatus, "unauthenticated");
+});
+it("short stale refresh token clears locally without calling the BFF", async () => {
+  const storage = new Memory(), state = new AppState(); let calls = 0;
+  await storage.save<AuthSession>("auth-session", { user: { id: "u", email: "test@example.com" }, accessToken: "fake", refreshToken: "short", expiresAt: 1 });
+  await new AuthManager({ post: async () => { calls++; }, setAccessToken: () => undefined } as never, storage as never, state).initialize();
+  assert.equal(calls, 0); assert.equal(state.authStatus, "unauthenticated");
 });
 it("validLocalSessionDoesNotRefresh", async () => {
   const storage = new Memory(), state = new AppState(); let calls = 0;
