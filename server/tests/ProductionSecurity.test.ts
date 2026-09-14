@@ -39,6 +39,11 @@ describe("produção e segurança do BFF", () => {
     });
   });
 
+  it("allows Capacitor Android's secure WebView origin in production", () => {
+    const config = Config.fromEnvironment({ NODE_ENV: "production", APP_BASE_URL: "https://lumeo-livros.vercel.app", ALLOWED_ORIGINS: "https://lumeo-livros.vercel.app" });
+    assert.deepEqual(config.allowedOrigins, ["https://lumeo-livros.vercel.app", "https://localhost"]);
+  });
+
   it("missingSupabaseConfigUsesSafeInternalCode", () => {
     assert.throws(
       () => Config.assertSupabase({ ...Config.fromEnvironment({}), localAuthMode: false }),

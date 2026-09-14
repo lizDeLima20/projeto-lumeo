@@ -26,6 +26,14 @@ export class Config {
   public static fromEnvironment(environment: NodeJS.ProcessEnv = process.env): ServerConfig {
     const nodeEnv = environment.NODE_ENV ?? "development";
     const googleCatalogFolderId = environment.GOOGLE_CATALOG_FOLDER_ID ?? "1JUbxHjUzyYruG9LWyz1HRYv9matGU7ad";
+    const configuredOrigins = environment.ALLOWED_ORIGINS
+      ?? (nodeEnv === "production" ? environment.APP_BASE_URL ?? "" : "http://localhost:5173,http://127.0.0.1:5173");
+    // Capacitor Android serves the packaged frontend at this secure local
+    // origin. It is not a loopback BFF URL: requests still target the public
+    // BFF and use bearer authentication. Keeping this explicit avoids an
+    // Android-only CORS failure when ALLOWED_ORIGINS is configured for web.
+    const allowedOrigins = [...configuredOrigins.split(","), ...(nodeEnv === "production" ? ["https://localhost"] : [])]
+      .map((origin) => origin.trim()).filter(Boolean);
     return {
       supabaseUrl: environment.SUPABASE_URL ?? "",
       supabasePublishableKey: environment.SUPABASE_PUBLISHABLE_KEY ?? environment.SUPABASE_ANON_KEY ?? "",
@@ -41,8 +49,7 @@ export class Config {
       appBaseUrl: environment.APP_BASE_URL ?? "http://localhost:5173",
       bffBaseUrl: environment.BFF_BASE_URL ?? "http://127.0.0.1:3000/api",
       port: Number(environment.PORT ?? 3000),
-      allowedOrigins: (environment.ALLOWED_ORIGINS ?? (nodeEnv === "production" ? environment.APP_BASE_URL ?? "" : "http://localhost:5173,http://127.0.0.1:5173"))
-        .split(",").map((origin) => origin.trim()).filter(Boolean),
+      allowedOrigins: [...new Set(allowedOrigins)],
       localAuthMode: nodeEnv !== "production" && environment.LOCAL_AUTH_MODE !== "false"
         && !environment.SUPABASE_URL,
       // Public pt-BR catalogue. The environment variable is the production
