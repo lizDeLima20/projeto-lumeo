@@ -7,7 +7,7 @@ import type { CatalogBookRecord, CatalogPage, CatalogQuery, CatalogSourceConfig,
 interface StructuredBook {
   bookId?: unknown; title?: unknown; author?: unknown; genre?: unknown; genreName?: unknown; format?: unknown;
   bookDriveFileId?: unknown; coverDriveFileId?: unknown; sha256?: unknown; fileSize?: unknown; description?: unknown;
-  volume?: unknown; collection?: unknown; language?: unknown; resourceKey?: unknown;
+  volume?: unknown; collection?: unknown; language?: unknown; resourceKey?: unknown; sourceFileName?: unknown;
 }
 interface StructuredDocument { version?: unknown; locale?: unknown; books?: unknown; }
 
@@ -56,7 +56,7 @@ export class StructuredDriveCatalogProvider implements CatalogSourceProvider {
     const coverUrl = coverId ? this.urls.coverUrl(coverId) : this.urls.resolve(driveFileId, format).coverUrl;
     const genre = this.string(value.genre) ?? "sem-genero";
     return { bookId: rawId, title: this.string(value.title) ?? "Livro sem título", author: this.string(value.author) ?? "Autor não informado",
-      genreId: genre, genreName: this.string(value.genreName) ?? this.genreName(genre), coverUrl, description: this.string(value.description), format,
+      genreId: genre, genreName: this.string(value.genreName) ?? this.genreName(genre), coverUrl, description: this.string(value.description), format, sourceFileName: this.string(value.sourceFileName),
       fileSize: this.number(value.fileSize), driveFileId, resourceKey: this.string(value.resourceKey), storageAccountId: `google-drive-${this.source.sourceId}`, sha256: this.sha(value.sha256),
       volume: this.string(value.volume), collection: this.string(value.collection), language: this.string(value.language) ?? this.source.locale,
       createdAt: now, updatedAt: now, status: "ACTIVE" };

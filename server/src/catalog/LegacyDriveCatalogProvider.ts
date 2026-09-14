@@ -25,7 +25,7 @@ export class LegacyDriveCatalogProvider implements CatalogSourceProvider {
       const format = this.format(file.name); if (!format) return [];
       const parsed = this.parseName(file.name), publicInfo = this.urls.resolve(file.fileId, format);
       return [{ bookId: file.fileId, title: parsed.title, author: parsed.author, genreId: "sem-genero", genreName: "Sem gênero", coverUrl: publicInfo.coverUrl,
-        description: null, format, fileSize: null, driveFileId: file.fileId, storageAccountId: `google-drive-${this.source.sourceId}`, sha256: null,
+        description: null, format, sourceFileName: file.name, fileSize: null, driveFileId: file.fileId, storageAccountId: `google-drive-${this.source.sourceId}`, sha256: null,
         volume: null, collection: null, language: this.source.locale, createdAt: now, updatedAt: now, status: "ACTIVE" }];
     });
     this.cache = { expiresAt: Date.now() + 5 * 60_000, books };

@@ -36,6 +36,9 @@ export interface CatalogBookRecord {
   coverUrl: string | null;
   description: string | null;
   format: CatalogFormat;
+  /** Original Drive filename. It is the legacy identity fallback only when
+   * checksum and byte size are unavailable. */
+  sourceFileName?: string | null;
   fileSize: number | null;
   driveFileId: string;
   resourceKey?: string | null;

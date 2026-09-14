@@ -40,6 +40,12 @@ describe("CatalogApplicationService", () => {
     assert.equal(download.expiresAt, null);
     assert.equal("body" in download, false);
   });
+  it("preserves the original Drive filename for legacy identity validation", async () => {
+    const store = new MemoryCatalogStore();
+    await store.save({ ...item(), sourceFileName: "52 maneiras de ganhar mais dinheiro.pdf", sha256: null, fileSize: null, format: "pdf" });
+    const download = await new CatalogApplicationService(store, () => driveStub()).download(item().bookId);
+    assert.equal(download.expectedFilename, "52 maneiras de ganhar mais dinheiro.pdf");
+  });
   it("requires a backend-admin decision before synchronization", async () => {
     const store = new MemoryCatalogStore(); const service = new CatalogApplicationService(store, () => driveStub());
     await assert.rejects(() => service.sync("user"), (error: unknown) => error instanceof ApiError && error.code === "CATALOG_ADMIN_REQUIRED");

@@ -26,6 +26,10 @@ describe("produção e segurança do frontend", () => {
   it("developmentKeepsLocalBff", () => {
     assert.equal(new EnvironmentConfig({ MODE: "development" } as ImportMetaEnv).read().bffBaseUrl, "http://localhost:3000/api");
   });
+  it("androidBuildUsesExplicitPublicBffInsteadOfWebViewLocalhost", () => {
+    const config = new EnvironmentConfig({ MODE: "production", PROD: true, VITE_CAPACITOR_API_URL: "https://lumeo-livros.vercel.app/api/" } as ImportMetaEnv, () => true).read();
+    assert.equal(config.bffBaseUrl, "https://lumeo-livros.vercel.app/api");
+  });
   it("frontendDoesNotContainServiceRoleKey", () => {
     const config = new EnvironmentConfig({ MODE: "production", VITE_APP_ENV: "production" } as ImportMetaEnv);
     assert.equal(config.assertNoFrontendSecrets(["VITE_SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_URL", "VITE_API_URL"]), true);

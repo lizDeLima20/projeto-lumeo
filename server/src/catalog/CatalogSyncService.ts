@@ -19,7 +19,7 @@ export class CatalogSyncService {
     const sha256 = await this.drive.hashAndValidate(file); const existing = await this.store.getAnyByDriveFileId(this.storageAccountId, file.id);
     const now = new Date().toISOString(); const parsed = this.parseName(file.name);
     const record: CatalogBookRecord = { bookId: existing?.bookId ?? randomUUID(), title: parsed.title, author: parsed.author, genreId: "sem-genero", genreName: "Sem gênero", coverUrl: existing?.coverUrl ?? null, description: existing?.description ?? null,
-      format: file.format, fileSize: file.size, driveFileId: file.id, storageAccountId: this.storageAccountId, sha256, volume: parsed.volume, collection: parsed.collection, language: existing?.language ?? null, createdAt: existing?.createdAt ?? now, updatedAt: now, status: "ACTIVE" };
+      format: file.format, sourceFileName: file.name, fileSize: file.size, driveFileId: file.id, storageAccountId: this.storageAccountId, sha256, volume: parsed.volume, collection: parsed.collection, language: existing?.language ?? null, createdAt: existing?.createdAt ?? now, updatedAt: now, status: "ACTIVE" };
     await this.store.save(record); if (existing) report.updated++; else report.created++;
   }
   private parseName(name: string): { title: string; author: string; volume: string | null; collection: string | null } {

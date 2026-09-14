@@ -17,7 +17,7 @@ export class CatalogApplicationService {
     const book = await this.get(bookId, locale);
     const info = this.urls.resolve(book.driveFileId, book.format);
     console.info(JSON.stringify({ event: "CATALOG_DOWNLOAD_REQUEST", bookId: book.bookId, driveFileId: info.driveFileId }));
-    console.info(JSON.stringify({ event: "CATALOG_DOWNLOAD_INFO", bookId: book.bookId, driveFileId: info.driveFileId, downloadUrl: info.downloadUrl, expectedFormat: info.expectedFormat }));
+    console.info(JSON.stringify({ event: "CATALOG_DOWNLOAD_INFO", bookId: book.bookId, driveFileId: info.driveFileId, expectedFormat: info.expectedFormat, hasFallbackUrl: info.downloadUrls.length > 1 }));
     return {
       bookId: book.bookId,
       driveFileId: info.driveFileId,
@@ -32,8 +32,8 @@ export class CatalogApplicationService {
       sha256: book.sha256,
       coverUrl: book.coverUrl ?? info.coverUrl,
       fileSize: book.fileSize,
-      filename: `${book.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "livro"}.${book.format}`,
-      expectedFilename: `${book.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "livro"}.${book.format}`,
+      filename: this.expectedFilename(book),
+      expectedFilename: this.expectedFilename(book),
       // Public Drive links are resolved by the browser; no OAuth token or BFF
       // byte proxy is involved in this catalogue flow.
       expiresAt: null,
@@ -42,6 +42,11 @@ export class CatalogApplicationService {
   public async sync(userId: string): Promise<CatalogSyncReport> {
     if (!await this.store.isAdmin(userId)) throw new ApiError(403, "CATALOG_ADMIN_REQUIRED", "Esta conta não pode sincronizar o catálogo.");
     return new CatalogSyncService(this.store, this.createDrive()).sync();
+  }
+  private expectedFilename(book: CatalogBookRecord): string {
+    const fallback = `${book.title || "livro"}.${book.format}`;
+    const candidate = (book.sourceFileName || fallback).replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").trim() || fallback;
+    return candidate.toLocaleLowerCase().endsWith(`.${book.format}`) ? candidate : `${candidate}.${book.format}`;
   }
   public async adminStatus(userId: string): Promise<{ isAdmin: boolean; sources?: readonly import("./types.js").CatalogSourceDiagnostic[] }> {
     const isAdmin = await this.store.isAdmin(userId);

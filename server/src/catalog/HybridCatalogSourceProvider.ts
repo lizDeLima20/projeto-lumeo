@@ -8,14 +8,19 @@ export class HybridCatalogSourceProvider {
 
   public async list(query: CatalogQuery): Promise<CatalogPage> {
     const providers = await this.sources(query.locale);
-    const pages = await Promise.allSettled(providers.map((provider) => provider.list({ ...query, offset: 0, limit: 500 })));
+    // A source can contain thousands of books. Fetch every provider page before
+    // deduplicating so a UI-sized page never becomes a catalogue-sized limit.
+    const pages = await Promise.allSettled(providers.map((provider) => this.allProviderItems(provider, query)));
     const books: CatalogBookRecord[] = [], seen = new Set<string>(); this.providersByBookId.clear();
+    const sourceCounts: Array<{ sourceId: string; items: number; pages: number; failed: boolean }> = [];
     pages.forEach((result, index) => {
       const provider = providers[index]!;
       if (result.status === "rejected") {
         console.warn(JSON.stringify({ event: "CATALOG_SOURCE_FAILED", sourceId: provider.source.sourceId, locale: provider.source.locale, provider: provider.provider, code: HybridCatalogSourceProvider.errorCode(result.reason) }));
+        sourceCounts.push({ sourceId: provider.source.sourceId, items: 0, pages: 0, failed: true });
         return;
       }
+      sourceCounts.push({ sourceId: provider.source.sourceId, items: result.value.items.length, pages: result.value.pages, failed: false });
       for (const book of result.value.items) {
         const identity = book.sha256 ? `sha:${book.sha256}` : `drive:${provider.source.sourceId}:${book.driveFileId}`;
         if (seen.has(identity) || this.providersByBookId.has(book.bookId)) continue;
@@ -24,6 +29,7 @@ export class HybridCatalogSourceProvider {
     });
     const filtered = books.filter((book) => this.matches(book, query));
     const page = filtered.slice(query.offset, query.offset + query.limit + 1);
+    console.info(JSON.stringify({ event: "CATALOG_PIPELINE_COUNTS", sourceCounts, totalFoundInSources: sourceCounts.reduce((total, source) => total + source.items, 0), afterDeduplication: books.length, afterFilters: filtered.length, returnedByApi: Math.min(query.limit, page.length), requestedOffset: query.offset }));
     return { items: page.slice(0, query.limit), nextCursor: page.length > query.limit ? String(query.offset + query.limit) : null };
   }
 
@@ -41,6 +47,24 @@ export class HybridCatalogSourceProvider {
 
   public async diagnostics(locale?: string): Promise<readonly CatalogSourceDiagnostic[]> {
     return (await this.sources(locale)).filter((provider) => !locale || provider.source.locale === locale).map((provider) => provider.diagnostic());
+  }
+
+  private async allProviderItems(provider: CatalogSourceProvider, query: CatalogQuery): Promise<{ items: readonly CatalogBookRecord[]; pages: number }> {
+    const items: CatalogBookRecord[] = [];
+    const seenCursors = new Set<number>();
+    let offset = 0;
+    let pages = 0;
+    while (true) {
+      if (seenCursors.has(offset)) throw new Error("CATALOG_SOURCE_CURSOR_LOOP");
+      seenCursors.add(offset);
+      const page = await provider.list({ ...query, offset, limit: 250 });
+      pages++;
+      items.push(...page.items);
+      if (!page.nextCursor) return { items, pages };
+      const nextOffset = Number.parseInt(page.nextCursor, 10);
+      if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset) throw new Error("CATALOG_SOURCE_CURSOR_INVALID");
+      offset = nextOffset;
+    }
   }
 
   private matches(book: CatalogBookRecord, query: CatalogQuery): boolean {

@@ -19,6 +19,15 @@ class MemoryProvider implements CatalogSourceProvider {
   public diagnostic() { return { sourceId: this.source.sourceId, locale: this.source.locale, mode: this.provider, provider: this.provider }; }
 }
 
+class PagedMemoryProvider extends MemoryProvider {
+  public override async list(query: CatalogQuery): Promise<CatalogPage> {
+    const all = await super.list(query);
+    const start = query.offset;
+    const page = all.items.slice(start, start + query.limit + 1);
+    return { items: page.slice(0, query.limit), nextCursor: page.length > query.limit ? String(start + query.limit) : null };
+  }
+}
+
 describe("hybrid catalog sources", () => {
   it("detects catalog.json sources as structured and missing files as legacy", async () => {
     const structured = new MemoryProvider(source("structured"), [], "structured") as MemoryProvider & { hasCatalog(): Promise<boolean> };
@@ -54,5 +63,14 @@ describe("hybrid catalog sources", () => {
     const structured = new StructuredDriveCatalogProvider(source("controlled", "pt-BR", "structured"), structuredFolder, async () => new Response(JSON.stringify({ version: 1, locale: "pt-BR", books: [{ bookId: "structured-book", title: "EPUB", author: "Autora", genre: "romance", format: "epub", bookDriveFileId: "epub-file-123", coverDriveFileId: "cover-file-123" }] })));
     const structuredBook = (await structured.list({ offset: 0, limit: 24 })).items[0]!;
     assert.match(structuredBook.coverUrl ?? "", /id=cover-file-123/);
+  });
+
+  it("searches and paginates beyond the former 500-record source cap", async () => {
+    const values = Array.from({ length: 1_501 }, (_, index) => book(`catalog-${index}`, `drive-${index}`));
+    const provider = new PagedMemoryProvider(source("large"), values);
+    const hybrid = new HybridCatalogSourceProvider(async () => [provider]);
+
+    const result = await hybrid.list({ offset: 0, limit: 24, query: "catalog-1500" });
+    assert.deepEqual(result.items.map((item) => item.bookId), ["catalog-1500"]);
   });
 });

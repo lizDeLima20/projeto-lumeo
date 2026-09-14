@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+
 export type FrontendEnvironment = "development" | "test" | "production";
 
 export interface FrontendEnvironmentConfig {
@@ -10,7 +12,7 @@ export interface FrontendEnvironmentConfig {
 }
 
 export class EnvironmentConfig {
-  public constructor(private readonly env: ImportMetaEnv = import.meta.env) {}
+  public constructor(private readonly env: ImportMetaEnv = import.meta.env, private readonly isNativeAndroid = (): boolean => Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {}
 
   public read(): FrontendEnvironmentConfig {
     return {
@@ -24,6 +26,10 @@ export class EnvironmentConfig {
   }
 
   private apiBaseUrl(): string {
+    // A Capacitor WebView is served from its own localhost origin. Unlike the
+    // deployed PWA, it needs the public HTTPS BFF URL at build time.
+    const capacitorApi = this.env.VITE_CAPACITOR_API_URL?.replace(/\/$/, "");
+    if (this.isNativeAndroid() && capacitorApi) return capacitorApi;
     // Production BFF is served by the same Vercel deployment. Never bake a
     // developer's localhost override into production requests.
     if (this.env.PROD || this.env.MODE === "production") return "/api";

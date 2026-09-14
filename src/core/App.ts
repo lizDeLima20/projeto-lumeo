@@ -141,7 +141,7 @@ export class App {
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
       () => this.router.navigate("explore"), (bookId) => this.router.navigate("reader", { id: bookId }),
       (book, link) => this.prepareCatalogDownload(book, link),
-      (book, link, progress, signal) => this.addCatalogBook(book, link, progress, signal), this.catalogDownloads));
+      (book, link, progress, signal, downloadedFile) => this.addCatalogBook(book, link, progress, signal, downloadedFile), this.catalogDownloads));
     this.router.register("catalog-admin", () => new CatalogAdminView(this.catalog, () => this.router.navigate("explore")));
     this.router.register("genre", (params) => new GenreView(this.state, params.get("id") ?? "",
       () => this.router.navigate("library"), (bookId) => this.router.navigate("reader", { id: bookId })));
@@ -255,14 +255,15 @@ export class App {
       format: link.format, expectedFilename: link.expectedFilename, coverUrl: link.coverUrl ?? null, catalogGenre: link.genreName, sha256: link.sha256 ?? null });
   }
 
-  private async addCatalogBook(catalogBook: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal): Promise<void> {
+  private async addCatalogBook(catalogBook: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal, downloadedFile?: File): Promise<string | null> {
     const local = this.state.books.find((book) => book.catalogBookId === catalogBook.bookId);
-    if (local) { this.router.navigate("reader", { id: local.id }); return; }
-    const folders = new FileSystemFolderManager(this.database);
-    const file = await folders.selectDownloadedBook();
-    if (!file) return;
-    const confirmed = await new CatalogGenreDialog(this.state, catalogBook).open();
-    if (!confirmed) return;
+    if (local) { this.router.navigate("reader", { id: local.id }); return local.id; }
+    const file = downloadedFile ?? await new FileSystemFolderManager(this.database).selectDownloadedBook();
+    if (!file) return null;
+    // Android downloads already carry catalogue metadata and must remain a
+    // one-tap flow: no Downloads folder or picker is involved.
+    const confirmed = downloadedFile ? catalogBook : await new CatalogGenreDialog(this.state, catalogBook).open();
+    if (!confirmed) return null;
     let genre = this.state.genres.find((item) => item.id === confirmed.genreId);
     if (!genre) { genre = new Genre(confirmed.genreId || crypto.randomUUID(), confirmed.genreName || "Sem gênero"); await this.genres.save(genre); this.state.library.addGenre(genre); }
     let collectionId: string | undefined;
@@ -279,7 +280,8 @@ export class App {
       const adjusted = new Book({ ...saved, collectionId }); await this.libraryService.saveBook(adjusted); this.state.library.addBook(adjusted);
     } else this.state.library.addBook(saved);
     this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
-    this.router.navigate("library");
+    if (!downloadedFile) this.router.navigate("library");
+    return saved.id;
   }
 
   private async updateBook(book: Book): Promise<void> {

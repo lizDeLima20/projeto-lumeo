@@ -5,6 +5,7 @@ import type { CatalogDownloadLink } from "../services/CatalogService";
 import { CatalogImportFileMismatchError, type CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { ApiError } from "../services/ApiClient";
 import type { CatalogDownloadService } from "../services/CatalogDownloadService";
+import { NativeBookDownloadError } from "../services/NativeBookDownload";
 import { UnsupportedFileError } from "../importers/LocalFileImporter";
 import { BaseView } from "./BaseView";
 
@@ -12,7 +13,7 @@ export class CatalogBookView extends BaseView {
   public constructor(private readonly catalog: CatalogService, private readonly state: AppState, private readonly bookId: string,
     private readonly onBack: () => void, private readonly onOpenLocal: (bookId: string) => void,
     private readonly onPrepareDownload: (book: CatalogBookData, link: CatalogDownloadLink) => Promise<void>,
-    private readonly onAdd: (book: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal) => Promise<void>,
+    private readonly onAdd: (book: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal, downloadedFile?: File) => Promise<string | null>,
     private readonly downloads: CatalogDownloadService) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog-detail page-shell"); const status = this.createElement("p", "catalog__status", this.t("ui.common.loading")); section.append(status);
@@ -37,11 +38,27 @@ export class CatalogBookView extends BaseView {
   }
   private configureDownloadFlow(book: CatalogBookData, action: HTMLButtonElement, progress: HTMLElement): void {
     let link: CatalogDownloadLink | null = null;
+    let controller: AbortController | null = null;
+    let importedBookId: string | null = null;
     action.addEventListener("click", () => void (async () => {
       try {
+        if (importedBookId) { this.onOpenLocal(importedBookId); return; }
+        if (controller) { controller.abort(); action.disabled = true; progress.textContent = this.t("ui.catalog.preparing"); return; }
         if (!link) {
           action.disabled = true; action.textContent = this.t("catalog.preparingDownload"); progress.textContent = "";
           link = await this.catalog.downloadLink(book.bookId);
+          if (this.downloads.target === "android-private-storage") {
+            controller = new AbortController();
+            action.disabled = false; action.textContent = this.t("ui.common.cancel");
+            const downloaded = await this.downloads.download(link, (current, total) => {
+              progress.textContent = total && total > 0 ? `${this.t("ui.catalog.downloading")} ${Math.min(100, Math.round(current * 100 / total))}%` : this.t("ui.catalog.downloading");
+            }, controller.signal);
+            controller = null;
+            if (downloaded.kind !== "native-file") throw new Error("O download nativo não retornou um arquivo local.");
+            importedBookId = await this.importSelectedFile(book, link, action, progress, downloaded.file);
+            if (importedBookId) { action.disabled = false; action.textContent = this.t("ui.catalog.open"); }
+            return;
+          }
           await this.onPrepareDownload(book, link);
           await this.downloads.download(link);
           action.disabled = false; action.dataset.downloadStarted = "true";
@@ -49,19 +66,20 @@ export class CatalogBookView extends BaseView {
         }
         await this.importSelectedFile(book, link, action, progress);
       } catch (error) {
-        action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = this.technicalCode(error);
+        controller = null; action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = this.technicalCode(error);
         const message = code === "IMPORT_FILE_INVALID" ? this.t("catalog.fileMismatch") : this.t("ui.catalog.downloadFailed");
         progress.textContent = `${message}${code ? ` (${code})` : ""}`;
       }
     })());
   }
-  private async importSelectedFile(book: CatalogBookData, link: CatalogDownloadLink, action: HTMLButtonElement, progress: HTMLElement): Promise<void> {
+  private async importSelectedFile(book: CatalogBookData, link: CatalogDownloadLink, action: HTMLButtonElement, progress: HTMLElement, downloadedFile?: File): Promise<string | null> {
     action.disabled = true; const controller = new AbortController();
-    await this.onAdd(book, link, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal);
+    return this.onAdd(book, link, (stage, percent) => { const label = this.t(`ui.catalog.${stage}` as never); progress.textContent = `${label}${percent == null ? "" : ` ${percent}%`}`; }, controller.signal, downloadedFile);
   }
   private technicalCode(error: unknown): string | null {
     if (error instanceof CatalogImportFileMismatchError) return error.code;
     if (error instanceof UnsupportedFileError) return "IMPORT_FORMAT_UNSUPPORTED";
+    if (error instanceof NativeBookDownloadError) return error.code;
     if (error instanceof ApiError) return error.code;
     return null;
   }

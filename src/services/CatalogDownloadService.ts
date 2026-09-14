@@ -1,21 +1,27 @@
+import { Capacitor } from "@capacitor/core";
 import type { CatalogDownloadLink } from "./CatalogService";
+import { CapacitorNativeBookDownloadBridge } from "./NativeBookDownload";
 
-/**
- * Boundary between the catalogue UI and the platform that receives the book.
- * The web implementation deliberately starts a normal browser download: Drive
- * does not expose a CORS-readable public media response for the PWA.
- */
+export type CatalogDownloadProgress = (downloadedBytes: number, totalBytes: number | null) => void;
+
+/** A native result becomes a File only inside the Android WebView, then uses
+ * the same ImportManager pipeline as every other Lumeo book. */
+export type CatalogDownloadReceipt =
+  | { readonly kind: "browser-download" }
+  | { readonly kind: "native-file"; readonly file: File };
+
+/** Boundary between catalogue UI and the platform that receives a book. */
 export interface CatalogDownloadService {
   readonly target: "browser-download" | "android-private-storage";
-  download(link: CatalogDownloadLink): Promise<void>;
+  download(link: CatalogDownloadLink, onProgress?: CatalogDownloadProgress, signal?: AbortSignal): Promise<CatalogDownloadReceipt>;
 }
 
-/** Web/Desktop: the browser owns its Downloads folder and the reader selects
- * the finished file explicitly before ImportManager persists it locally. */
+/** Web/Desktop retains its existing normal browser-download behaviour. */
 export class WebCatalogDownloadService implements CatalogDownloadService {
   public readonly target = "browser-download" as const;
 
-  public async download(link: CatalogDownloadLink): Promise<void> {
+  public async download(link: CatalogDownloadLink, _onProgress?: CatalogDownloadProgress, signal?: AbortSignal): Promise<CatalogDownloadReceipt> {
+    if (signal?.aborted) throw new DOMException("Download cancelado.", "AbortError");
     if (typeof document === "undefined") throw new Error("O download do navegador não está disponível neste ambiente.");
     const anchor = document.createElement("a");
     anchor.href = link.downloadUrl;
@@ -25,27 +31,35 @@ export class WebCatalogDownloadService implements CatalogDownloadService {
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
+    return { kind: "browser-download" };
   }
 }
 
-/**
- * Contract reserved for the future Capacitor plugin. It intentionally has no
- * Android implementation in the PWA: a native plugin will download directly
- * from Drive into app-private storage, never through the BFF.
- */
 export interface AndroidCatalogDownloadBridge {
-  downloadToPrivateStorage(link: CatalogDownloadLink): Promise<void>;
+  downloadToPrivateStorage(link: CatalogDownloadLink, onProgress?: CatalogDownloadProgress, signal?: AbortSignal): Promise<File>;
 }
 
 export class AndroidCatalogDownloadService implements CatalogDownloadService {
   public readonly target = "android-private-storage" as const;
   public constructor(private readonly bridge: AndroidCatalogDownloadBridge) {}
-  public download(link: CatalogDownloadLink): Promise<void> { return this.bridge.downloadToPrivateStorage(link); }
+  public async download(link: CatalogDownloadLink, onProgress?: CatalogDownloadProgress, signal?: AbortSignal): Promise<CatalogDownloadReceipt> {
+    return { kind: "native-file", file: await this.bridge.downloadToPrivateStorage(link, onProgress, signal) };
+  }
 }
 
-/** Keeps platform selection in one place while the PWA remains web-first. */
+/** Keeps platform selection in one place; views stay platform agnostic. */
 export class HybridCatalogDownloadService implements CatalogDownloadService {
-  public constructor(private readonly web: CatalogDownloadService = new WebCatalogDownloadService(), private readonly android: CatalogDownloadService | null = null) {}
+  private readonly android: CatalogDownloadService | null;
+  public constructor(private readonly web: CatalogDownloadService = new WebCatalogDownloadService(), android?: CatalogDownloadService | null) {
+    this.android = android === undefined ? HybridCatalogDownloadService.androidService() : android;
+  }
   public get target(): CatalogDownloadService["target"] { return this.android?.target ?? this.web.target; }
-  public download(link: CatalogDownloadLink): Promise<void> { return (this.android ?? this.web).download(link); }
+  public download(link: CatalogDownloadLink, onProgress?: CatalogDownloadProgress, signal?: AbortSignal): Promise<CatalogDownloadReceipt> {
+    return (this.android ?? this.web).download(link, onProgress, signal);
+  }
+  private static androidService(): CatalogDownloadService | null {
+    if (typeof window === "undefined" || !Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return null;
+    if (!Capacitor.isPluginAvailable("NativeBookDownload")) return null;
+    return new AndroidCatalogDownloadService(new CapacitorNativeBookDownloadBridge());
+  }
 }

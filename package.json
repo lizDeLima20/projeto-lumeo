@@ -15,10 +15,15 @@
     "test:storage": "tsx --test tests/*.test.ts",
     "test": "npm run test:server && npm run test:storage",
     "smoke:supabase": "sh -c 'if [ -f .env ]; then node --env-file=.env --import tsx server/src/supabaseSmoke.ts; else node --import tsx server/src/supabaseSmoke.ts; fi'",
-    "preview": "vite preview"
+    "audit:catalog": "sh -c 'if [ -f .env ]; then node --env-file=.env --import tsx server/src/catalogAudit.ts; else node --import tsx server/src/catalogAudit.ts; fi'",
+    "preview": "vite preview",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.30.0",
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/core": "^7.6.9",
     "@lingo-reader/mobi-parser": "^0.4.6",
     "@supabase/supabase-js": "^2.57.0",
     "fflate": "^0.8.3",
@@ -26,6 +31,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
     "@types/node": "^24.3.0",
     "concurrently": "^9.2.1",
     "fake-indexeddb": "^6.2.2",

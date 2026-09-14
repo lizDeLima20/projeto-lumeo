@@ -13,7 +13,7 @@ export interface CatalogStore {
 
 type Row = {
   book_id: string; title: string; author: string; genre_id: string; genre_name: string; cover_url: string | null; description: string | null;
-  format: "pdf" | "epub"; file_size: number | null; drive_file_id: string; storage_account_id: string; sha256: string | null;
+  format: "pdf" | "epub"; source_file_name?: string | null; file_size: number | null; drive_file_id: string; storage_account_id: string; sha256: string | null;
   volume: string | null; collection: string | null; language: string | null; created_at: string; updated_at: string; status: CatalogBookRecord["status"];
 };
 
@@ -64,7 +64,7 @@ export class CatalogRepository implements CatalogStore {
     const { data, error } = await this.database.from("profiles").select("is_admin").eq("user_id", userId).maybeSingle();
     if (error) throw error; return data?.is_admin === true;
   }
-  private map(row: Row): CatalogBookRecord { return { bookId: row.book_id, title: row.title, author: row.author, genreId: row.genre_id, genreName: row.genre_name, coverUrl: row.cover_url, description: row.description, format: row.format, fileSize: row.file_size, driveFileId: row.drive_file_id, storageAccountId: row.storage_account_id, sha256: row.sha256, volume: row.volume, collection: row.collection, language: row.language, createdAt: row.created_at, updatedAt: row.updated_at, status: row.status }; }
-  private row(book: CatalogBookRecord): Row { return { book_id: book.bookId, title: book.title, author: book.author, genre_id: book.genreId, genre_name: book.genreName, cover_url: book.coverUrl, description: book.description, format: book.format, file_size: book.fileSize, drive_file_id: book.driveFileId, storage_account_id: book.storageAccountId, sha256: book.sha256, volume: book.volume, collection: book.collection, language: book.language, created_at: book.createdAt, updated_at: book.updatedAt, status: book.status }; }
+  private map(row: Row): CatalogBookRecord { return { bookId: row.book_id, title: row.title, author: row.author, genreId: row.genre_id, genreName: row.genre_name, coverUrl: row.cover_url, description: row.description, format: row.format, sourceFileName: row.source_file_name ?? null, fileSize: row.file_size, driveFileId: row.drive_file_id, storageAccountId: row.storage_account_id, sha256: row.sha256, volume: row.volume, collection: row.collection, language: row.language, createdAt: row.created_at, updatedAt: row.updated_at, status: row.status }; }
+  private row(book: CatalogBookRecord): Row { return { book_id: book.bookId, title: book.title, author: book.author, genre_id: book.genreId, genre_name: book.genreName, cover_url: book.coverUrl, description: book.description, format: book.format, source_file_name: book.sourceFileName ?? null, file_size: book.fileSize, drive_file_id: book.driveFileId, storage_account_id: book.storageAccountId, sha256: book.sha256, volume: book.volume, collection: book.collection, language: book.language, created_at: book.createdAt, updated_at: book.updatedAt, status: book.status }; }
   private escapeLike(value: string): string { return value.replace(/[,%_()]/g, " ").trim().slice(0, 120); }
 }
