@@ -27,12 +27,24 @@ export class CatalogImportCoordinator {
   private async assertMatches(download: CatalogDownloadLink, file: File): Promise<void> {
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (extension !== download.format) throw new CatalogImportFileMismatchError();
-    if (this.normalizedName(file.name) !== this.normalizedName(download.expectedFilename)) throw new CatalogImportFileMismatchError();
+    if (download.fileSize !== null && download.fileSize !== undefined && file.size !== download.fileSize) throw new CatalogImportFileMismatchError();
     if (download.sha256 && typeof crypto !== "undefined" && crypto.subtle) {
       const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
       const actual = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
       if (actual.toLowerCase() !== download.sha256.toLowerCase()) throw new CatalogImportFileMismatchError();
+      // The checksum is the content identity. Browser collision suffixes such
+      // as " (1)" must not prevent importing the same catalog file.
+      return;
     }
+    // Older catalog rows can lack a checksum. Keep a conservative fallback so
+    // they remain usable, but only tolerate the browser's numeric collision
+    // suffix and never treat a different base filename as the same book.
+    if (this.normalizedName(this.withoutBrowserCopySuffix(file.name)) !== this.normalizedName(download.expectedFilename)) {
+      throw new CatalogImportFileMismatchError();
+    }
+  }
+  private withoutBrowserCopySuffix(value: string): string {
+    return value.replace(/\s*\(\d+\)(?=\.[^.]+$)/, "");
   }
   private normalizedName(value: string): string {
     return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/-+/g, "-");

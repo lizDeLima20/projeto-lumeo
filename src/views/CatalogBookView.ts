@@ -4,6 +4,7 @@ import { CatalogService } from "../services/CatalogService";
 import type { CatalogDownloadLink } from "../services/CatalogService";
 import { CatalogImportFileMismatchError, type CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { ApiError } from "../services/ApiClient";
+import type { CatalogDownloadService } from "../services/CatalogDownloadService";
 import { UnsupportedFileError } from "../importers/LocalFileImporter";
 import { BaseView } from "./BaseView";
 
@@ -11,7 +12,8 @@ export class CatalogBookView extends BaseView {
   public constructor(private readonly catalog: CatalogService, private readonly state: AppState, private readonly bookId: string,
     private readonly onBack: () => void, private readonly onOpenLocal: (bookId: string) => void,
     private readonly onPrepareDownload: (book: CatalogBookData, link: CatalogDownloadLink) => Promise<void>,
-    private readonly onAdd: (book: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal) => Promise<void>) { super(); }
+    private readonly onAdd: (book: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal) => Promise<void>,
+    private readonly downloads: CatalogDownloadService) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog-detail page-shell"); const status = this.createElement("p", "catalog__status", this.t("ui.common.loading")); section.append(status);
     void this.load(section, status); return section;
@@ -28,7 +30,7 @@ export class CatalogBookView extends BaseView {
     const metadata = this.createElement("dl", "catalog-detail__metadata"); this.meta(metadata, this.t("ui.catalog.genre"), book.genreName); this.meta(metadata, this.t("ui.catalog.format"), book.format.toUpperCase());
     if (book.fileSize) this.meta(metadata, this.t("ui.catalog.size"), this.formatSize(book.fileSize)); if (book.collection) this.meta(metadata, this.t("ui.catalog.collection"), book.collection); if (book.volume) this.meta(metadata, this.t("ui.catalog.volumeLabel"), book.volume);
     copy.append(metadata); if (book.description) copy.append(this.createElement("p", "catalog-detail__description", book.description));
-    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary catalog-detail__action", local ? this.t("ui.catalog.open") : this.t("catalog.findBook")); action.type = "button";
+    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const action = this.createElement("button", "button button--primary catalog-detail__action", local ? this.t("ui.catalog.open") : this.t("catalog.download")); action.type = "button";
     const progress = this.createElement("p", "catalog__status"); progress.setAttribute("role", "status");
     if (local) action.addEventListener("click", () => this.onOpenLocal(local.id)); else this.configureDownloadFlow(book, action, progress);
     copy.append(action, progress); root.append(cover, copy); return root;
@@ -38,13 +40,12 @@ export class CatalogBookView extends BaseView {
     action.addEventListener("click", () => void (async () => {
       try {
         if (!link) {
-          action.disabled = true; action.textContent = this.t("catalog.searching"); progress.textContent = "";
+          action.disabled = true; action.textContent = this.t("catalog.preparingDownload"); progress.textContent = "";
           link = await this.catalog.downloadLink(book.bookId);
-          action.disabled = false; action.textContent = this.t("catalog.downloadBook"); progress.textContent = this.t("catalog.found"); return;
-        }
-        if (action.dataset.downloadStarted !== "true") {
-          await this.onPrepareDownload(book, link); this.startBrowserDownload(link); action.dataset.downloadStarted = "true";
-          action.textContent = this.t("catalog.addToLibrary"); progress.textContent = `${this.t("catalog.downloadStarted")} ${this.t("catalog.selectExpectedFile", { filename: link.expectedFilename })}`; return;
+          await this.onPrepareDownload(book, link);
+          await this.downloads.download(link);
+          action.disabled = false; action.dataset.downloadStarted = "true";
+          action.textContent = this.t("catalog.addToLumeo"); progress.textContent = `${this.t("catalog.downloadStarted")} ${this.t("catalog.selectExpectedFile", { filename: link.expectedFilename })}`; return;
         }
         await this.importSelectedFile(book, link, action, progress);
       } catch (error) {
@@ -53,10 +54,6 @@ export class CatalogBookView extends BaseView {
         progress.textContent = `${message}${code ? ` (${code})` : ""}`;
       }
     })());
-  }
-  private startBrowserDownload(link: CatalogDownloadLink): void {
-    const anchor = document.createElement("a"); anchor.href = link.downloadUrl; anchor.download = link.expectedFilename;
-    anchor.rel = "noreferrer"; anchor.style.display = "none"; document.body.append(anchor); anchor.click(); anchor.remove();
   }
   private async importSelectedFile(book: CatalogBookData, link: CatalogDownloadLink, action: HTMLButtonElement, progress: HTMLElement): Promise<void> {
     action.disabled = true; const controller = new AbortController();

@@ -22,6 +22,7 @@ import { ApiClient, ApiError } from "../services/ApiClient";
 import { CatalogService } from "../services/CatalogService";
 import type { CatalogDownloadLink } from "../services/CatalogService";
 import { CatalogImportCoordinator, type CatalogImportStage } from "../services/CatalogImportCoordinator";
+import { HybridCatalogDownloadService } from "../services/CatalogDownloadService";
 import { FileSystemFolderManager } from "../services/FileSystemFolderManager";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { AuthManager } from "../services/AuthManager";
@@ -88,6 +89,7 @@ export class App {
     new ReadingProgressService(this.progress, this.books), this.readerSettings,this.limaDocuments);
   private readonly api = new ApiClient(new EnvironmentConfig().read().bffBaseUrl);
   private readonly catalog = new CatalogService(this.api);
+  private readonly catalogDownloads = new HybridCatalogDownloadService();
   private readonly auth = new AuthManager(this.api, this.storage, this.state);
   private readonly devices = new DeviceManager(this.api, this.storage, this.state);
   private readonly router: Router;
@@ -139,7 +141,7 @@ export class App {
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
       () => this.router.navigate("explore"), (bookId) => this.router.navigate("reader", { id: bookId }),
       (book, link) => this.prepareCatalogDownload(book, link),
-      (book, link, progress, signal) => this.addCatalogBook(book, link, progress, signal)));
+      (book, link, progress, signal) => this.addCatalogBook(book, link, progress, signal), this.catalogDownloads));
     this.router.register("catalog-admin", () => new CatalogAdminView(this.catalog, () => this.router.navigate("explore")));
     this.router.register("genre", (params) => new GenreView(this.state, params.get("id") ?? "",
       () => this.router.navigate("library"), (bookId) => this.router.navigate("reader", { id: bookId })));
@@ -251,9 +253,6 @@ export class App {
     const folders = new FileSystemFolderManager(this.database);
     await folders.savePending({ bookId: catalogBook.bookId, driveFileId: link.driveFileId, title: link.title, author: link.author,
       format: link.format, expectedFilename: link.expectedFilename, coverUrl: link.coverUrl ?? null, catalogGenre: link.genreName, sha256: link.sha256 ?? null });
-    if (!folders.supportsDirectoryPicker) return;
-    try { await folders.chooseLumeoFolder(); }
-    catch { this.showToast(I18nManager.shared.t("catalog.chooseLumeoFolder")); }
   }
 
   private async addCatalogBook(catalogBook: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal): Promise<void> {
