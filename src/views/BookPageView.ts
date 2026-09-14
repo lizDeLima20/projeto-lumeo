@@ -1,4 +1,5 @@
 import type { ReaderPage, ReaderParagraph } from "../reader/reflow/ReaderDocument";
+import { ReaderCoverPageView } from "./ReaderCoverPageView";
 
 export class BookPageView {
   public constructor(
@@ -16,20 +17,7 @@ export class BookPageView {
     }
     if (this.page.cover) {
       article.classList.add("open-book-page--cover");
-      const frame = document.createElement("div");
-      frame.className = "reader-cover-page";
-      if (this.page.cover.image) {
-        const image = document.createElement("img");
-        image.src = this.page.cover.image;
-        image.alt = `Capa de ${this.page.cover.title}`;
-        frame.append(image);
-      } else {
-        const fallback = document.createElement("div");
-        fallback.className = "reader-cover-page__fallback";
-        fallback.textContent = this.page.cover.title.slice(0, 2).toUpperCase();
-        frame.append(fallback);
-      }
-      article.append(frame);
+      article.append(new ReaderCoverPageView().render(this.page.cover));
       return article;
     }
     this.page.paragraphs.forEach((value) => {
@@ -42,7 +30,7 @@ export class BookPageView {
     });
     const number = document.createElement("span");
     number.className = "open-book-page__number";
-    number.textContent = String(this.page.index + 1);
+    number.textContent = this.page.visualLabel ?? String(this.page.index + 1);
     article.append(number);
     return article;
   }

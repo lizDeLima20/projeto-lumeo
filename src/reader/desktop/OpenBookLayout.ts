@@ -4,7 +4,19 @@ export class OpenBookLayout {
   public render(spread:PageSpread,neighbours:SpreadNeighbours=noNeighbours):HTMLElement{
     const book=document.createElement("div");book.className="open-book-layout";
     const cover=spread.left?.cover?spread.left:spread.right?.cover?spread.right:null;
-    if(cover){book.classList.add("open-book-layout--cover");book.append(new BookPageView(cover,"cover",this.paragraph).render());return book;}
+    if(cover){
+      book.classList.add("open-book-layout--cover");
+      const afterCover=spread.left?.cover?spread.right:spread.left;
+      if(afterCover){
+        const under=new BookPageView(afterCover,"right",this.paragraph).render();
+        under.className="open-book-page open-book-page--under-cover";
+        under.setAttribute("aria-hidden","true"); book.append(under);
+      }
+      const leaf=new BookPageView(cover,"cover",this.paragraph).render();
+      leaf.append(this.verso(afterCover,"right"));
+      book.append(leaf);
+      return book;
+    }
     /* Uncovered pages go in first so they sit behind; each shares the grid cell of the
      * leaf that reveals it. Without them a turn opened onto the stage background. */
     book.append(this.under(neighbours.underBefore,"left"),this.under(neighbours.underAfter,"right"));

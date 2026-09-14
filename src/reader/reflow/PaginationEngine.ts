@@ -30,6 +30,10 @@ export class PaginationEngine {
     const push = () => { current.endOffset = offset; if (current.paragraphs.length || !pages.length) pages.push(current); current = { index: pages.length, paragraphs: [], startOffset: offset, endOffset: offset }; used = 0; };
     for (let paragraphIndex = 0; paragraphIndex < document.paragraphs.length; paragraphIndex++) {
       const paragraph = document.paragraphs[paragraphIndex]!, next = document.paragraphs[paragraphIndex + 1], height = this.blockHeight(paragraph.text, paragraph.kind, layout);
+      /* A visual leaf may divide a physical PDF page, but it never blends two physical
+         source pages. This gives every generated leaf a stable 1A / 1B identity. */
+      const currentSourcePage = current.paragraphs[0]?.sourcePage;
+      if (current.paragraphs.length && currentSourcePage !== paragraph.sourcePage) push();
       if (paragraph.kind === "heading" && next && current.paragraphs.length) { const pairHeight = height + Math.min(this.blockHeight(next.text, next.kind, layout), this.linesHeight(PaginationEngine.minLines, next.kind, layout)); if (used + pairHeight > usableHeight && pairHeight <= usableHeight) push(); }
       if (used + height <= usableHeight) { current.paragraphs.push({ ...paragraph, sourceBlockId: paragraph.sourceBlockId ?? paragraph.id, sourceStart: paragraph.sourceStart ?? 0 }); used += height; offset += paragraph.text.length; continue; }
       /* It does not fit in what is left. A paragraph flows on into the next page, as it
@@ -51,7 +55,8 @@ export class PaginationEngine {
         if (remaining) push();
       }
     }
-    current.endOffset = offset; if (current.paragraphs.length || !pages.length) pages.push(current); return pages;
+    current.endOffset = offset; if (current.paragraphs.length || !pages.length) pages.push(current);
+    return this.labelSourceParts(pages);
   }
   /** A split never leaves a single line stranded: at least this many lines stay at the foot
    *  of the page (no orphan) and at least this many carry over to the next (no widow). */
@@ -79,7 +84,7 @@ export class PaginationEngine {
   private linesHeight(lines: number, kind: BlockKind, layout: Layout): number {
     return kind === "heading" ? lines * layout.headingLineHeight + layout.headingGap : lines * layout.lineHeight + layout.paragraphGap;
   }
-  public withCover(pages: ReaderPage[], cover: { title: string; author?: string; image?: string }): ReaderPage[] { return [{ index: 0, paragraphs: [], startOffset: 0, endOffset: 0, cover }, ...pages.map((page, index) => ({ ...page, index: index + 1 }))]; }
+  public withCover(pages: ReaderPage[], cover: { title: string; author?: string; image?: string }): ReaderPage[] { return [{ index: 0, paragraphs: [], startOffset: 0, endOffset: 0, cover, visualLabel: "Capa" }, ...pages.map((page, index) => ({ ...page, index: index + 1 }))]; }
   public pageForAnchor(pages: readonly ReaderPage[], anchor: ReadingAnchor): number { const found = pages.findIndex(page => !page.cover && anchor.logicalOffset >= page.startOffset && anchor.logicalOffset <= page.endOffset); return Math.max(0, found); }
 
   /** Measured when the reader could measure; otherwise the average-character estimate the
@@ -131,4 +136,27 @@ export class PaginationEngine {
     return words.slice(0, low).join(" ");
   }
   private firstWord(text: string): string { return text.match(/\S+/)?.[0] ?? ""; }
+  private labelSourceParts(pages: ReaderPage[]): ReaderPage[] {
+    const groups = new Map<number, ReaderPage[]>();
+    for (const page of pages) {
+      const sourcePage = page.paragraphs[0]?.sourcePage;
+      if (sourcePage === undefined) continue;
+      const group = groups.get(sourcePage) ?? [];
+      group.push(page); groups.set(sourcePage, group);
+    }
+    for (const [sourcePage, group] of groups) {
+      group.forEach((page, index) => Object.assign(page, {
+        sourcePage,
+        sourcePart: index + 1,
+        sourcePartCount: group.length,
+        visualLabel: `${sourcePage}${this.partLabel(index)}`,
+      }));
+    }
+    return pages;
+  }
+  private partLabel(index: number): string {
+    let value = index + 1, label = "";
+    while (value > 0) { value--; label = String.fromCharCode(65 + value % 26) + label; value = Math.floor(value / 26); }
+    return label;
+  }
 }

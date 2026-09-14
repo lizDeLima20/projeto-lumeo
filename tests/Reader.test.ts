@@ -83,7 +83,7 @@ describe("Reader chrome minimal", () => {
     assert.doesNotMatch(source, /neutralTap\(\)/);
   });
   it("coverOpeningShowsOnlyCoverImageWithoutGeneratedTitle", async () => {
-    const page = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/views/BookPageView.ts", import.meta.url), "utf8"));
+    const page = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/views/ReaderCoverPageView.ts", import.meta.url), "utf8"));
     const reader = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/views/ReaderView.ts", import.meta.url), "utf8"));
     assert.match(page, /reader-cover-page/);
     assert.doesNotMatch(page, /frame\.append\(title, author\)/);
