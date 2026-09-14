@@ -8,6 +8,7 @@
     "dev:server": "tsx watch server/src/local.ts",
     "dev:all": "concurrently -n web,api \"npm:dev\" \"npm:dev:server\"",
     "build": "npm run typecheck && vite build && npm run build:server",
+    "build:android": "npm run typecheck && vite build --mode android && npm run build:server",
     "build:server": "tsc -p server/tsconfig.json",
     "typecheck": "tsc --noEmit",
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
@@ -17,7 +18,12 @@
     "smoke:supabase": "sh -c 'if [ -f .env ]; then node --env-file=.env --import tsx server/src/supabaseSmoke.ts; else node --import tsx server/src/supabaseSmoke.ts; fi'",
     "audit:catalog": "sh -c 'if [ -f .env ]; then node --env-file=.env --import tsx server/src/catalogAudit.ts; else node --import tsx server/src/catalogAudit.ts; fi'",
     "preview": "vite preview",
-    "android:sync": "npm run build && cap sync android",
+    "android:java": "./scripts/android-terminal.sh java",
+    "android:sync": "./scripts/android-terminal.sh sync",
+    "android:build": "./scripts/android-terminal.sh build",
+    "android:install": "./scripts/android-terminal.sh install",
+    "android:logs": "./scripts/android-terminal.sh logs",
+    "android:dev": "./scripts/android-terminal.sh dev",
     "android:open": "cap open android"
   },
   "dependencies": {

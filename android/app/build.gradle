@@ -3,6 +3,13 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.lumeo.reader"
     compileSdk rootProject.ext.compileSdkVersion
+    // Capacitor 7 and the Android Gradle Plugin are compiled with Java 21.
+    // Keep the source/target level explicit so a system JDK 17 is never
+    // silently selected for this project.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
     defaultConfig {
         applicationId "com.lumeo.reader"
         minSdkVersion rootProject.ext.minSdkVersion

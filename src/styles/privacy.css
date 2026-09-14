@@ -1,0 +1,12 @@
+.privacy-page { max-width: 52rem; }
+.privacy-page__heading { display: grid; gap: .8rem; margin-bottom: 2.75rem; }
+.privacy-page__updated { color: var(--color-muted); font-size: .9rem; }
+.privacy-page__section { margin-top: 2rem; }
+.privacy-page__title { margin-bottom: .75rem; color: var(--color-primary); font-size: clamp(1.15rem, 3vw, 1.4rem); }
+.privacy-page__section p + p { margin-top: .75rem; }
+.app-legal { display: flex; justify-content: center; padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom)); }
+.app-legal__link { color: var(--color-muted); font-size: .82rem; text-decoration: underline; text-underline-offset: .2em; }
+@media (max-width: 63.99rem) {
+  .app-legal--with-navigation { padding-bottom: calc(5.6rem + env(safe-area-inset-bottom)); }
+  .privacy-page { padding-bottom: 3rem; }
+}

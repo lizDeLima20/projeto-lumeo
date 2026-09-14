@@ -1,0 +1,8 @@
+{
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "java.jdt.ls.java.home": "/home/delima/.local/share/lumeo/jdk-21/usr/lib/jvm/java-21-openjdk-amd64",
+  "terminal.integrated.env.linux": {
+    "JAVA_HOME": "/home/delima/.local/share/lumeo/jdk-21/usr/lib/jvm/java-21-openjdk-amd64",
+    "PATH": "/home/delima/.local/share/lumeo/jdk-21/usr/lib/jvm/java-21-openjdk-amd64/bin:${env:PATH}"
+  }
+}

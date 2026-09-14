@@ -10,8 +10,14 @@ import "./styles/auth.css";
 import "./styles/home.css";
 import "./styles/reader.css";
 import "./styles/catalog.css";
+import "./styles/privacy.css";
+import "./styles/native-launch-splash.css";
 import { App } from "./core/App";
+import { EnvironmentConfig } from "./config/EnvironmentConfig";
 import { GlobalErrorHandler } from "./errors/GlobalErrorHandler";
+import { I18nManager } from "./i18n/I18nManager";
+import { AndroidRuntimeDiagnostics } from "./platform/AndroidRuntimeDiagnostics";
+import { NativeLaunchSplash } from "./platform/NativeLaunchSplash";
 import { ServiceWorkerRegistrationService } from "./pwa/ServiceWorkerRegistrationService";
 
 const outlet = document.querySelector<HTMLElement>("#app");
@@ -23,5 +29,15 @@ if (!outlet || !header || !footer) throw new Error("Os containers principais da 
 const errors = new GlobalErrorHandler(outlet);
 errors.bind();
 const app = new App(outlet, header, footer);
-void app.start().catch(error => errors.showStartupFailure(error));
+const nativeSplash = new NativeLaunchSplash();
+void (async () => {
+  await I18nManager.shared.initialize();
+  nativeSplash.show();
+  AndroidRuntimeDiagnostics.start(new EnvironmentConfig().read());
+  await app.start();
+  await nativeSplash.hide();
+})().catch(async error => {
+  await nativeSplash.hide();
+  errors.showStartupFailure(error);
+});
 new ServiceWorkerRegistrationService().register(import.meta.env.PROD);

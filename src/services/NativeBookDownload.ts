@@ -25,8 +25,19 @@ export class CapacitorNativeBookDownloadBridge implements AndroidCatalogDownload
       });
       if (signal?.aborted) { cancel(); throw new DOMException("Download cancelado.", "AbortError"); }
       signal?.addEventListener("abort", cancel, { once: true });
-      const result = await NativeBookDownload.downloadBook({ bookId: link.bookId, url: link.downloadUrl, expectedSize: link.fileSize ?? undefined, sha256: link.sha256 ?? undefined });
-      return this.asImportFile(result, link);
+      const urls = [...new Set([link.downloadUrl, ...(link.downloadUrls ?? [])])];
+      let lastError: unknown;
+      for (const url of urls) {
+        try {
+          const result = await NativeBookDownload.downloadBook({ bookId: link.bookId, url, expectedSize: link.fileSize ?? undefined, sha256: link.sha256 ?? undefined });
+          return this.asImportFile(result, link);
+        } catch (error) {
+          lastError = error;
+          const code = NativeBookDownloadError.from(error).code;
+          if (code === "DOWNLOAD_CANCELLED" || code === "DOWNLOAD_SIZE_MISMATCH" || code === "DOWNLOAD_HASH_MISMATCH" || code === "DOWNLOAD_NO_SPACE" || code === "DOWNLOAD_IO_ERROR") throw error;
+        }
+      }
+      throw lastError;
     } catch (error) {
       throw NativeBookDownloadError.from(error);
     } finally {

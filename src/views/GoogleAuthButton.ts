@@ -1,4 +1,5 @@
 import { I18nManager } from "../i18n/I18nManager";
+import { Capacitor } from "@capacitor/core";
 import { GoogleSignIn, type GoogleButtonText } from "../services/GoogleSignIn";
 
 /** The Google option under an authentication form: Google's own button when Google is set
@@ -18,7 +19,11 @@ export class GoogleAuthButton {
     divider.textContent = I18nManager.shared.t("ui.auth.or");
     const host = document.createElement("div"); host.className = "auth-google";
     wrap.append(divider, host);
-    if (!this.google.configured) { host.append(this.fallback(I18nManager.shared.t("ui.auth.google.notConfigured"))); return wrap; }
+    if (!this.google.configured) {
+      const nativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+      host.append(this.fallback(I18nManager.shared.t(nativeAndroid ? "ui.auth.google.androidNotConfigured" : "ui.auth.google.notConfigured")));
+      return wrap;
+    }
     host.append(this.fallback());
     queueMicrotask(() => void this.paint(host));
     return wrap;

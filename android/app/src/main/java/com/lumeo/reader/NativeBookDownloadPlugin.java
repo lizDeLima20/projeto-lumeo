@@ -1,5 +1,7 @@
 package com.lumeo.reader;
 
+import android.util.Log;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -12,6 +14,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.net.SocketTimeoutException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,6 +34,7 @@ import okhttp3.ResponseBody;
  */
 @CapacitorPlugin(name = "NativeBookDownload")
 public class NativeBookDownloadPlugin extends Plugin {
+    private static final String TAG = "NativeBookDownload";
     private static final String DIRECTORY_NAME = "lumeo-books";
     private static final long STALE_PART_FILE_MS = TimeUnit.DAYS.toMillis(1);
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -82,6 +86,9 @@ public class NativeBookDownloadPlugin extends Plugin {
         final String expectedSha256 = normalizeHash(pluginCall.getString("sha256"));
         final Request request = new Request.Builder().url(url).get().header("Accept", "application/pdf,application/epub+zip,application/octet-stream;q=0.8").build();
         final Call httpCall = http.newCall(request);
+        // Log only the host and technical state: never the full signed URL,
+        // session data, or book bytes.
+        Log.i(TAG, "download.start bookId=" + safeBookId + " sourceHost=" + request.url().host());
         activeCalls.put(bookId, httpCall);
         executor.execute(() -> download(pluginCall, bookId, safeBookId, directory, httpCall, expectedSize, expectedSha256));
     }
@@ -106,8 +113,14 @@ public class NativeBookDownloadPlugin extends Plugin {
         final File part = new File(directory, safeBookId + ".part");
         try (Response response = httpCall.execute()) {
             final int status = response.code();
-            if (status != 200 && status != 206) throw new DownloadFailure("DOWNLOAD_HTTP_" + status, "Não foi possível obter o arquivo do livro.");
-            final String contentType = response.header("Content-Type", "").toLowerCase(Locale.ROOT);
+            final int redirects = redirectCount(response);
+            final String finalHost = response.request().url().host();
+            final String rawContentType = response.header("Content-Type", "");
+            final String rawContentLength = response.header("Content-Length", "unknown");
+            Log.i(TAG, "download.response bookId=" + safeBookId + " finalHost=" + finalHost + " status=" + status + " redirects=" + redirects + " contentType=" + safeHeader(rawContentType) + " contentLength=" + safeHeader(rawContentLength));
+            if (redirects > 10) throw new DownloadFailure("DOWNLOAD_REDIRECT_ERROR", "A origem redirecionou a requisição muitas vezes.");
+            if (status != 200 && status != 206) throw new DownloadFailure("DOWNLOAD_HTTP_ERROR", "A origem retornou HTTP " + status + ".");
+            final String contentType = rawContentType.toLowerCase(Locale.ROOT);
             if (contentType.contains("text/html") || contentType.contains("application/xhtml")) {
                 throw new DownloadFailure("DOWNLOAD_HTML_RESPONSE", "A origem retornou uma página em vez do livro.");
             }
@@ -118,6 +131,7 @@ public class NativeBookDownloadPlugin extends Plugin {
             long downloaded = 0;
             final byte[] signature = new byte[8];
             int signatureLength = 0;
+            Log.i(TAG, "download.part bookId=" + safeBookId + " created=true");
             try (BufferedInputStream input = new BufferedInputStream(body.byteStream()); FileOutputStream output = new FileOutputStream(part, false)) {
                 final byte[] buffer = new byte[64 * 1024];
                 int count;
@@ -141,6 +155,7 @@ public class NativeBookDownloadPlugin extends Plugin {
             }
             final String mimeType = documentMimeType(signature, signatureLength, contentType);
             final String hash = hex(digest.digest());
+            Log.i(TAG, "download.validation bookId=" + safeBookId + " bytes=" + downloaded + " signature=valid mimeType=" + mimeType + " expectedSha256=" + presence(expectedSha256) + " calculatedSha256=" + abbreviatedHash(hash));
             if (expectedSha256 != null && !expectedSha256.equals(hash)) {
                 throw new DownloadFailure("DOWNLOAD_HASH_MISMATCH", "A integridade do arquivo não confere.");
             }
@@ -148,19 +163,23 @@ public class NativeBookDownloadPlugin extends Plugin {
             moveAtomically(part, destination);
             resolve(pluginCall, bookId, destination, hash, mimeType, false);
             notifyCompleted(bookId, destination, downloaded, hash, mimeType);
+            Log.i(TAG, "download.complete bookId=" + safeBookId + " bytes=" + downloaded + " mimeType=" + mimeType);
         } catch (DownloadFailure failure) {
             deleteQuietly(part);
             notifyFailed(bookId, failure.code);
+            Log.w(TAG, "download.failed bookId=" + safeBookId + " code=" + failure.code);
             pluginCall.reject(failure.getMessage(), failure.code);
         } catch (IOException failure) {
             deleteQuietly(part);
-            final String code = httpCall.isCanceled() ? "DOWNLOAD_CANCELLED" : "DOWNLOAD_NETWORK_FAILED";
+            final String code = httpCall.isCanceled() ? "DOWNLOAD_CANCELLED" : failure instanceof SocketTimeoutException ? "DOWNLOAD_TIMEOUT" : ioCode(failure);
             notifyFailed(bookId, code);
+            Log.w(TAG, "download.failed bookId=" + safeBookId + " code=" + code + " exception=" + failure.getClass().getSimpleName() + " message=" + safeMessage(failure.getMessage()));
             pluginCall.reject(httpCall.isCanceled() ? "Download cancelado." : "Não foi possível baixar o livro.", code);
         } catch (Exception failure) {
             deleteQuietly(part);
-            notifyFailed(bookId, "DOWNLOAD_FAILED");
-            pluginCall.reject("Não foi possível salvar o livro neste dispositivo.", "DOWNLOAD_FAILED");
+            notifyFailed(bookId, "DOWNLOAD_UNKNOWN");
+            Log.w(TAG, "download.failed bookId=" + safeBookId + " code=DOWNLOAD_UNKNOWN exception=" + failure.getClass().getSimpleName());
+            pluginCall.reject("Não foi possível salvar o livro neste dispositivo.", "DOWNLOAD_UNKNOWN");
         } finally {
             activeCalls.remove(bookId);
         }
@@ -182,7 +201,8 @@ public class NativeBookDownloadPlugin extends Plugin {
     }
     private void notifyProgress(String bookId, long downloaded, long total) {
         JSObject event = new JSObject(); event.put("bookId", bookId); event.put("bytesDownloaded", downloaded); event.put("totalBytes", total > 0 ? total : null);
-        event.put("percentage", total > 0 ? Math.min(100, (int) ((downloaded * 100) / total) : null); notifyListeners("bookDownloadProgress", event);
+        event.put("percentage", total > 0 ? Math.min(100, (int) ((downloaded * 100) / total)) : null);
+        notifyListeners("bookDownloadProgress", event);
     }
     private void notifyCompleted(String bookId, File file, long size, String hash, String mimeType) {
         JSObject event = new JSObject(); event.put("bookId", bookId); event.put("uri", file.toURI().toString()); event.put("size", size); event.put("sha256", hash); event.put("mimeType", mimeType); notifyListeners("bookDownloadCompleted", event);
@@ -198,7 +218,8 @@ public class NativeBookDownloadPlugin extends Plugin {
         if (pdf) return "application/pdf";
         if (zip) return "application/epub+zip";
         if (responseType.contains("text/html")) throw new DownloadFailure("DOWNLOAD_HTML_RESPONSE", "A origem retornou uma página em vez do livro.");
-        throw new DownloadFailure("DOWNLOAD_FILE_SIGNATURE_INVALID", "O arquivo baixado não é um PDF ou EPUB válido.");
+        if (responseType.length() > 0 && !responseType.contains("pdf") && !responseType.contains("epub") && !responseType.contains("octet-stream")) throw new DownloadFailure("DOWNLOAD_INVALID_MIME", "A origem retornou um tipo de conteúdo inválido.");
+        throw new DownloadFailure("DOWNLOAD_INVALID_SIGNATURE", "O arquivo baixado não é um PDF ou EPUB válido.");
     }
     private String mimeTypeFor(File file) { return file.getName().endsWith(".epub") ? "application/epub+zip" : "application/pdf"; }
     private String normalizeHash(String value) { return value == null || value.trim().isEmpty() ? null : value.trim().toLowerCase(Locale.ROOT); }
@@ -207,6 +228,12 @@ public class NativeBookDownloadPlugin extends Plugin {
     /** Same-directory rename is atomic on Android's app-private filesystem. */
     private void moveAtomically(File source, File destination) throws IOException { if (destination.exists() && !destination.delete()) throw new IOException("Could not replace previous file"); if (!source.renameTo(destination)) throw new IOException("Could not finalize downloaded file"); }
     private void deleteQuietly(File file) { if (file.exists()) file.delete(); }
+    private int redirectCount(Response response) { int count = 0; for (Response prior = response.priorResponse(); prior != null; prior = prior.priorResponse()) count++; return count; }
+    private String safeHeader(String value) { return value == null ? "unknown" : value.replaceAll("[^A-Za-z0-9+./;=_ -]", "").substring(0, Math.min(100, value.replaceAll("[^A-Za-z0-9+./;=_ -]", "").length())); }
+    private String presence(String value) { return value == null ? "absent" : "present"; }
+    private String abbreviatedHash(String value) { return value == null || value.length() < 12 ? presence(value) : value.substring(0, 12) + "…"; }
+    private String safeMessage(String value) { if (value == null) return "none"; String safe = value.replaceAll("https?://\\S+", "[url]").replaceAll("[\\r\\n]", " "); return safe.substring(0, Math.min(160, safe.length())); }
+    private String ioCode(IOException failure) { String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(Locale.ROOT); return message.contains("no space") || message.contains("enospc") ? "DOWNLOAD_NO_SPACE" : "DOWNLOAD_IO_ERROR"; }
 
     private static final class DownloadFailure extends Exception {
         final String code;

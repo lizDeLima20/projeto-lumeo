@@ -63,6 +63,7 @@ import { CatalogExplorerView } from "../views/CatalogExplorerView";
 import { CatalogBookView } from "../views/CatalogBookView";
 import { CatalogGenreDialog } from "../views/CatalogGenreDialog";
 import { CatalogAdminView } from "../views/CatalogAdminView";
+import { PrivacyView } from "../views/PrivacyView";
 import { MobileBottomNavigation } from "../views/MobileBottomNavigation";
 import { I18nManager } from "../i18n/I18nManager";
 import { AppState } from "./AppState";
@@ -129,6 +130,7 @@ export class App {
   private registerRoutes(): void {
     this.router.register("login", () => new LoginView(this.auth, () => this.afterAuthentication(), () => this.router.navigate("register")));
     this.router.register("register", () => new RegisterView(this.auth, () => this.afterAuthentication(), () => this.router.navigate("login")));
+    this.router.register("privacy", () => new PrivacyView());
     this.router.register("device-conflict", () => new DeviceConflictView(
       this.state, this.auth, this.devices, () => void this.afterAuthentication(), () => void this.logout(),
     ));
@@ -303,7 +305,8 @@ export class App {
   private findBook(id: string | null): Book | null { return id ? this.state.library.findBookById(id) ?? null : null; }
 
   private guardRoute(route: RouteName): RouteName {
-    const publicRoutes: readonly RouteName[] = ["login", "register"];
+    const publicRoutes: readonly RouteName[] = ["login", "register", "privacy"];
+    if (route === "privacy") return route;
     if (!this.isAuthenticated()) return publicRoutes.includes(route) ? route : "login";
     if (this.state.deviceStatus === "conflict") return route === "login" ? "login" : "device-conflict";
     if (this.state.deviceStatus !== "authorized" || !this.hasUsableLicense()) return "login";
@@ -339,8 +342,11 @@ export class App {
       this.isAuthenticated() && this.state.deviceStatus === "authorized",
       this.userName(), () => void this.logout());
     this.headerView.mount(this.headerRoot);
-    this.footerRoot.replaceChildren(...(this.isAuthenticated() && this.state.deviceStatus === "authorized"
-      ? [new MobileBottomNavigation((route)=>this.router.navigate(route)).render()] : []));
+    const authenticated = this.isAuthenticated() && this.state.deviceStatus === "authorized";
+    const legal = document.createElement("div"); legal.className = `app-legal${authenticated ? " app-legal--with-navigation" : ""}`;
+    const privacy = document.createElement("a"); privacy.className = "app-legal__link"; privacy.href = "/privacy"; privacy.textContent = "Política de Privacidade";
+    privacy.addEventListener("click", (event) => { event.preventDefault(); this.router.navigate("privacy"); }); legal.append(privacy);
+    this.footerRoot.replaceChildren(...(authenticated ? [new MobileBottomNavigation((route)=>this.router.navigate(route)).render()] : []), legal);
     I18nManager.shared.localizeTree(this.footerRoot);
   }
 

@@ -38,5 +38,11 @@ describe("download nativo Android do catálogo", () => {
     assert.match(plugin, /bookDownloadProgress/);
     assert.match(plugin, /bookDownloadCompleted/);
     assert.match(plugin, /DOWNLOAD_HTML_RESPONSE/);
+    assert.match(plugin, /DOWNLOAD_TIMEOUT/);
+    assert.match(plugin, /DOWNLOAD_INVALID_MIME/);
+    assert.match(plugin, /DOWNLOAD_INVALID_SIGNATURE/);
+    assert.match(plugin, /DOWNLOAD_NO_SPACE/);
+    assert.match(plugin, /finalHost=/);
+    assert.match(plugin, /redirects=/);
   });
 });
