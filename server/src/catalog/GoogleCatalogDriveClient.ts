@@ -11,8 +11,10 @@ export interface CatalogDriveListing { books: readonly CatalogDriveFile[]; audit
 /** Recursive server-only Drive indexer. It stores metadata only, never book bytes. */
 export class GoogleCatalogDriveClient {
   private token: { value: string; expiresAt: number } | null = null;
+  private folderAccessLogged = false;
   private readonly credentials: ServiceAccount;
   public constructor(rawCredentials: string, private readonly folderId: string, private readonly maxFileBytes: number, private readonly fetcher: typeof fetch = fetch) {
+    this.log("CATALOG_SERVICE_ACCOUNT_INPUT", GoogleCatalogDriveClient.describeEnvironmentValue(rawCredentials));
     this.credentials = GoogleCatalogDriveClient.parseCredentials(rawCredentials);
     if (!folderId.trim() || !/^[A-Za-z0-9_-]{10,}$/.test(folderId)) throw new ApiError(503, "CATALOG_FOLDER_INVALID", "A pasta do catálogo não está configurada corretamente.");
     this.log("CATALOG_SERVICE_ACCOUNT_CONFIG", { stage: "accepted" });
@@ -25,6 +27,7 @@ export class GoogleCatalogDriveClient {
     this.log("CATALOG_SOURCE_TOTAL_FILES", { count: audit.rawItemsFound }); this.log("CATALOG_SOURCE_PAGES_FETCHED", { count: audit.pagesFetched }); this.log("CATALOG_SOURCE_FILES_SEEN", { count: audit.filesSeen });
     this.log("CATALOG_SOURCE_SUPPORTED_FILES", { count: audit.supportedFiles, pdfCount: audit.pdfCount, epubCount: audit.epubCount }); this.log("CATALOG_SOURCE_UNSUPPORTED_FILES", { count: audit.unsupportedCount });
     this.log("CATALOG_SOURCE_DUPLICATES", { count: audit.duplicates }); this.log("CATALOG_SOURCE_PARSE_FAILURES", { count: audit.parseFailures }); this.log("CATALOG_SOURCE_FINAL_BOOKS", { count: audit.finalCatalogCount, foldersVisited: audit.foldersVisited, shortcutCount: audit.shortcutCount });
+    this.log("CATALOG_CATALOG_FLOW", { stage: "total_books", outcome: "ok", count: audit.finalCatalogCount });
     return { books: [...books.values()], audit };
   }
   public async hashAndValidate(file: CatalogDriveFile): Promise<string> {
@@ -41,7 +44,10 @@ export class GoogleCatalogDriveClient {
     do {
       const url = new URL("https://www.googleapis.com/drive/v3/files"); url.searchParams.set("q", `'${folderId.replace(/'/g, "\\'")}' in parents and trashed = false`);
       url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,size,modifiedTime,resourceKey,shortcutDetails(targetId,targetMimeType))"); url.searchParams.set("pageSize", "1000"); url.searchParams.set("orderBy", "modifiedTime desc"); url.searchParams.set("supportsAllDrives", "true"); url.searchParams.set("includeItemsFromAllDrives", "true"); if (pageToken) url.searchParams.set("pageToken", pageToken);
-      const response = await this.authorized(url); if (!response.ok) { this.log("CATALOG_DRIVE_API_ERROR", { status: response.status, folderId }); throw this.driveError(response.status); } const data = await response.json() as { files?: DriveFile[]; nextPageToken?: string }; const files = data.files ?? [];
+      const response = await this.authorized(url); if (!response.ok) { this.log("CATALOG_CATALOG_FLOW", { stage: "folder_access", outcome: "failed", httpStatus: response.status }); throw this.driveError(response.status); }
+      if (!this.folderAccessLogged) { this.folderAccessLogged = true; this.log("CATALOG_CATALOG_FLOW", { stage: "folder_access", outcome: "ok" }); }
+      const data = await response.json() as { files?: DriveFile[]; nextPageToken?: string }; const files = data.files ?? [];
+      this.log("CATALOG_CATALOG_FLOW", { stage: "drive_api", outcome: "ok", page: audit.pagesFetched + 1 });
       audit.pagesFetched++; audit.rawItemsFound += files.length; folderCount += files.length; this.log("CATALOG_DRIVE_PAGE_FETCHED", { page: audit.pagesFetched, items: files.length, hasNextPage: Boolean(data.nextPageToken) });
       for (const file of files) await this.visitItem(file, visited, books, audit); pageToken = data.nextPageToken ?? "";
     } while (pageToken);
@@ -78,23 +84,28 @@ export class GoogleCatalogDriveClient {
       GoogleCatalogDriveClient.logValidationFailure("JSON.parse");
       throw new ApiError(503, "CATALOG_SERVICE_ACCOUNT_JSON_INVALID", "O JSON da conta de serviço é inválido.");
     }
+    GoogleCatalogDriveClient.logValidationSuccess("JSON.parse");
 
     if (!GoogleCatalogDriveClient.isServiceAccount(value)) {
       GoogleCatalogDriveClient.logValidationFailure("required_fields");
       throw new ApiError(503, "CATALOG_SERVICE_ACCOUNT_FIELDS_INVALID", "O JSON da conta de serviço não possui os campos obrigatórios.");
     }
+    GoogleCatalogDriveClient.logValidationSuccess("required_fields");
 
     const privateKey = value.private_key.replace(/\\n/g, "\n").replace(/\r\n?/g, "\n");
     if (!privateKey.includes("-----BEGIN PRIVATE KEY-----") || !privateKey.includes("-----END PRIVATE KEY-----")) {
       GoogleCatalogDriveClient.logValidationFailure("private_key_format");
       throw new ApiError(503, "CATALOG_PRIVATE_KEY_INVALID", "A chave privada da conta de serviço não possui um PEM válido.");
     }
+    GoogleCatalogDriveClient.logValidationSuccess("private_key_format");
     return { ...value, private_key: privateKey };
   }
 
   /** Vercel may preserve JSON, stringify it once more, or provide base64 JSON. */
   private static decodeEnvironmentValue(source: string): string {
-    const unquoted = source.startsWith("'") && source.endsWith("'") ? source.slice(1, -1) : source;
+    const withoutAssignment = source.startsWith("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=")
+      ? source.slice("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=".length).trim() : source;
+    const unquoted = withoutAssignment.startsWith("'") && withoutAssignment.endsWith("'") ? withoutAssignment.slice(1, -1) : withoutAssignment;
     return unquoted.startsWith("{") || unquoted.startsWith("\"")
       ? GoogleCatalogDriveClient.escapeLiteralPrivateKeyNewlines(unquoted)
       : Buffer.from(unquoted, "base64").toString("utf8");
@@ -119,6 +130,22 @@ export class GoogleCatalogDriveClient {
   }
 
   private static logValidationFailure(stage: "JSON.parse" | "required_fields" | "private_key_format"): void {
-    console.info(JSON.stringify({ event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage }));
+    console.info(JSON.stringify({ event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage, outcome: "failed" }));
+  }
+
+  private static logValidationSuccess(stage: "JSON.parse" | "required_fields" | "private_key_format"): void {
+    console.info(JSON.stringify({ event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage, outcome: "ok" }));
+  }
+
+  private static describeEnvironmentValue(raw: string): Record<string, unknown> {
+    const source = raw.replace(/^\uFEFF/, "").trim();
+    const assigned = source.startsWith("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=");
+    const value = assigned ? source.slice("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=".length).trim() : source;
+    const unquoted = value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1) : value;
+    const format = !unquoted ? "empty"
+      : unquoted.startsWith("{") ? "json_object"
+        : unquoted.startsWith("\"") ? "json_string"
+          : /^[A-Za-z0-9+/=_-]+$/u.test(unquoted) ? "base64_candidate" : "unknown";
+    return { present: Boolean(source), length: source.length, format: assigned ? `environment_assignment:${format}` : format };
   }
 }

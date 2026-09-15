@@ -13,6 +13,7 @@ describe("GoogleCatalogDriveClient", () => {
     accepts(json);
     accepts(JSON.stringify(json));
     accepts(Buffer.from(json).toString("base64"));
+    accepts(`GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=${json}`);
     // This mirrors an editor that turns the escaped newlines in private_key
     // into physical line breaks before Vercel supplies the environment value.
     accepts(json.replace(/\\n/g, "\n"));
@@ -23,7 +24,7 @@ describe("GoogleCatalogDriveClient", () => {
     console.info = (message: unknown): void => { messages.push(String(message)); };
     try {
       assert.throws(() => new GoogleCatalogDriveClient("not-json-or-base64", "root-folder", 1024), { code: "CATALOG_SERVICE_ACCOUNT_JSON_INVALID" });
-      assert.deepEqual(JSON.parse(messages.at(-1) ?? "{}"), { event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage: "JSON.parse" });
+      assert.deepEqual(JSON.parse(messages.at(-1) ?? "{}"), { event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage: "JSON.parse", outcome: "failed" });
     } finally { console.info = original; }
   });
 
