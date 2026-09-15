@@ -34,5 +34,6 @@ describe("MobileNavigationDrawer", () => {
     assert.match(header, /AUTHENTICATED_NAVIGATION/);
     assert.match(header, /new MobileNavigationDrawer\(items,/);
     assert.match(header, /items\.forEach\(\(item\) => desktopNav\.append/);
+    assert.match(header, /this\.drawer\.mount\(document\.body\)/);
   });
 });

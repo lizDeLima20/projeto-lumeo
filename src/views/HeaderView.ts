@@ -29,7 +29,10 @@ export class HeaderView extends BaseView {
     if (this.authenticated) {
       const hamburger = this.hamburger.render(); hamburger.addEventListener("click", () => this.drawer?.toggle()); wrapper.append(hamburger);
       this.drawer = new MobileNavigationDrawer(items, this.userName, this.onNavigate, this.onLogout, (open) => this.hamburger.setOpen(open));
-      wrapper.append(this.drawer.render());
+      // The header uses backdrop-filter, which creates a containing block for
+      // fixed descendants. Mounting the drawer at body level keeps it between
+      // the header and mobile bottom navigation instead of clipping its links.
+      this.drawer.mount(document.body);
     }
     return wrapper;
   }
