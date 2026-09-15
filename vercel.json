@@ -12,7 +12,7 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; connect-src 'self' https://rasonfawfsvyfhjkinbp.supabase.co https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com https://api.dictionaryapi.dev https://api.mymemory.translated.net https://www.google.com; img-src 'self' https: blob: data:; worker-src 'self' blob:; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com; frame-src https://login.microsoftonline.com https://login.live.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; connect-src 'self' https://rasonfawfsvyfhjkinbp.supabase.co https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com https://api.dictionaryapi.dev https://api.mymemory.translated.net https://www.google.com; img-src 'self' https: blob: data:; worker-src 'self' blob:; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com; frame-src https://login.microsoftonline.com https://login.live.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         }
       ]
     },

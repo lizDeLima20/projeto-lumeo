@@ -27,6 +27,7 @@ export class HybridCatalogSourceProvider {
         seen.add(identity); books.push(book); this.providersByBookId.set(book.bookId, provider);
       }
     });
+    if (providers.length > 0 && pages.every((result) => result.status === "rejected")) throw new Error(`CATALOG_ALL_SOURCES_FAILED:${HybridCatalogSourceProvider.errorCode((pages[0] as PromiseRejectedResult).reason)}`);
     const filtered = books.filter((book) => this.matches(book, query));
     const page = filtered.slice(query.offset, query.offset + query.limit + 1);
     console.info(JSON.stringify({ event: "CATALOG_PIPELINE_COUNTS", sourceCounts, totalFoundInSources: sourceCounts.reduce((total, source) => total + source.items, 0), afterDeduplication: books.length, afterFilters: filtered.length, returnedByApi: Math.min(query.limit, page.length), requestedOffset: query.offset }));

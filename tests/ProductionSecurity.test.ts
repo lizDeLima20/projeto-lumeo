@@ -91,4 +91,12 @@ describe("produção e segurança do frontend", () => {
     assert.match(sw, /BOOK_FILE_PATTERN/);
     assert.match(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
   });
+
+  it("permite o popup e os estilos oficiais do Google Identity", async () => {
+    const config = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8")) as { headers: Array<{ headers: Array<{ key: string; value: string }> }> };
+    const headers = new Map(config.headers[0]!.headers.map(({ key, value }) => [key, value]));
+    assert.equal(headers.get("Cross-Origin-Opener-Policy"), "same-origin-allow-popups");
+    assert.match(headers.get("Content-Security-Policy") ?? "", /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
+    assert.match(headers.get("Content-Security-Policy") ?? "", /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
+  });
 });
