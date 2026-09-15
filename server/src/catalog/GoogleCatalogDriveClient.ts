@@ -8,6 +8,14 @@ interface DriveFile { id: string; name: string; mimeType: string; size?: string;
 export interface CatalogDriveFile { id: string; name: string; format: CatalogFormat; mimeType: string; size: number | null; modifiedAt: string; resourceKey?: string; }
 export interface CatalogDriveListing { books: readonly CatalogDriveFile[]; audit: CatalogSourceAudit; }
 
+type CredentialInputFormat = "json_object" | "quoted_json" | "base64" | "unknown" | "empty";
+type CredentialParseReason = "invalid_json_syntax" | "unexpected_wrapping" | "base64_decode_failed" | "empty_value" | "unsupported_format";
+
+/** Deliberately carries only a stable, safe category: never parser output or credential content. */
+class CredentialInputError extends Error {
+  public constructor(public readonly reason: CredentialParseReason) { super(reason); }
+}
+
 /** Recursive server-only Drive indexer. It stores metadata only, never book bytes. */
 export class GoogleCatalogDriveClient {
   private token: { value: string; expiresAt: number } | null = null;
@@ -74,14 +82,18 @@ export class GoogleCatalogDriveClient {
   private log(event: string, details: Record<string, unknown>): void { console.info(JSON.stringify({ event, ...details })); }
   private static parseCredentials(raw: string): ServiceAccount {
     const source = raw.replace(/^\uFEFF/, "").trim();
-    if (!source) throw new ApiError(503, "CATALOG_SERVICE_ACCOUNT_MISSING", "A conta de serviço do catálogo não está configurada.");
+    if (!source) {
+      GoogleCatalogDriveClient.logValidationFailure("JSON.parse", "empty_value");
+      throw new ApiError(503, "CATALOG_SERVICE_ACCOUNT_MISSING", "A conta de serviço do catálogo não está configurada.");
+    }
 
     let value: unknown;
     try {
       const decoded = GoogleCatalogDriveClient.decodeEnvironmentValue(source);
       value = GoogleCatalogDriveClient.parseJsonValue(decoded);
-    } catch {
-      GoogleCatalogDriveClient.logValidationFailure("JSON.parse");
+    } catch (error) {
+      const reason = error instanceof CredentialInputError ? error.reason : "invalid_json_syntax";
+      GoogleCatalogDriveClient.logValidationFailure("JSON.parse", reason);
       throw new ApiError(503, "CATALOG_SERVICE_ACCOUNT_JSON_INVALID", "O JSON da conta de serviço é inválido.");
     }
     GoogleCatalogDriveClient.logValidationSuccess("JSON.parse");
@@ -105,10 +117,24 @@ export class GoogleCatalogDriveClient {
   private static decodeEnvironmentValue(source: string): string {
     const withoutAssignment = source.startsWith("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=")
       ? source.slice("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=".length).trim() : source;
-    const unquoted = withoutAssignment.startsWith("'") && withoutAssignment.endsWith("'") ? withoutAssignment.slice(1, -1) : withoutAssignment;
-    return unquoted.startsWith("{") || unquoted.startsWith("\"")
-      ? GoogleCatalogDriveClient.escapeLiteralPrivateKeyNewlines(unquoted)
-      : Buffer.from(unquoted, "base64").toString("utf8");
+    if ((withoutAssignment.startsWith("'") && !withoutAssignment.endsWith("'"))
+      || (!withoutAssignment.startsWith("'") && withoutAssignment.endsWith("'"))) {
+      throw new CredentialInputError("unexpected_wrapping");
+    }
+    const unquoted = withoutAssignment.startsWith("'") && withoutAssignment.endsWith("'")
+      ? withoutAssignment.slice(1, -1).trim() : withoutAssignment;
+    const format = GoogleCatalogDriveClient.inputFormat(unquoted);
+    if (format === "empty") throw new CredentialInputError("empty_value");
+    if (format === "json_object" || format === "quoted_json") return GoogleCatalogDriveClient.escapeLiteralPrivateKeyNewlines(unquoted);
+    if (format !== "base64") throw new CredentialInputError("unsupported_format");
+    try {
+      const decoded = Buffer.from(unquoted, "base64").toString("utf8");
+      if (!decoded.trim() || !["{", "\""].includes(decoded.trim().charAt(0))) throw new CredentialInputError("base64_decode_failed");
+      return GoogleCatalogDriveClient.escapeLiteralPrivateKeyNewlines(decoded);
+    } catch (error) {
+      if (error instanceof CredentialInputError) throw error;
+      throw new CredentialInputError("base64_decode_failed");
+    }
   }
 
   private static parseJsonValue(source: string): unknown {
@@ -129,8 +155,8 @@ export class GoogleCatalogDriveClient {
       && typeof account.private_key === "string" && Boolean(account.private_key);
   }
 
-  private static logValidationFailure(stage: "JSON.parse" | "required_fields" | "private_key_format"): void {
-    console.info(JSON.stringify({ event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage, outcome: "failed" }));
+  private static logValidationFailure(stage: "JSON.parse" | "required_fields" | "private_key_format", reason?: CredentialParseReason): void {
+    console.info(JSON.stringify({ event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage, outcome: "failed", ...(reason ? { reason } : {}) }));
   }
 
   private static logValidationSuccess(stage: "JSON.parse" | "required_fields" | "private_key_format"): void {
@@ -139,13 +165,33 @@ export class GoogleCatalogDriveClient {
 
   private static describeEnvironmentValue(raw: string): Record<string, unknown> {
     const source = raw.replace(/^\uFEFF/, "").trim();
-    const assigned = source.startsWith("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=");
-    const value = assigned ? source.slice("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=".length).trim() : source;
-    const unquoted = value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1) : value;
-    const format = !unquoted ? "empty"
-      : unquoted.startsWith("{") ? "json_object"
-        : unquoted.startsWith("\"") ? "json_string"
-          : /^[A-Za-z0-9+/=_-]+$/u.test(unquoted) ? "base64_candidate" : "unknown";
-    return { present: Boolean(source), length: source.length, format: assigned ? `environment_assignment:${format}` : format };
+    const value = source.startsWith("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=")
+      ? source.slice("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=".length).trim() : source;
+    return {
+      present: Boolean(value),
+      length: value.length,
+      format: GoogleCatalogDriveClient.inputFormat(value),
+      firstCharType: GoogleCatalogDriveClient.characterType(value.charAt(0), true),
+      lastCharType: GoogleCatalogDriveClient.characterType(value.charAt(value.length - 1), false),
+    };
+  }
+
+  private static inputFormat(value: string): CredentialInputFormat {
+    const source = value.trim();
+    if (!source) return "empty";
+    if (source.startsWith("{")) return "json_object";
+    if (source.startsWith("\"")) return "quoted_json";
+    return GoogleCatalogDriveClient.isBase64(source) ? "base64" : "unknown";
+  }
+
+  private static isBase64(value: string): boolean {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    return normalized.length >= 4 && normalized.length % 4 !== 1 && /^[A-Za-z0-9+/]*={0,2}$/u.test(normalized);
+  }
+
+  private static characterType(character: string, first: boolean): "brace" | "quote" | "other" {
+    if (first ? character === "{" : character === "}") return "brace";
+    if (character === "\"" || character === "'") return "quote";
+    return "other";
   }
 }

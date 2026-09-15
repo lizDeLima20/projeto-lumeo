@@ -4,13 +4,17 @@ import { describe, it } from "node:test";
 import { GoogleCatalogDriveClient } from "../src/catalog/GoogleCatalogDriveClient.js";
 
 describe("GoogleCatalogDriveClient", () => {
-  it("accepts the service-account formats preserved by Vercel without exposing its contents", () => {
+  const accountJson = (): string => {
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
-    const account = { type: "service_account", project_id: "catalog-test", client_email: "catalog@example.iam.gserviceaccount.com", private_key: privateKey.export({ format: "pem", type: "pkcs8" }).toString() };
-    const json = JSON.stringify(account);
+    return JSON.stringify({ type: "service_account", project_id: "catalog-test", client_email: "catalog@example.iam.gserviceaccount.com", private_key: privateKey.export({ format: "pem", type: "pkcs8" }).toString() });
+  };
+
+  it("accepts the service-account formats preserved by Vercel without exposing its contents", () => {
+    const json = accountJson();
     const accepts = (environmentValue: string): void => assert.doesNotThrow(() => new GoogleCatalogDriveClient(environmentValue, "root-folder", 1024));
 
     accepts(json);
+    accepts(`\n  ${json}\n`);
     accepts(JSON.stringify(json));
     accepts(Buffer.from(json).toString("base64"));
     accepts(`GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=${json}`);
@@ -19,18 +23,40 @@ describe("GoogleCatalogDriveClient", () => {
     accepts(json.replace(/\\n/g, "\n"));
   });
 
-  it("reports only the structural validation stage when service-account input is invalid", () => {
+  it("reports structural input metadata and safe parse categories without credential contents", () => {
     const messages: string[] = [], original = console.info;
     console.info = (message: unknown): void => { messages.push(String(message)); };
     try {
       assert.throws(() => new GoogleCatalogDriveClient("not-json-or-base64", "root-folder", 1024), { code: "CATALOG_SERVICE_ACCOUNT_JSON_INVALID" });
-      assert.deepEqual(JSON.parse(messages.at(-1) ?? "{}"), { event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage: "JSON.parse", outcome: "failed" });
+      const input = JSON.parse(messages[0] ?? "{}") as Record<string, unknown>;
+      const validation = JSON.parse(messages.at(-1) ?? "{}") as Record<string, unknown>;
+      assert.deepEqual(input, { event: "CATALOG_SERVICE_ACCOUNT_INPUT", present: true, length: 18, format: "base64", firstCharType: "other", lastCharType: "other" });
+      assert.deepEqual(validation, { event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage: "JSON.parse", outcome: "failed", reason: "base64_decode_failed" });
+    } finally { console.info = original; }
+  });
+
+  it("classifies empty, malformed, and incorrectly wrapped environment values safely", () => {
+    const json = accountJson();
+    const cases: Array<{ value: string; code: string; reason: string }> = [
+      { value: "", code: "CATALOG_SERVICE_ACCOUNT_MISSING", reason: "empty_value" },
+      { value: json.slice(0, -3), code: "CATALOG_SERVICE_ACCOUNT_JSON_INVALID", reason: "invalid_json_syntax" },
+      { value: `'${json}`, code: "CATALOG_SERVICE_ACCOUNT_JSON_INVALID", reason: "unexpected_wrapping" },
+      { value: Buffer.from("not a json document").toString("base64"), code: "CATALOG_SERVICE_ACCOUNT_JSON_INVALID", reason: "base64_decode_failed" },
+    ];
+    const messages: string[] = [], original = console.info;
+    console.info = (message: unknown): void => { messages.push(String(message)); };
+    try {
+      for (const test of cases) {
+        assert.throws(() => new GoogleCatalogDriveClient(test.value, "root-folder", 1024), { code: test.code });
+        const validation = JSON.parse(messages.at(-1) ?? "{}") as Record<string, unknown>;
+        assert.equal(validation.reason, test.reason);
+      }
     } finally { console.info = original; }
   });
 
   it("indexes every page, subfolder and shortcut without a UI-sized limit", async () => {
-    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 1024 }); const urls: URL[] = [];
-    const client = new GoogleCatalogDriveClient(JSON.stringify({ type: "service_account", project_id: "catalog-test", client_email: "catalog@example.iam.gserviceaccount.com", private_key: privateKey.export({ format: "pem", type: "pkcs8" }).toString() }), "root-folder", 1024, async (input) => {
+    const urls: URL[] = [];
+    const client = new GoogleCatalogDriveClient(accountJson(), "root-folder", 1024, async (input) => {
       const url = new URL(String(input));
       if (url.hostname === "oauth2.googleapis.com") return new Response(JSON.stringify({ access_token: "test", expires_in: 3600 }));
       urls.push(url); const parent = /'([^']+)' in parents/.exec(url.searchParams.get("q") ?? "")?.[1], token = url.searchParams.get("pageToken");
