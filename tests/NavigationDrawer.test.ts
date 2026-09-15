@@ -10,8 +10,8 @@ const header = readFileSync(new URL("../src/views/HeaderView.ts", import.meta.ur
 describe("MobileNavigationDrawer", () => {
   it("drawerHasOwnBackground", () => {
     assert.equal(MobileNavigationDrawer.hasOwnBackground, true);
-    assert.match(styles, /\.navigation-drawer[^}]*background:\s*rgba\(245, 245, 247, \.94\)/s);
-    assert.match(styles, /\.drawer-link[^}]*color:\s*#24212b/s);
+    assert.match(styles, /\.navigation-drawer[^}]*background:\s*#603519/s);
+    assert.match(styles, /\.drawer-link[^}]*color:\s*#f7e4c0/s);
   });
   it("drawerOverlayOpens", () => {
     assert.equal(MobileNavigationDrawer.hasOverlay, true);
