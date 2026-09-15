@@ -29,8 +29,12 @@ export class CapacitorNativeBookDownloadBridge implements AndroidCatalogDownload
       let lastError: unknown;
       for (const url of urls) {
         try {
+          this.log("BFF_URL_OK", { bookId: link.bookId, sourceHost: new URL(url).host });
+          this.log("NATIVE_PLUGIN_CALLED", { bookId: link.bookId });
           const result = await NativeBookDownload.downloadBook({ bookId: link.bookId, url, expectedSize: link.fileSize ?? undefined, sha256: link.sha256 ?? undefined });
-          return this.asImportFile(result, link);
+          const file = await this.asImportFile(result, link);
+          this.log("FILE_SAVED", { bookId: link.bookId, bytes: result.size, existing: result.existing });
+          return file;
         } catch (error) {
           lastError = error;
           const code = NativeBookDownloadError.from(error).code;
@@ -51,8 +55,10 @@ export class CapacitorNativeBookDownloadBridge implements AndroidCatalogDownload
     if (!response.ok) throw new NativeBookDownloadError("NATIVE_FILE_UNREADABLE", "O arquivo salvo não pôde ser preparado para a biblioteca.");
     const blob = await response.blob();
     if (blob.size <= 0 || (result.size > 0 && blob.size !== result.size)) throw new NativeBookDownloadError("NATIVE_FILE_INCOMPLETE", "O arquivo salvo está incompleto.");
+    this.log("FILE_VALIDATED", { bookId: result.bookId, bytes: blob.size, mimeType: result.mimeType });
     return new File([blob], link.expectedFilename, { type: result.mimeType });
   }
+  private log(stage: string, details: Record<string, unknown>): void { console.info(JSON.stringify({ event: "LUMEO_ANDROID_DOWNLOAD", stage, ...details })); }
 }
 
 export class NativeBookDownloadError extends Error {

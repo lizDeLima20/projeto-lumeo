@@ -21,6 +21,7 @@ import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js"
 import { CatalogSourceRegistry } from "./catalog/CatalogSourceRegistry.js";
 import { HybridCatalogSourceProvider } from "./catalog/HybridCatalogSourceProvider.js";
 import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalogProvider.js";
+import { UserPersistenceRepository } from "./repositories/UserPersistenceRepository.js";
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 
@@ -54,6 +55,7 @@ export class ServerApp {
         new LicenseService(new LicenseRepository(supabase.admin), config),
         new ProfileRepository(supabase.admin),
         new CatalogApplicationService(new CatalogRepository(supabase.admin), () => createDrive(), new HybridCatalogSourceProvider(async (locale) => authorizedSources ? authorizedSources.filter((source) => !locale || source.source.locale === locale) : catalogSources.providers(locale))),
+        new UserPersistenceRepository(supabase.admin),
       );
       return controller;
     };

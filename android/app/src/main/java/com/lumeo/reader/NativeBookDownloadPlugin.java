@@ -88,7 +88,8 @@ public class NativeBookDownloadPlugin extends Plugin {
         final Call httpCall = http.newCall(request);
         // Log only the host and technical state: never the full signed URL,
         // session data, or book bytes.
-        Log.i(TAG, "download.start bookId=" + safeBookId + " sourceHost=" + request.url().host());
+        Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=NATIVE_PLUGIN_CALLED bookId=" + safeBookId);
+        Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=DOWNLOAD_STARTED bookId=" + safeBookId + " sourceHost=" + request.url().host());
         activeCalls.put(bookId, httpCall);
         executor.execute(() -> download(pluginCall, bookId, safeBookId, directory, httpCall, expectedSize, expectedSha256));
     }
@@ -117,7 +118,8 @@ public class NativeBookDownloadPlugin extends Plugin {
             final String finalHost = response.request().url().host();
             final String rawContentType = response.header("Content-Type", "");
             final String rawContentLength = response.header("Content-Length", "unknown");
-            Log.i(TAG, "download.response bookId=" + safeBookId + " finalHost=" + finalHost + " status=" + status + " redirects=" + redirects + " contentType=" + safeHeader(rawContentType) + " contentLength=" + safeHeader(rawContentLength));
+            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=REDIRECT bookId=" + safeBookId + " finalHost=" + finalHost + " redirects=" + redirects);
+            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=HTTP_STATUS bookId=" + safeBookId + " status=" + status + " contentType=" + safeHeader(rawContentType) + " contentLength=" + safeHeader(rawContentLength));
             if (redirects > 10) throw new DownloadFailure("DOWNLOAD_REDIRECT_ERROR", "A origem redirecionou a requisição muitas vezes.");
             if (status != 200 && status != 206) throw new DownloadFailure("DOWNLOAD_HTTP_ERROR", "A origem retornou HTTP " + status + ".");
             final String contentType = rawContentType.toLowerCase(Locale.ROOT);
@@ -150,12 +152,13 @@ public class NativeBookDownloadPlugin extends Plugin {
                 output.getFD().sync();
             }
             if (downloaded <= 0) throw new DownloadFailure("DOWNLOAD_EMPTY_FILE", "O arquivo baixado está vazio.");
+            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=BYTES_RECEIVED bookId=" + safeBookId + " bytes=" + downloaded);
             if (expectedSize != null && expectedSize > 0 && downloaded != expectedSize) {
                 throw new DownloadFailure("DOWNLOAD_SIZE_MISMATCH", "O tamanho do arquivo não confere.");
             }
             final String mimeType = documentMimeType(signature, signatureLength, contentType);
             final String hash = hex(digest.digest());
-            Log.i(TAG, "download.validation bookId=" + safeBookId + " bytes=" + downloaded + " signature=valid mimeType=" + mimeType + " expectedSha256=" + presence(expectedSha256) + " calculatedSha256=" + abbreviatedHash(hash));
+            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=FILE_VALIDATED bookId=" + safeBookId + " bytes=" + downloaded + " mimeType=" + mimeType + " expectedSha256=" + presence(expectedSha256));
             if (expectedSha256 != null && !expectedSha256.equals(hash)) {
                 throw new DownloadFailure("DOWNLOAD_HASH_MISMATCH", "A integridade do arquivo não confere.");
             }
@@ -163,7 +166,7 @@ public class NativeBookDownloadPlugin extends Plugin {
             moveAtomically(part, destination);
             resolve(pluginCall, bookId, destination, hash, mimeType, false);
             notifyCompleted(bookId, destination, downloaded, hash, mimeType);
-            Log.i(TAG, "download.complete bookId=" + safeBookId + " bytes=" + downloaded + " mimeType=" + mimeType);
+            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=FILE_SAVED bookId=" + safeBookId + " bytes=" + downloaded + " mimeType=" + mimeType);
         } catch (DownloadFailure failure) {
             deleteQuietly(part);
             notifyFailed(bookId, failure.code);

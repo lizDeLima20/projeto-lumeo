@@ -15,6 +15,7 @@ import { ReaderSettingsManager } from "../reader/ReaderSettingsManager";
 import { BookFileRepository } from "../repositories/BookFileRepository";
 import { BookRepository } from "../repositories/BookRepository";
 import { GenreRepository } from "../repositories/GenreRepository";
+import { UserLibraryPreferencesRepository } from "../repositories/UserLibraryPreferencesRepository";
 import { ReadingProgressRepository } from "../repositories/ReadingProgressRepository";
 import { CollectionRepository } from "../repositories/CollectionRepository";
 import { BookMetadataExtractor } from "../metadata/BookMetadataExtractor";
@@ -37,6 +38,7 @@ import { LibraryBootstrapService } from "../services/LibraryBootstrapService";
 import { DesktopLibraryFolderService } from "../services/DesktopLibraryFolderService";
 import { StoragePersistenceService } from "../services/StoragePersistenceService";
 import { StorageService } from "../services/StorageService";
+import { AccountPersistenceService, type RemoteLibraryBook } from "../services/AccountPersistenceService";
 import { ConnectivityManager } from "../pwa/ConnectivityManager";
 import { PwaInstallManager } from "../pwa/PwaInstallManager";
 import { LimaDocumentRepository } from "../repositories/LimaDocumentRepository";
@@ -79,6 +81,7 @@ export class App {
   private progress = new ReadingProgressRepository(this.database);
   private collections = new CollectionRepository(this.database);
   private limaDocuments=new LimaDocumentRepository(this.database);
+  private preferences = new UserLibraryPreferencesRepository(this.database);
   private readonly metadataExtractor = new BookMetadataExtractor();
   private readonly covers = new CoverService();
   private readonly driveConfig: GoogleDriveConfig = { clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "",
@@ -89,6 +92,7 @@ export class App {
   private readerManager = new ReaderManager(this.books, new LocalBookFileStore(this.files),
     new ReadingProgressService(this.progress, this.books), this.readerSettings,this.limaDocuments);
   private readonly api = new ApiClient(new EnvironmentConfig().read().bffBaseUrl);
+  private readonly accountPersistence = new AccountPersistenceService(this.api);
   private readonly catalog = new CatalogService(this.api);
   private readonly catalogDownloads = new HybridCatalogDownloadService();
   private readonly auth = new AuthManager(this.api, this.storage, this.state);
@@ -191,13 +195,11 @@ export class App {
           await this.hydrateLibrary();
         }
         else {
-          await this.auth.logout();
           throw new ApiError(403, "LICENSE_REQUIRED", "Esta conta não possui uma licença ativa.");
         }
       }
     } catch (error) {
       if (error instanceof ApiError && error.code === "DEVICE_REVOKED") {
-        await this.auth.logout();
         throw new ApiError(403, "DEVICE_REVOKED", "Este aparelho foi revogado. Entre novamente em um aparelho autorizado.");
       }
       throw error instanceof ApiError ? error : new ApiError(500, "DEVICE_VALIDATION_FAILED", "Não foi possível validar este aparelho.");
@@ -206,8 +208,26 @@ export class App {
 
   private async hydrateLibrary(): Promise<void> {
     const files=new LocalBookFileStore(this.files),folder=new DesktopLibraryFolderService(this.database),manager=new PersistentLibraryManager(this.books,files,this.limaDocuments,undefined,folder),restored=await new LibraryBootstrapService(this.genres,manager).restore();
-    this.state.library.replaceGenres(restored.genres); this.state.library.replaceBooks(restored.books);
-    this.state.onboardingCompleted = restored.genres.length > 0; this.state.notify();
+    const localPreferences = await this.preferences.load();
+    // A remote metadata failure must never hide a valid local library or end a
+    // session. It will reconcile on the next authenticated online boot.
+    const remote = await this.accountPersistence.load().catch(() => null);
+    const preferences = remote?.preferences ?? localPreferences;
+    const genres = [...restored.genres];
+    for (const item of preferences?.genres ?? []) {
+      if (genres.some((genre) => genre.id === item.id)) continue;
+      const genre = new Genre(item.id, item.name); await this.genres.save(genre); genres.push(genre);
+    }
+    const books = [...restored.books];
+    for (const item of remote?.books ?? []) {
+      if (books.some((book) => book.id === item.bookId)) continue;
+      const book = this.remoteBook(item); if (!book) continue;
+      await this.books.save(book); books.push(book);
+    }
+    this.state.library.replaceGenres(genres); this.state.library.replaceBooks(books);
+    this.state.onboardingCompleted = preferences?.onboardingCompleted ?? genres.length > 0;
+    if (preferences) { this.state.settings.theme = preferences.theme; this.applyTheme(preferences.theme); await this.preferences.save(preferences); }
+    this.state.notify();
   }
 
   private configureLocalLibrary(userId: string): void {
@@ -216,6 +236,7 @@ export class App {
     this.files = new BookFileRepository(this.database); this.progress = new ReadingProgressRepository(this.database);
     this.collections = new CollectionRepository(this.database);
     this.limaDocuments=new LimaDocumentRepository(this.database);
+    this.preferences = new UserLibraryPreferencesRepository(this.database);
     this.imports = this.createImportManager();
     this.libraryService = this.createLibraryService();
     this.readerSettings = new ReaderSettingsManager(this.storage);
@@ -224,8 +245,10 @@ export class App {
   }
 
   private async finishOnboarding(): Promise<void> {
+    const preferences = this.preferences.fromState(true, this.state.settings.theme, this.state.genres);
     await Promise.all([Promise.all(this.state.genres.map((genre) => this.genres.save(genre))),
-      this.storage.save("theme", this.state.settings.theme)]);
+      this.preferences.save(preferences), this.storage.save("theme", this.state.settings.theme)]);
+    void this.accountPersistence.savePreferences(preferences).catch(() => undefined);
     this.applyTheme(this.state.settings.theme); this.router.navigate("home");
   }
 
@@ -247,6 +270,7 @@ export class App {
 
   private async addBook(book: Book): Promise<void> {
     this.state.library.addBook(book); this.state.notify();
+    void this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId)).catch(() => undefined);
     void new StoragePersistenceService().requestAfterImport();
     this.router.navigate("book", { id: book.id }); this.showToast("Livro adicionado à biblioteca.");
   }
@@ -259,7 +283,13 @@ export class App {
 
   private async addCatalogBook(catalogBook: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal, downloadedFile?: File): Promise<string | null> {
     const local = this.state.books.find((book) => book.catalogBookId === catalogBook.bookId);
-    if (local) { this.router.navigate("reader", { id: local.id }); return local.id; }
+    if (local?.availability === "AVAILABLE") { this.router.navigate("reader", { id: local.id }); return local.id; }
+    if (local) {
+      // A remote metadata placeholder is intentionally retained after logout
+      // or a device change. Replace only that placeholder when bytes return.
+      await this.libraryService.deleteBook(local.id);
+      this.state.library.removeBook(local.id);
+    }
     const file = downloadedFile ?? await new FileSystemFolderManager(this.database).selectDownloadedBook();
     if (!file) return null;
     // Android downloads already carry catalogue metadata and must remain a
@@ -275,12 +305,16 @@ export class App {
       else { const created = new Collection(crypto.randomUUID(), confirmed.collection, "custom"); await this.collections.save(created); collectionId = created.id; }
     }
     const coordinator = new CatalogImportCoordinator(this.imports, this.covers);
+    this.logCatalogImport("IMPORT_STARTED", { bookId: catalogBook.bookId, format: link.format });
     const saved = await coordinator.addDownloadedFile({ ...confirmed, genreId: genre.id }, link, file, progress, signal);
+    this.logCatalogImport("IMPORT_COMPLETED", { bookId: catalogBook.bookId, localBookId: saved.id });
     // Catalog collection metadata is optional; ImportManager already saved the original file,
     // cover and LIMA document locally. Keep library state authoritative for the shelf.
     if (collectionId) {
       const adjusted = new Book({ ...saved, collectionId }); await this.libraryService.saveBook(adjusted); this.state.library.addBook(adjusted);
     } else this.state.library.addBook(saved);
+    void this.accountPersistence.saveBook(saved, this.state.genres.find((genre) => genre.id === saved.genreId)).catch(() => undefined);
+    this.logCatalogImport("LIBRARY_REGISTERED", { bookId: catalogBook.bookId, localBookId: saved.id });
     this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
     if (!downloadedFile) this.router.navigate("library");
     return saved.id;
@@ -289,15 +323,21 @@ export class App {
   private async updateBook(book: Book): Promise<void> {
     await this.libraryService.saveBook(book);
     this.state.library.replaceBooks(this.state.books.map((item) => item.id === book.id ? book : item));
+    void this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId)).catch(() => undefined);
     this.state.notify(); this.router.navigate("book", { id: book.id }); this.showToast("Livro atualizado.");
   }
 
   private syncBook(book: Book): void {
-    this.state.library.replaceBooks(this.state.books.map((item) => item.id === book.id ? book : item)); this.state.notify();
+    this.state.library.replaceBooks(this.state.books.map((item) => item.id === book.id ? book : item));
+    // Reader progress updates the Book record asynchronously. Mirror only its
+    // lightweight metadata; the file, annotations and highlights stay local.
+    void this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId)).catch(() => undefined);
+    this.state.notify();
   }
 
   private async deleteBook(id: string, navigate = true): Promise<void> {
     await this.libraryService.deleteBook(id);
+    void this.accountPersistence.deleteBook(id).catch(() => undefined);
     this.state.library.removeBook(id); this.state.notify(); if(navigate)this.router.navigate("library"); this.showToast("Livro e arquivo removidos.");
   }
   private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await new LocalBookFileStore(this.files).save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
@@ -327,7 +367,12 @@ export class App {
   }
 
   private async changeTheme(theme: "light" | "dark"): Promise<void> {
-    this.state.settings.theme = theme; this.applyTheme(theme); await this.storage.save("theme", theme); this.state.notify();
+    this.state.settings.theme = theme; this.applyTheme(theme); await this.storage.save("theme", theme);
+    if (this.state.currentUser) {
+      const preferences = this.preferences.fromState(this.state.onboardingCompleted, theme, this.state.genres);
+      await this.preferences.save(preferences); void this.accountPersistence.savePreferences(preferences).catch(() => undefined);
+    }
+    this.state.notify();
   }
 
   private applyTheme(theme: "light" | "dark"): void { document.documentElement.dataset.theme = theme; }
@@ -354,9 +399,25 @@ export class App {
     await this.auth.logout(); this.state.library.replaceBooks([]); this.state.library.replaceGenres([]);
     this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
   }
+  private remoteBook(item: RemoteLibraryBook): Book | null {
+    const data = item.metadata; const text = (key: string): string | null => typeof data[key] === "string" && (data[key] as string).trim() ? (data[key] as string).trim() : null;
+    const title = text("title"), author = text("author"), genreId = text("genreId"), fileType = text("fileType");
+    if (!title || !author || !genreId || (fileType !== "pdf" && fileType !== "epub")) return null;
+    const number = (key: string): number => typeof data[key] === "number" && Number.isFinite(data[key]) ? data[key] as number : 0;
+    const cover = text("cover")?.startsWith("https://") ? text("cover")! : "";
+    return new Book({ id: item.bookId, title, author, genreId, cover, fileType, fileName: text("fileName") ?? `${title}.${fileType}`,
+      fileSize: number("fileSize"), mimeType: text("mimeType") ?? (fileType === "pdf" ? "application/pdf" : "application/epub+zip"),
+      readingStatus: data.readingStatus === "finished" ? "finished" : data.readingStatus === "reading" ? "reading" : "unread",
+      progressPercent: number("progressPercent"), currentLocation: text("currentLocation") ?? undefined, collectionId: text("collectionId") ?? undefined,
+      volume: text("volume") ?? undefined, series: text("series") ?? undefined, description: text("description") ?? undefined,
+      publicationYear: number("publicationYear") || undefined, catalogBookId: text("catalogBookId") ?? undefined,
+      source: data.source === "catalog" || data.source === "google-drive" || data.source === "onedrive" || data.source === "url" ? data.source : "device",
+      availability: "MISSING_FILE", offlineAvailability: "REMOTE_ONLY" });
+  }
   private showToast(message: string): void {
     const root = document.querySelector<HTMLElement>("#toast-root"); if (!root) return;
     root.textContent = message; root.className = "toast toast--visible";
     window.setTimeout(() => { root.className = "toast"; }, 5000);
   }
+  private logCatalogImport(stage: string, details: Record<string, unknown>): void { console.info(JSON.stringify({ event: "LUMEO_CATALOG_IMPORT", stage, ...details })); }
 }

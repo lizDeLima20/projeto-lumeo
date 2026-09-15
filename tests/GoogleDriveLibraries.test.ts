@@ -73,6 +73,15 @@ it("invalidRefresh400ClearsSessionWithoutThrowingIntoImportUI", async () => {
   const auth = new AuthManager({ post: async () => { calls++; throw new ApiError(400, "INVALID", "invalid"); }, setAccessToken: () => undefined } as never, storage as never, state);
   await auth.initialize(); assert.equal(calls, 1); assert.equal(state.authStatus, "unauthenticated");
 });
+it("temporaryRefreshFailureRestoresOfflineSessionWithoutClearingIt", async () => {
+  const storage = new Memory(), state = new AppState();
+  const saved: AuthSession = { user: { id: "u", email: "test@example.com" }, accessToken: "fake", refreshToken: "valid-refresh-token", expiresAt: 1 };
+  await storage.save<AuthSession>("auth-session", saved);
+  const auth = new AuthManager({ post: async () => { throw new ApiError(503, "SUPABASE_UNAVAILABLE", "temporarily unavailable"); }, setAccessToken: () => undefined } as never, storage as never, state);
+  await auth.initialize();
+  assert.equal(state.authStatus, "OFFLINE_AUTHENTICATED");
+  assert.deepEqual(await storage.load("auth-session"), saved);
+});
 it("short stale refresh token clears locally without calling the BFF", async () => {
   const storage = new Memory(), state = new AppState(); let calls = 0;
   await storage.save<AuthSession>("auth-session", { user: { id: "u", email: "test@example.com" }, accessToken: "fake", refreshToken: "short", expiresAt: 1 });

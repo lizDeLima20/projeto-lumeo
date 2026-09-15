@@ -58,11 +58,11 @@ export class CatalogExplorerView extends BaseView {
     action.addEventListener("click", (event) => { event.stopPropagation(); this.onOpen(book.bookId); });
     card.append(cover, info, action); return card;
   }
-  private isLocal(book: CatalogBookData): boolean { return this.state.books.some((item) => item.catalogBookId === book.bookId); }
+  private isLocal(book: CatalogBookData): boolean { return this.state.books.some((item) => item.catalogBookId === book.bookId && item.availability === "AVAILABLE"); }
   private appendCover(root: HTMLElement, book: CatalogBookData): void {
     const fallback = (): void => root.replaceChildren(this.createElement("span", "catalog-card__placeholder", "📖"));
     if (!book.coverUrl) { fallback(); return; }
-    const image = this.createElement("img", "") as HTMLImageElement; image.src = book.coverUrl; image.alt = this.t("ui.catalog.coverOf", { title: book.title }); image.loading = "lazy";
+    const image = this.createElement("img", "") as HTMLImageElement; image.src = book.coverUrl; image.alt = this.t("ui.catalog.coverOf", { title: book.title }); image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
     image.addEventListener("error", fallback, { once: true }); root.append(image);
   }
   private isUnclassified(book: CatalogBookData): boolean { return !book.genreId || book.genreId === "sem-genero" || /^sem gênero$/i.test(book.genreName.trim()); }

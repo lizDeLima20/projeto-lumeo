@@ -7,6 +7,7 @@ import { LicenseService } from "../services/LicenseService.js";
 import type { ApiResponse, AuthenticatedRequest } from "../types/http.js";
 import { RequestValidator } from "../validation/RequestValidator.js";
 import { CatalogApplicationService } from "../catalog/CatalogApplicationService.js";
+import type { PersistedGenre, PersistedLibraryBook, PersistedPreferences, UserPersistenceStore } from "../repositories/UserPersistenceRepository.js";
 
 export class ApiController {
   private readonly validator = new RequestValidator();
@@ -17,6 +18,7 @@ export class ApiController {
     private readonly licenses: LicenseService,
     private readonly profiles: ProfileStore,
     private readonly catalog?: CatalogApplicationService,
+    private readonly persistence?: UserPersistenceStore,
   ) {}
 
   public async handle(request: AuthenticatedRequest, response: ApiResponse, path: string): Promise<void> {
@@ -34,6 +36,26 @@ export class ApiController {
         await this.devices.assertActive(user.id, this.installationId(request));
         const license = await this.licenses.getForUser(user.id);
         return this.json(response, 200, { user, license: { status: license.status } });
+      }
+      if (request.method === "GET" && path === "/api/user-state") {
+        return this.json(response, 200, await this.requiredPersistence().getState(user.id));
+      }
+      if (request.method === "POST" && path === "/api/user-state/preferences") {
+        const body = await this.body(request);
+        await this.requiredPersistence().savePreferences(user.id, this.preferences(body.preferences));
+        return this.json(response, 200, { ok: true });
+      }
+      if (request.method === "POST" && path === "/api/user-state/library") {
+        const body = await this.body(request);
+        await this.requiredPersistence().saveBook(user.id, this.libraryBook(body.book));
+        return this.json(response, 200, { ok: true });
+      }
+      if (request.method === "POST" && path === "/api/user-state/library/delete") {
+        const body = await this.body(request);
+        const bookId = typeof body.bookId === "string" ? body.bookId.trim() : "";
+        if (!bookId || bookId.length > 160) throw new ApiError(400, "INVALID_LIBRARY_BOOK", "Livro inválido.");
+        await this.requiredPersistence().deleteBook(user.id, bookId);
+        return this.json(response, 200, { ok: true });
       }
       if (request.method === "GET" && path === "/api/device") {
         return this.json(response, 200, await this.devices.getState(user.id, this.installationId(request)));
@@ -159,6 +181,32 @@ export class ApiController {
   private requiredCatalog(): CatalogApplicationService {
     if (!this.catalog) throw new ApiError(503, "CATALOG_NOT_CONFIGURED", "O catálogo ainda não está configurado no servidor.");
     return this.catalog;
+  }
+  private requiredPersistence(): UserPersistenceStore {
+    if (!this.persistence) throw new ApiError(503, "USER_PERSISTENCE_NOT_CONFIGURED", "A persistência da conta ainda não está configurada.");
+    return this.persistence;
+  }
+  private preferences(value: unknown): PersistedPreferences {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new ApiError(400, "INVALID_PREFERENCES", "Preferências inválidas.");
+    const input = value as Record<string, unknown>;
+    const theme = input.theme === "dark" ? "dark" : input.theme === "light" ? "light" : null;
+    if (!theme || typeof input.onboardingCompleted !== "boolean" || !Array.isArray(input.genres) || input.genres.length > 80) throw new ApiError(400, "INVALID_PREFERENCES", "Preferências inválidas.");
+    const genres: PersistedGenre[] = input.genres.map((genre): PersistedGenre | null => {
+      if (!genre || typeof genre !== "object" || Array.isArray(genre)) return null;
+      const entry = genre as Record<string, unknown>; const id = typeof entry.id === "string" ? entry.id.trim() : ""; const name = typeof entry.name === "string" ? entry.name.trim() : "";
+      return id && id.length <= 100 && name && name.length <= 80 ? { id, name } : null;
+    }).filter((genre): genre is PersistedGenre => Boolean(genre));
+    if (genres.length !== input.genres.length) throw new ApiError(400, "INVALID_PREFERENCES", "Preferências inválidas.");
+    return { onboardingCompleted: input.onboardingCompleted, theme, genres };
+  }
+  private libraryBook(value: unknown): PersistedLibraryBook {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new ApiError(400, "INVALID_LIBRARY_BOOK", "Livro inválido.");
+    const input = value as Record<string, unknown>; const bookId = typeof input.bookId === "string" ? input.bookId.trim() : "";
+    const metadata = input.metadata;
+    if (!bookId || bookId.length > 160 || !metadata || typeof metadata !== "object" || Array.isArray(metadata)) throw new ApiError(400, "INVALID_LIBRARY_BOOK", "Livro inválido.");
+    const encoded = JSON.stringify(metadata);
+    if (Buffer.byteLength(encoded) > 12_000) throw new ApiError(413, "LIBRARY_METADATA_TOO_LARGE", "Metadados do livro excedem o limite.");
+    return { bookId, metadata: metadata as Record<string, unknown> };
   }
   private async assertCatalogLicense(userId: string): Promise<void> {
     const license = await this.licenses.getForUser(userId);

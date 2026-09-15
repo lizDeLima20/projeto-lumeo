@@ -26,16 +26,18 @@ export class AuthManager {
       await this.applySession(session);
     } catch (error) {
       if (error instanceof ApiError && error.code === "NETWORK_ERROR") {
-        this.api.setAccessToken(saved.accessToken);
-        this.state.currentUser = saved.user;
-        this.state.authStatus = "OFFLINE_AUTHENTICATED";
-        this.state.deviceStatus = "authorized";
-        this.state.licenseStatus = "offline_grace";
-        this.state.notify();
+        this.restoreOffline(saved);
         return;
       }
-      this.state.authStatus = "EXPIRED";
-      await this.clearSession();
+      // Only an authentication refusal proves that the persisted refresh token
+      // is unusable. A transient BFF/Supabase/server error must not log out a
+      // reader or erase the recoverable session from WebView storage.
+      if (error instanceof ApiError && (error.status === 400 || error.status === 401) && this.isRefreshRejection(error.code)) {
+        this.state.authStatus = "EXPIRED";
+        await this.clearSession();
+        return;
+      }
+      this.restoreOffline(saved);
     }
   }
 
@@ -76,5 +78,16 @@ export class AuthManager {
     this.state.licenseStatus = "unknown";
     await this.storage.remove(AuthManager.SESSION_KEY);
     this.state.notify();
+  }
+  private restoreOffline(saved: AuthSession): void {
+    this.api.setAccessToken(saved.accessToken);
+    this.state.currentUser = saved.user;
+    this.state.authStatus = "OFFLINE_AUTHENTICATED";
+    this.state.deviceStatus = "authorized";
+    this.state.licenseStatus = "offline_grace";
+    this.state.notify();
+  }
+  private isRefreshRejection(code: string): boolean {
+    return ["SESSION_EXPIRED", "AUTH_INVALID_CREDENTIALS", "AUTH_REQUIRED", "AUTH_REFRESH_INVALID", "INVALID_REFRESH_TOKEN", "INVALID_TOKEN", "INVALID"].includes(code);
   }
 }
