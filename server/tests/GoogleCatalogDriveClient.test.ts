@@ -30,7 +30,10 @@ describe("GoogleCatalogDriveClient", () => {
       assert.throws(() => new GoogleCatalogDriveClient("not-json-or-base64", "root-folder", 1024), { code: "CATALOG_SERVICE_ACCOUNT_JSON_INVALID" });
       const input = JSON.parse(messages[0] ?? "{}") as Record<string, unknown>;
       const validation = JSON.parse(messages.at(-1) ?? "{}") as Record<string, unknown>;
-      assert.deepEqual(input, { event: "CATALOG_SERVICE_ACCOUNT_INPUT", present: true, length: 18, format: "base64", firstCharType: "other", lastCharType: "other" });
+      assert.deepEqual(input, {
+        event: "CATALOG_SERVICE_ACCOUNT_INPUT", present: true, length: 18, format: "base64", firstCharType: "other", lastCharType: "other",
+        leadingWhitespace: false, bom: false, outerQuote: false, doubleEncoded: false, base64: true, unexpectedPrefix: false, unexpectedSuffix: false,
+      });
       assert.deepEqual(validation, { event: "CATALOG_SERVICE_ACCOUNT_VALIDATION", stage: "JSON.parse", outcome: "failed", reason: "base64_decode_failed" });
     } finally { console.info = original; }
   });
@@ -51,6 +54,31 @@ describe("GoogleCatalogDriveClient", () => {
         const validation = JSON.parse(messages.at(-1) ?? "{}") as Record<string, unknown>;
         assert.equal(validation.reason, test.reason);
       }
+    } finally { console.info = original; }
+  });
+
+  it("unwraps a copied environment assignment with spacing and outer quotes", () => {
+    const json = accountJson();
+    // Matches the production shape: an external `export NAME = '...'` wrapper
+    // starts with a non-JSON character and ends with a quote.
+    const copiedEnvironmentLine = ` \uFEFFexport GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON = '${json}'`;
+    const messages: string[] = [], original = console.info;
+    console.info = (message: unknown): void => { messages.push(String(message)); };
+    try {
+      assert.doesNotThrow(() => new GoogleCatalogDriveClient(copiedEnvironmentLine, "root-folder", 1024));
+      const input = JSON.parse(messages[0] ?? "{}") as Record<string, unknown>;
+      assert.equal(input.format, "json_object");
+      assert.equal(input.firstCharType, "other");
+      assert.equal(input.lastCharType, "quote");
+      assert.equal(input.leadingWhitespace, true);
+      assert.equal(input.bom, true);
+      assert.equal(input.outerQuote, true);
+      assert.equal(input.unexpectedPrefix, true);
+      assert.equal(input.unexpectedSuffix, false);
+      const validationStages = messages.slice(1).map((message) => JSON.parse(message) as Record<string, unknown>);
+      assert.ok(validationStages.some((event) => event.stage === "JSON.parse" && event.outcome === "ok"));
+      assert.ok(validationStages.some((event) => event.stage === "required_fields" && event.outcome === "ok"));
+      assert.ok(validationStages.some((event) => event.stage === "private_key_format" && event.outcome === "ok"));
     } finally { console.info = original; }
   });
 

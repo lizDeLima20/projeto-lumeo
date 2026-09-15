@@ -10,6 +10,16 @@ export interface CatalogDriveListing { books: readonly CatalogDriveFile[]; audit
 
 type CredentialInputFormat = "json_object" | "quoted_json" | "base64" | "unknown" | "empty";
 type CredentialParseReason = "invalid_json_syntax" | "unexpected_wrapping" | "base64_decode_failed" | "empty_value" | "unsupported_format";
+interface CredentialEnvelope {
+  value: string;
+  leadingWhitespace: boolean;
+  bom: boolean;
+  outerQuote: boolean;
+  doubleEncoded: boolean;
+  base64: boolean;
+  unexpectedPrefix: boolean;
+  unexpectedSuffix: boolean;
+}
 
 /** Deliberately carries only a stable, safe category: never parser output or credential content. */
 class CredentialInputError extends Error {
@@ -81,7 +91,8 @@ export class GoogleCatalogDriveClient {
   private encode(value: object): string { return Buffer.from(JSON.stringify(value)).toString("base64url"); }
   private log(event: string, details: Record<string, unknown>): void { console.info(JSON.stringify({ event, ...details })); }
   private static parseCredentials(raw: string): ServiceAccount {
-    const source = raw.replace(/^\uFEFF/, "").trim();
+    const envelope = GoogleCatalogDriveClient.normalizeEnvelope(raw);
+    const source = envelope.value;
     if (!source) {
       GoogleCatalogDriveClient.logValidationFailure("JSON.parse", "empty_value");
       throw new ApiError(503, "CATALOG_SERVICE_ACCOUNT_MISSING", "A conta de serviço do catálogo não está configurada.");
@@ -115,20 +126,16 @@ export class GoogleCatalogDriveClient {
 
   /** Vercel may preserve JSON, stringify it once more, or provide base64 JSON. */
   private static decodeEnvironmentValue(source: string): string {
-    const withoutAssignment = source.startsWith("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=")
-      ? source.slice("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=".length).trim() : source;
-    if ((withoutAssignment.startsWith("'") && !withoutAssignment.endsWith("'"))
-      || (!withoutAssignment.startsWith("'") && withoutAssignment.endsWith("'"))) {
+    if ((source.startsWith("'") && !source.endsWith("'"))
+      || (!source.startsWith("'") && source.endsWith("'"))) {
       throw new CredentialInputError("unexpected_wrapping");
     }
-    const unquoted = withoutAssignment.startsWith("'") && withoutAssignment.endsWith("'")
-      ? withoutAssignment.slice(1, -1).trim() : withoutAssignment;
-    const format = GoogleCatalogDriveClient.inputFormat(unquoted);
+    const format = GoogleCatalogDriveClient.inputFormat(source);
     if (format === "empty") throw new CredentialInputError("empty_value");
-    if (format === "json_object" || format === "quoted_json") return GoogleCatalogDriveClient.escapeLiteralPrivateKeyNewlines(unquoted);
+    if (format === "json_object" || format === "quoted_json") return GoogleCatalogDriveClient.escapeLiteralPrivateKeyNewlines(source);
     if (format !== "base64") throw new CredentialInputError("unsupported_format");
     try {
-      const decoded = Buffer.from(unquoted, "base64").toString("utf8");
+      const decoded = Buffer.from(source, "base64").toString("utf8");
       if (!decoded.trim() || !["{", "\""].includes(decoded.trim().charAt(0))) throw new CredentialInputError("base64_decode_failed");
       return GoogleCatalogDriveClient.escapeLiteralPrivateKeyNewlines(decoded);
     } catch (error) {
@@ -164,17 +171,61 @@ export class GoogleCatalogDriveClient {
   }
 
   private static describeEnvironmentValue(raw: string): Record<string, unknown> {
-    const source = raw.replace(/^\uFEFF/, "").trim();
-    const value = source.startsWith("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=")
-      ? source.slice("GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON=".length).trim() : source;
+    const envelope = GoogleCatalogDriveClient.normalizeEnvelope(raw);
+    const source = GoogleCatalogDriveClient.trimLeadingUnicodeMarkers(raw).trim();
+    const value = envelope.value;
     return {
-      present: Boolean(value),
-      length: value.length,
+      present: Boolean(source),
+      length: source.length,
       format: GoogleCatalogDriveClient.inputFormat(value),
-      firstCharType: GoogleCatalogDriveClient.characterType(value.charAt(0), true),
-      lastCharType: GoogleCatalogDriveClient.characterType(value.charAt(value.length - 1), false),
+      firstCharType: GoogleCatalogDriveClient.characterType(source.charAt(0), true),
+      lastCharType: GoogleCatalogDriveClient.characterType(source.charAt(source.length - 1), false),
+      leadingWhitespace: envelope.leadingWhitespace,
+      bom: envelope.bom,
+      outerQuote: envelope.outerQuote,
+      doubleEncoded: envelope.doubleEncoded,
+      base64: envelope.base64,
+      unexpectedPrefix: envelope.unexpectedPrefix,
+      unexpectedSuffix: envelope.unexpectedSuffix,
     };
   }
+
+  /**
+   * Vercel expects a value, while terminals and copy/paste workflows often
+   * include `export NAME = 'value'`. Remove only that outer transport layer;
+   * the JSON payload and private key are never rewritten here.
+   */
+  private static normalizeEnvelope(raw: string): CredentialEnvelope {
+    const leadingWhitespace = /^\s/u.test(raw);
+    // String.trimStart() considers U+FEFF whitespace, so use only ordinary
+    // transport whitespace here in order to retain a safe BOM diagnostic.
+    const beforeMarker = raw.replace(/^[ \t\r\n\f\v]+/u, "");
+    const bom = /^[\uFEFF\u200B\u2060]/u.test(beforeMarker);
+    let value = GoogleCatalogDriveClient.trimLeadingUnicodeMarkers(beforeMarker).trim();
+    const assignment = /^(?:export\s+)?GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON\s*=\s*/u.exec(value);
+    const unexpectedPrefix = Boolean(assignment);
+    if (assignment) value = value.slice(assignment[0].length).trim();
+
+    const startsSingleQuote = value.startsWith("'");
+    const endsSingleQuote = value.endsWith("'");
+    const outerQuote = startsSingleQuote && endsSingleQuote && value.length >= 2;
+    const unexpectedSuffix = startsSingleQuote !== endsSingleQuote;
+    if (outerQuote) value = value.slice(1, -1).trim();
+
+    const format = GoogleCatalogDriveClient.inputFormat(value);
+    return {
+      value,
+      leadingWhitespace,
+      bom,
+      outerQuote,
+      doubleEncoded: format === "quoted_json",
+      base64: format === "base64",
+      unexpectedPrefix,
+      unexpectedSuffix,
+    };
+  }
+
+  private static trimLeadingUnicodeMarkers(value: string): string { return value.replace(/^[\uFEFF\u200B\u2060]+/u, ""); }
 
   private static inputFormat(value: string): CredentialInputFormat {
     const source = value.trim();
