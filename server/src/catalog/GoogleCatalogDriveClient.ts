@@ -32,6 +32,9 @@ export class GoogleCatalogDriveClient {
   private folderAccessLogged = false;
   private readonly credentials: ServiceAccount;
   public constructor(rawCredentials: string, private readonly folderId: string, private readonly maxFileBytes: number, private readonly fetcher: typeof fetch = fetch) {
+    // This must precede every normalizer/parser. It reports positional data
+    // only, allowing production diagnosis without exposing a credential byte.
+    this.log("CATALOG_SERVICE_ACCOUNT_SHAPE", GoogleCatalogDriveClient.describeRawShape(rawCredentials));
     this.log("CATALOG_SERVICE_ACCOUNT_INPUT", GoogleCatalogDriveClient.describeEnvironmentValue(rawCredentials));
     this.credentials = GoogleCatalogDriveClient.parseCredentials(rawCredentials);
     if (!folderId.trim() || !/^[A-Za-z0-9_-]{10,}$/.test(folderId)) throw new ApiError(503, "CATALOG_FOLDER_INVALID", "A pasta do catálogo não está configurada corretamente.");
@@ -187,6 +190,42 @@ export class GoogleCatalogDriveClient {
       base64: envelope.base64,
       unexpectedPrefix: envelope.unexpectedPrefix,
       unexpectedSuffix: envelope.unexpectedSuffix,
+    };
+  }
+
+  /** Positional-only raw-input diagnostics. No character or substring is ever logged. */
+  private static describeRawShape(raw: string): Record<string, unknown> {
+    const trimmed = raw.trim();
+    const leadingWhitespaceCount = (raw.match(/^\s*/u)?.[0].length) ?? 0;
+    const trailingWhitespaceCount = (raw.match(/\s*$/u)?.[0].length) ?? 0;
+    const firstOpeningBraceIndex = raw.indexOf("{");
+    const lastClosingBraceIndex = raw.lastIndexOf("}");
+    const hasObject = firstOpeningBraceIndex >= 0 && lastClosingBraceIndex >= firstOpeningBraceIndex;
+    const first = (index: number): number | null => index >= 0 && index < raw.length ? raw.charCodeAt(index) : null;
+    const meaningfulEnd = raw.length - trailingWhitespaceCount - 1;
+    return {
+      length: raw.length,
+      trimmedLength: trimmed.length,
+      leadingWhitespaceCount,
+      trailingWhitespaceCount,
+      hasBom: /^[\s]*[\uFEFF]/u.test(raw),
+      firstCharCode: first(0),
+      secondCharCode: first(1),
+      thirdCharCode: first(2),
+      lastCharCode: first(raw.length - 1),
+      secondLastCharCode: first(raw.length - 2),
+      startsWithBrace: trimmed.startsWith("{"),
+      endsWithBrace: trimmed.endsWith("}"),
+      startsWithQuote: trimmed.startsWith("\"") || trimmed.startsWith("'"),
+      endsWithQuote: trimmed.endsWith("\"") || trimmed.endsWith("'"),
+      startsWithBase64JsonSignature: /^(?:eyJ|ew)/u.test(trimmed),
+      containsJsonObjectAfterPrefix: hasObject && firstOpeningBraceIndex > leadingWhitespaceCount,
+      jsonObjectStartIndex: hasObject ? firstOpeningBraceIndex : null,
+      containsJsonObjectBeforeSuffix: hasObject && lastClosingBraceIndex < meaningfulEnd,
+      firstOpeningBraceIndex: hasObject ? firstOpeningBraceIndex : null,
+      lastClosingBraceIndex: hasObject ? lastClosingBraceIndex : null,
+      charactersBeforeOpeningBrace: hasObject ? firstOpeningBraceIndex : null,
+      charactersAfterClosingBrace: hasObject ? raw.length - lastClosingBraceIndex - 1 : null,
     };
   }
 

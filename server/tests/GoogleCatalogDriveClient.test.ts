@@ -14,6 +14,7 @@ describe("GoogleCatalogDriveClient", () => {
     const accepts = (environmentValue: string): void => assert.doesNotThrow(() => new GoogleCatalogDriveClient(environmentValue, "root-folder", 1024));
 
     accepts(json);
+    accepts(`\uFEFF${json}`);
     accepts(`\n  ${json}\n`);
     accepts(JSON.stringify(json));
     accepts(Buffer.from(json).toString("base64"));
@@ -28,7 +29,13 @@ describe("GoogleCatalogDriveClient", () => {
     console.info = (message: unknown): void => { messages.push(String(message)); };
     try {
       assert.throws(() => new GoogleCatalogDriveClient("not-json-or-base64", "root-folder", 1024), { code: "CATALOG_SERVICE_ACCOUNT_JSON_INVALID" });
-      const input = JSON.parse(messages[0] ?? "{}") as Record<string, unknown>;
+      const shape = JSON.parse(messages[0] ?? "{}") as Record<string, unknown>;
+      const input = JSON.parse(messages[1] ?? "{}") as Record<string, unknown>;
+      assert.equal(shape.event, "CATALOG_SERVICE_ACCOUNT_SHAPE");
+      assert.equal(shape.length, 18);
+      assert.equal(shape.firstCharCode, 110);
+      assert.equal(shape.lastCharCode, 52);
+      assert.equal("private_key" in shape, false);
       const validation = JSON.parse(messages.at(-1) ?? "{}") as Record<string, unknown>;
       assert.deepEqual(input, {
         event: "CATALOG_SERVICE_ACCOUNT_INPUT", present: true, length: 18, format: "base64", firstCharType: "other", lastCharType: "other",
@@ -66,7 +73,7 @@ describe("GoogleCatalogDriveClient", () => {
     console.info = (message: unknown): void => { messages.push(String(message)); };
     try {
       assert.doesNotThrow(() => new GoogleCatalogDriveClient(copiedEnvironmentLine, "root-folder", 1024));
-      const input = JSON.parse(messages[0] ?? "{}") as Record<string, unknown>;
+      const input = JSON.parse(messages.find((message) => JSON.parse(message).event === "CATALOG_SERVICE_ACCOUNT_INPUT") ?? "{}") as Record<string, unknown>;
       assert.equal(input.format, "json_object");
       assert.equal(input.firstCharType, "other");
       assert.equal(input.lastCharType, "quote");
@@ -75,10 +82,42 @@ describe("GoogleCatalogDriveClient", () => {
       assert.equal(input.outerQuote, true);
       assert.equal(input.unexpectedPrefix, true);
       assert.equal(input.unexpectedSuffix, false);
-      const validationStages = messages.slice(1).map((message) => JSON.parse(message) as Record<string, unknown>);
+      const validationStages = messages.map((message) => JSON.parse(message) as Record<string, unknown>);
       assert.ok(validationStages.some((event) => event.stage === "JSON.parse" && event.outcome === "ok"));
       assert.ok(validationStages.some((event) => event.stage === "required_fields" && event.outcome === "ok"));
       assert.ok(validationStages.some((event) => event.stage === "private_key_format" && event.outcome === "ok"));
+    } finally { console.info = original; }
+  });
+
+  it("reports positional shape data for every supported and wrapped transport form", () => {
+    const json = accountJson();
+    const cases: Array<{ name: string; value: string; succeeds: boolean }> = [
+      { name: "BOM plus JSON", value: `\uFEFF${json}`, succeeds: true },
+      { name: "whitespace plus JSON", value: ` \r\n${json}\r\n`, succeeds: true },
+      { name: "prefix plus JSON", value: `prefix:${json}`, succeeds: false },
+      { name: "JSON plus suffix", value: `${json}:suffix`, succeeds: false },
+      { name: "prefix plus JSON plus suffix", value: `prefix:${json}:suffix`, succeeds: false },
+      { name: "outer quotes", value: `'${json}'`, succeeds: true },
+      { name: "double encoded", value: JSON.stringify(json), succeeds: true },
+      { name: "base64", value: Buffer.from(json).toString("base64"), succeeds: true },
+      { name: "literal private key newlines", value: json, succeeds: true },
+      { name: "physical private key newlines", value: json.replace(/\\n/g, "\n"), succeeds: true },
+    ];
+    const original = console.info;
+    try {
+      for (const test of cases) {
+        const messages: string[] = [];
+        console.info = (message: unknown): void => { messages.push(String(message)); };
+        if (test.succeeds) assert.doesNotThrow(() => new GoogleCatalogDriveClient(test.value, "root-folder", 1024), test.name);
+        else assert.throws(() => new GoogleCatalogDriveClient(test.value, "root-folder", 1024), test.name);
+        const shape = JSON.parse(messages[0] ?? "{}") as Record<string, unknown>;
+        assert.equal(shape.event, "CATALOG_SERVICE_ACCOUNT_SHAPE", test.name);
+        assert.equal(typeof shape.length, "number", test.name);
+        assert.ok("firstOpeningBraceIndex" in shape, test.name);
+        assert.ok("charactersAfterClosingBrace" in shape, test.name);
+        assert.equal("client_email" in shape, false, test.name);
+        assert.equal("private_key" in shape, false, test.name);
+      }
     } finally { console.info = original; }
   });
 
