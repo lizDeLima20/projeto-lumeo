@@ -9,7 +9,7 @@ const styles = readFileSync(new URL("../src/styles/components.css", import.meta.
 describe("MobileNavigationDrawer", () => {
   it("drawerHasOwnBackground", () => {
     assert.equal(MobileNavigationDrawer.hasOwnBackground, true);
-    assert.match(styles, /\.navigation-drawer[^}]*background:\s*var\(--color-surface\)/s);
+    assert.match(styles, /\.navigation-drawer[^}]*background:\s*linear-gradient/s);
   });
   it("drawerOverlayOpens", () => {
     assert.equal(MobileNavigationDrawer.hasOverlay, true);
@@ -18,4 +18,9 @@ describe("MobileNavigationDrawer", () => {
   it("drawerBackdropCloses", () => assert.match(source, /overlay\.addEventListener\("click", \(\) => this\.close\(\)\)/));
   it("drawerEscapeCloses", () => assert.match(source, /event\.key === "Escape"[\s\S]*this\.close\(\)/));
   it("drawerRestoresFocus", () => assert.match(source, /this\.returnFocusTo\?\.focus\(\)/));
+  it("keeps privacy separated in the drawer footer", () => {
+    assert.match(source, /className = "drawer-footer"/);
+    assert.match(source, /this\.onNavigate\("privacy"\)/);
+    assert.match(styles, /\.drawer-footer[^}]*margin-top:\s*auto/s);
+  });
 });

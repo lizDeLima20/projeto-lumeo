@@ -6,7 +6,7 @@
 .page-shell { width: min(100% - 2rem, 72rem); margin: 0 auto; padding: 3rem 0 5rem; }
 .page-heading { display: grid; gap: var(--spacing-xs); margin-bottom: 2.5rem; }
 @media (min-width: 48rem) { .header__inner { padding-inline: var(--spacing-lg); } .page-shell { padding-top: 4.5rem; } }
-@media (min-width: 64rem) { .header__nav--desktop { display: flex; } .hamburger-button, .mobile-navigation { display: none; } }
+@media (min-width: 64rem) { .header__nav--desktop { display: flex; } }
 .brand__identity { display:grid;line-height:1; }.brand__tagline { margin-top:.35rem;color:var(--color-muted);font-size:.42rem;font-weight:650;letter-spacing:.24em;text-transform:uppercase; }
 :root[data-theme="dark"] #app-header { border-bottom-color:rgba(205,139,67,.42);background:linear-gradient(135deg,#0d0c10,#171620);box-shadow:0 .35rem 0 #603519,0 .55rem .8rem rgba(0,0,0,.28); }
 :root[data-theme="dark"] .brand { color:#f7e4c0; }:root[data-theme="dark"] .brand__tagline { color:#b8b1bd; }

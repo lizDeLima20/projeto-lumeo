@@ -343,10 +343,7 @@ export class App {
       this.userName(), () => void this.logout());
     this.headerView.mount(this.headerRoot);
     const authenticated = this.isAuthenticated() && this.state.deviceStatus === "authorized";
-    const legal = document.createElement("div"); legal.className = `app-legal${authenticated ? " app-legal--with-navigation" : ""}`;
-    const privacy = document.createElement("a"); privacy.className = "app-legal__link"; privacy.href = "/privacy"; privacy.textContent = "Política de Privacidade";
-    privacy.addEventListener("click", (event) => { event.preventDefault(); this.router.navigate("privacy"); }); legal.append(privacy);
-    this.footerRoot.replaceChildren(...(authenticated ? [new MobileBottomNavigation((route)=>this.router.navigate(route)).render()] : []), legal);
+    this.footerRoot.replaceChildren(...(authenticated ? [new MobileBottomNavigation((route)=>this.router.navigate(route)).render()] : []));
     I18nManager.shared.localizeTree(this.footerRoot);
   }
 

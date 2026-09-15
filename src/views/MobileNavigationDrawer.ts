@@ -29,7 +29,11 @@ export class MobileNavigationDrawer {
     const wish = document.createElement("span"); wish.textContent = this.i18n.t("ui.greeting.goodReading"); greeting.append(hello, wish); profile.append(avatar, greeting);
     const nav = document.createElement("nav"); nav.className = "drawer-links"; nav.setAttribute("aria-label", this.i18n.t("ui.navigation.mobile"));
     this.items.forEach((item) => nav.append(this.navigationButton(item)));
-    drawer.append(profile, nav); root.append(overlay, drawer); this.root = root; this.drawer = drawer; return root;
+    const footer = document.createElement("footer"); footer.className = "drawer-footer";
+    const privacy = document.createElement("button"); privacy.type = "button"; privacy.className = "drawer-privacy";
+    privacy.textContent = this.i18n.t("ui.navigation.privacy");
+    privacy.addEventListener("click", () => { this.close(false); this.onNavigate("privacy"); }); footer.append(privacy);
+    drawer.append(profile, nav, footer); root.append(overlay, drawer); this.root = root; this.drawer = drawer; return root;
   }
 
   public mount(container: HTMLElement): void { this.unmount(); container.append(this.render()); }
