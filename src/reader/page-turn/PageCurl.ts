@@ -48,6 +48,10 @@ export class PageCurl {
     inner.style.width=`${this.width}px`;
     if(this.padding)inner.style.padding=this.padding;
     source.forEach(child=>inner.append(child.cloneNode(true)));
+    /* The back face is its own plane, turned away from the reader. Rotating only its
+       content left the opaque back paper facing forward, over the front: the leaf went
+       blank (or showed the mirrored verso) the moment a turn began. */
+    if(face==="back")band.style.transform="rotateY(180deg)";
     band.append(inner);return{band,inner};
   }
   private element(className:string):HTMLElement{const node=document.createElement("div");node.className=className;return node;}
@@ -64,16 +68,22 @@ export class PageCurl {
       const nodes=this.strips[slot]!,strip=plan[direction===1?slot:count-1-slot]!;
       const{left,origin,shiftX,angle,shadeLeft,shadeRight}=PageCurl.place(strip,slot,count,this.width,direction);
       const root=nodes.root.style;
-      root.left=`${left}px`;root.width=`${this.width/count+strip.bleed}px`;root.transformOrigin=origin;
+      const stripWidth=this.width/count+strip.bleed;
+      root.left=`${left}px`;root.width=`${stripWidth}px`;root.transformOrigin=origin;
       root.transform=`translate3d(${shiftX}px,${strip.y}px,${strip.z}px) rotateY(${angle}deg)`;
       nodes.root.style.setProperty("--strip-shade-a",shadeLeft.toFixed(3));
       nodes.root.style.setProperty("--strip-shade-b",shadeRight.toFixed(3));
       nodes.root.style.setProperty("--strip-ink",strip.ink.toFixed(3));
+      /* Each strip is flattened by its own clipping, so backface culling of the faces
+       * inside it is not dependable: past 90deg the front's type bled through the verso.
+       * The face turned away is hidden explicitly; both stay laid out and decoded. */
+      nodes.root.classList.toggle("page-turn-strip--back",strip.showsBack);
       /* The faces are real planes. The back rotates with the paper itself; using
        * display:none to swap cloned text at 90deg was what made the sheet look like a
-       * transparent card on some desktop compositors. */
+       * transparent card on some desktop compositors. Its band is already turned about
+       * the strip's centre, so the content is offset to show the mirrored slice x -> W-x-left. */
       nodes.front.style.transform=`translateX(${-left}px)`;
-      nodes.back.style.transform=`translateX(${-left}px) rotateY(180deg)`;
+      nodes.back.style.transform=`translateX(${stripWidth-this.width+left}px)`;
     }
     return plan;
   }

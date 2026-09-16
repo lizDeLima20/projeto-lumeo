@@ -75,6 +75,9 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
    property that would force transform-style back to flat and collapse the arc into a
    plane. Clipping lives on the strips, which are each planar anyway. */
 .page-turn-active,.open-book-page.page-turn-active,.reflow-sheet.page-turn-active{position:relative;z-index:12;overflow:visible;user-select:none;backface-visibility:visible;transform-style:preserve-3d;touch-action:none}
+/* A single-page sheet keeps its full box while it turns; relative positioning shrank the
+   cover leaf to its image height at the first frame. */
+.reflow-sheet.page-turn-active{position:absolute}
 .page-turn-curled,.open-book-page.page-turn-curled,.reflow-sheet.page-turn-curled{background-color:transparent;background-image:none;box-shadow:none}
 .page-turn-curled>*:not(.page-turn-curl){visibility:hidden}
 .page-turn-curled::after,.page-turn-curled::before{display:none}
@@ -83,7 +86,8 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 /* Shading is baked into the strip's own opaque paper rather than laid over it. As a
    translucent overlay it was drawn twice wherever two strips overlap, and every seam
    came out as a dark hairline - the banding that read as a roll lying on the page. */
-.page-turn-strip__front,.page-turn-strip__back{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;transform-style:preserve-3d;background-color:var(--reader-paper-lit);background-image:linear-gradient(90deg,rgba(22,15,7,var(--strip-shade-a,0)),rgba(22,15,7,var(--strip-shade-b,0)))}
+.page-turn-strip__front,.page-turn-strip__back{position:absolute;inset:0;overflow:hidden;backface-visibility:visible;transform-style:preserve-3d;background-color:var(--reader-paper-lit);background-image:linear-gradient(90deg,rgba(22,15,7,var(--strip-shade-a,0)),rgba(22,15,7,var(--strip-shade-b,0)))}
+.page-turn-strip--back>.page-turn-strip__front,.page-turn-strip:not(.page-turn-strip--back)>.page-turn-strip__back{visibility:hidden}
 .page-turn-strip__inner{position:absolute;top:0;bottom:0;left:0;opacity:var(--strip-ink,1)}
 /* The crease darkening is the geometry shading itself - each strip takes the lamp in
    proportion to how squarely it faces the reader - not a band painted across the page. */
@@ -246,6 +250,9 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
     z-index:40!important;overflow:visible!important;isolation:auto!important;contain:none!important;
     transform-style:preserve-3d!important;
   }
+  /* Once the strips carry the leaf, its own box paints nothing: the desktop paper rule
+     above is !important and left a white sheet over the page being uncovered. */
+  .open-book-page.page-turn-curled{background:transparent!important;box-shadow:none!important}
   .open-book-page.page-turn-active>.page-turn-curl{
     z-index:61!important;overflow:visible!important;transform-style:preserve-3d!important;
   }

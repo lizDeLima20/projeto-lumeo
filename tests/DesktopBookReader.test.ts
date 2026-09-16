@@ -25,6 +25,32 @@ describe("OpenBookLayout",()=>{
   });
 });
 
+describe("pré-renderização e capa do livro fechado",()=>{
+  const layout=readFileSync("src/reader/desktop/OpenBookLayout.ts","utf8"),reader=readFileSync("src/views/ReaderView.ts","utf8"),css=readFileSync("src/styles/reader.css","utf8");
+  it("a página 1 ao lado da capa aberta já tem verso e a página que revela",()=>{
+    assert.match(layout,/first\.append\(this\.verso\(neighbours\.versoAfter,"right"\)\)/);
+    assert.match(layout,/book\.append\(this\.under\(neighbours\.underAfter,"right"\),back,first\)/);
+    assert.match(reader,/versoAfter:this\.reflow\.pageAt\(3\),underAfter:this\.reflow\.pageAt\(4\)/);
+  });
+  it("atrás da página 1 fica o forro da capa, nunca a arte da capa",()=>{
+    assert.match(layout,/if\(page\?\.cover\)\{const lining=this\.hardCoverInside\("left"\)/);
+  });
+  it("posições físicas: capa fechada, capa aberta e spreads que continuam a virada",()=>{
+    // total+1: the lining takes a place of its own, so page n sits at position n+1
+    const navigation=new OpenBookNavigationController(10+1);
+    assert.equal(navigation.next(1),2);assert.equal(navigation.next(2),4);assert.equal(navigation.next(3),4);
+    assert.equal(navigation.spreadStart(4),4);assert.equal(navigation.previous(4),2);assert.equal(navigation.previous(2),1);
+    assert.match(reader,/private desktopPosition\(\):number\{const page=this\.reflow\?\.currentPageNumber\?\?1;return page===1\?\(this\.desktopState\.isClosed\?1:2\):page\+1;\}/);
+  });
+  it("progresso só da capa ou da primeira página abre o livro fechado",()=>{
+    assert.match(reader,/if\(this\.reflow\.currentPageNumber<=2&&this\.reflow\.pageAt\(1\)\?\.cover\)\{this\.reflow\.goTo\(1\);this\.desktopState\.restore\(0\);\}/);
+  });
+  it("a folha curvada não pinta papel branco sobre a página revelada",()=>{
+    assert.match(css,/\.open-book-page\.page-turn-curled\{background:transparent!important;box-shadow:none!important\}/);
+    assert.match(css,/\.reflow-sheet\.page-turn-active\{position:absolute\}/);
+  });
+});
+
 describe("camadas da folha desktop",()=>{
   const css=readFileSync("src/styles/reader.css","utf8");
   it("a folha em movimento cruza por cima do lado de destino sem ser recortada",()=>{

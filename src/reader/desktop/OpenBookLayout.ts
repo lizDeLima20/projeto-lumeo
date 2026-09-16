@@ -13,7 +13,10 @@ export class OpenBookLayout {
         const back=this.hardCoverInside("left");
         const first=new BookPageView(afterCover,"right",this.paragraph).render();
         first.classList.add("open-book-page--right");
-        book.append(back,first);
+        /* Page 1 is a leaf like any other: its back and the page it uncovers are built
+         * with it, so turning it never opens onto an empty sheet. */
+        first.append(this.verso(neighbours.versoAfter,"right"));
+        book.append(this.under(neighbours.underAfter,"right"),back,first);
         return book;
       }
       /* The first real page is prepared under the cover for the physical turn, but is
@@ -63,6 +66,8 @@ export class OpenBookLayout {
    *  page made it the first match for the querySelector that picks the leaf to turn,
    *  so the turn animated the hidden page instead of the visible one. */
   private under(page:ReaderPage|null,side:"left"|"right"):HTMLElement{
+    /* Behind page 1 lies the cover's lining, never the cover artwork. */
+    if(page?.cover){const lining=this.hardCoverInside("left");lining.className=`open-book-page open-book-page--under-${side} open-book-page--cover-back`;return lining;}
     const article=new BookPageView(page,side,this.paragraph).render();
     article.classList.replace(`open-book-page--${side}`,`open-book-page--under-${side}`);
     article.setAttribute("aria-hidden","true");

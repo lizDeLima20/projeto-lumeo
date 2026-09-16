@@ -61,9 +61,13 @@ describe("PageCurlGeometry",()=>{
   });
   it("a folha tem frente e verso físicos, nunca faces alternadas por display",()=>{
     const css=readFileSync("src/styles/reader.css","utf8"),source=readFileSync("src/reader/page-turn/PageCurl.ts","utf8");
-    assert.match(css,/\.page-turn-strip__front,\.page-turn-strip__back\{[^}]*backface-visibility:hidden/);
+    /* Each strip clips, which flattens it: backface culling of the faces inside is
+       relative to the strip, so it hid the real verso and let the front bleed through.
+       The face turned away is chosen by the geometry instead. */
+    assert.match(css,/\.page-turn-strip--back>\.page-turn-strip__front,\.page-turn-strip:not\(\.page-turn-strip--back\)>\.page-turn-strip__back\{visibility:hidden\}/);
+    assert.match(source,/classList\.toggle\("page-turn-strip--back",strip\.showsBack\)/);
     assert.equal(css.includes(".page-turn-strip[data-face="),false);
-    assert.match(source,/rotateY\(180deg\)/);
+    assert.match(source,/if\(face==="back"\)band\.style\.transform="rotateY\(180deg\)"/);
     assert.equal(source.includes("dataset.face"),false);
   });
 });

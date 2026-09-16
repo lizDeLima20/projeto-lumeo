@@ -45,7 +45,10 @@ export class DesktopReaderStateMachine {
     return true;
   }
 
+  /** Only a drag settles. The closed cover's own turn never left CLOSED, and overwriting
+   *  it here made beginOpening() refuse the commit: the cover always fell back shut. */
   public beginSettling(direction: 1 | -1): void {
+    if (this.value !== "DRAGGING_NEXT" && this.value !== "DRAGGING_PREVIOUS") return;
     this.value = direction === 1 ? "SETTLING_NEXT" : "SETTLING_PREVIOUS";
   }
 

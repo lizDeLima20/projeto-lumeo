@@ -17,6 +17,18 @@ describe("DesktopReaderStateMachine", () => {
     assert.equal(state.isClosed, false);
   });
 
+  it("a virada da capa fechada ainda pode abrir o livro", () => {
+    const state = new DesktopReaderStateMachine();
+    state.restore(0);
+    state.beginDrag(1);
+    state.beginSettling(1);
+    assert.equal(state.state, "CLOSED");
+    assert.equal(state.beginOpening(), true);
+    state.opened();
+    state.settle();
+    assert.equal(state.state, "OPEN");
+  });
+
   it("libera o estado depois de cancelamento, blur ou perda de captura", () => {
     const state = new DesktopReaderStateMachine();
     state.restore(42);
