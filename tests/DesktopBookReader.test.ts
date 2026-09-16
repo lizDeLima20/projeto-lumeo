@@ -18,4 +18,22 @@ describe("OpenBookLayout",()=>{
     const replacements=source.match(/classList\.replace\(/g)??[];
     assert.equal(replacements.length,2,"verso e under precisam trocar a classe, nao acrescentar");
   });
+  it("a capa fechada não usa conteúdo real como verso",()=>{
+    assert.match(source,/leaf\.append\(this\.coverVerso\(cover\)\)/);
+    assert.match(source,/private coverVerso\(cover:ReaderPage\)/);
+  });
+});
+
+describe("camadas da folha desktop",()=>{
+  const css=readFileSync("src/styles/reader.css","utf8");
+  it("a folha em movimento cruza por cima do lado de destino sem ser recortada",()=>{
+    const start=css.lastIndexOf(".open-book-page.page-turn-active,.open-book-layout--cover");
+    const rule=css.slice(start,css.indexOf("}",start));
+    assert.match(rule,/z-index:40!important/);
+    assert.match(rule,/overflow:visible!important/);
+  });
+  it("a capa fechada ocupa a página direita da geometria final",()=>{
+    assert.match(css,/\.open-book-layout--closed \.open-book-page--cover\{[\s\S]*grid-column:2!important/);
+    assert.match(css,/\.open-book-layout--cover,\.open-book-layout--closed,\.open-book-layout--open-cover\{[\s\S]*width:calc\(var\(--desktop-page-width\) \* 2\)!important/);
+  });
 });

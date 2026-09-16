@@ -198,4 +198,52 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
   .open-book-layout,.open-book-page{cursor:grab}.page-turn-active{cursor:grabbing!important}
   .page-turn-active>.page-turn-verso{background-color:var(--reader-paper-lit)!important;background-image:linear-gradient(90deg,rgba(37,20,8,.24),transparent 36%,rgba(255,255,255,.09))!important;backface-visibility:visible}
 }
+
+/* Desktop physical-book scene.  This deliberately sits after the historical reader
+   styles above: the cover uses the final spread's geometry in both states, so opening
+   rotates around the fixed centre spine instead of recentering the whole book. */
+@media (min-width:64rem){
+  .desktop-reader-book-slot,.desktop-book-reader--closed .desktop-reader-book-slot{
+    grid-column:1 / -1!important;padding-left:0!important;place-items:center!important;
+  }
+  .open-book-layout--cover,.open-book-layout--closed,.open-book-layout--open-cover{
+    grid-template-columns:var(--desktop-page-width) var(--desktop-page-width)!important;
+    width:calc(var(--desktop-page-width) * 2)!important;
+    height:var(--desktop-page-height)!important;
+    margin:0!important;
+    transform:rotateX(.45deg)!important;
+    transform-style:preserve-3d!important;
+    overflow:visible!important;
+  }
+  .open-book-layout--cover::before,.open-book-layout--cover::after{display:none!important}
+  .open-book-layout--closed .open-book-page--cover{
+    position:relative!important;inset:auto!important;grid-column:2!important;grid-row:1!important;
+    z-index:3!important;
+  }
+  .open-book-page--under-cover{
+    position:relative!important;inset:auto!important;display:block!important;grid-column:2!important;grid-row:1!important;
+    z-index:1!important;visibility:hidden!important;
+  }
+  .open-book-layout--closed:has(.page-turn--next) .open-book-page--under-cover{visibility:visible!important}
+  .open-book-layout--open-cover .open-book-page--cover-back{
+    grid-column:1!important;grid-row:1!important;z-index:2!important;background:var(--reader-paper-lit)!important;
+  }
+  .open-book-page--cover-back .reader-cover-page,.open-book-page--cover-back .reader-cover-page img{
+    filter:none!important;
+  }
+  /* A moving leaf crosses the gutter over both static pages.  It must not inherit the
+     old desktop clipping rule, otherwise the right leaf disappears underneath left. */
+  .open-book-page.page-turn-active,.open-book-layout--cover .open-book-page.page-turn-active{
+    z-index:40!important;overflow:visible!important;isolation:auto!important;contain:none!important;
+    transform-style:preserve-3d!important;
+  }
+  .open-book-page.page-turn-active>.page-turn-curl{
+    z-index:61!important;overflow:visible!important;transform-style:preserve-3d!important;
+  }
+  .open-book-layout:has(.page-turn--next) .open-book-page--left,
+  .open-book-layout:has(.page-turn--previous) .open-book-page--right{z-index:2!important}
+  .open-book-layout:has(.page-turn--next) .open-book-page--under-right,
+  .open-book-layout:has(.page-turn--previous) .open-book-page--under-left{z-index:1!important}
+  .open-book-layout--closed .page-turn-verso--cover{background:var(--reader-paper-lit)!important}
+}
 .reader-highlight{border-radius:.16em;background:rgba(232,201,91,.48);color:inherit;padding:.02em 0}.reader-highlight--orange{background:rgba(224,150,78,.45)}.reader-highlight--green{background:rgba(112,177,125,.42)}.reader-highlight--blue{background:rgba(100,160,211,.42)}.reader-highlight--pink{background:rgba(218,130,166,.4)}.reader[data-paper="dark"] .reader-highlight{background:rgba(240,205,85,.38)}.reader-highlight--focus{animation:highlight-focus 1.4s ease 2}.selection-context-menu{position:fixed;z-index:90;display:flex;max-width:calc(100vw - 1rem);align-items:center;gap:.3rem;overflow:auto;border:1px solid color-mix(in srgb,currentColor 14%,transparent);border-radius:.75rem;color:var(--color-text);background:var(--color-surface);box-shadow:0 .8rem 2.5rem rgba(0,0,0,.3);padding:.4rem}.selection-context-menu button{min-height:2.1rem;border-radius:.5rem;color:inherit;background:transparent;padding:.35rem .5rem;font-size:.72rem}.highlight-palette{display:flex;gap:.2rem}.highlight-swatch{min-width:1.8rem!important;width:1.8rem;background:#e8c95b!important}.highlight-swatch--orange{background:#df9651!important}.highlight-swatch--green{background:#72b27f!important}.highlight-swatch--blue{background:#66a1d3!important}.highlight-swatch--pink{background:#da82a6!important}.study-panel{position:fixed;z-index:69;inset:4.15rem .65rem 4.6rem auto;width:min(22rem,calc(100vw - 1.3rem));overflow:auto;border-radius:1rem;color:var(--color-text);background:var(--color-surface);box-shadow:0 1rem 3rem rgba(0,0,0,.28);padding:1rem;opacity:0;transform:translateX(calc(100% + 1rem));visibility:hidden;transition:.22s}.study-panel--open{opacity:1;transform:translateX(0);visibility:visible}.study-panel h2,.study-panel h3{margin:.3rem 0 .7rem}.study-panel section{display:grid;gap:.5rem;margin-bottom:1rem}.study-item{display:grid;grid-template-columns:1fr auto;gap:.3rem;border-left:.3rem solid #e8c95b;border-radius:.5rem;background:color-mix(in srgb,currentColor 5%,transparent);padding:.5rem}.study-item[data-color="orange"]{border-color:#df9651}.study-item[data-color="green"]{border-color:#72b27f}.study-item[data-color="blue"]{border-color:#66a1d3}.study-item[data-color="pink"]{border-color:#da82a6}.study-item button{color:inherit;background:transparent;text-align:left}.study-item p{grid-column:1/-1;margin:0;font-size:.78rem}@keyframes highlight-focus{50%{filter:brightness(1.35);outline:2px solid currentColor}}@media(max-width:40rem){.selection-context-menu{inset:auto .5rem 4rem!important}.study-panel{inset:auto .45rem .45rem;width:calc(100vw - .9rem);max-height:70dvh;transform:translateY(calc(100% + 1rem))}.study-panel--open{transform:translateY(0)}}

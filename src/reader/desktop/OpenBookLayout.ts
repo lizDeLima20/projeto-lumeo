@@ -18,13 +18,13 @@ export class OpenBookLayout {
         book.append(back,first);
         return book;
       }
-      if(afterCover){
-        const under=new BookPageView(afterCover,"right",this.paragraph).render();
-        under.className="open-book-page open-book-page--under-cover";
-        under.setAttribute("aria-hidden","true"); book.append(under);
-      }
+      /* The first real page is prepared under the cover for the physical turn, but is
+       * fully hidden while closed. It never participates in the closed layout. */
+      if(afterCover){const under=new BookPageView(afterCover,"right",this.paragraph).render();under.className="open-book-page open-book-page--under-cover";under.setAttribute("aria-hidden","true");book.append(under);}
       const leaf=new BookPageView(cover,"cover",this.paragraph).render();
-      leaf.append(this.verso(afterCover,"right"));
+      /* The back of a physical cover is still the cover material, never page 1 or
+       * copyright text. This prevents content leaking at the 90° crossover. */
+      leaf.append(this.coverVerso(cover));
       book.append(leaf);
       return book;
     }
@@ -45,6 +45,10 @@ export class OpenBookLayout {
     if(page){const inner=new BookPageView(page,side,this.paragraph).render();
       inner.classList.replace(`open-book-page--${side}`,"open-book-page--verso");face.append(inner);}
     return face;
+  }
+  private coverVerso(cover:ReaderPage):HTMLElement{
+    const face=document.createElement("div");face.className="page-turn-verso page-turn-verso--cover";face.setAttribute("aria-hidden","true");
+    const inner=new BookPageView(cover,"cover",this.paragraph).render();inner.classList.remove("open-book-page--cover");inner.classList.add("open-book-page--verso");face.append(inner);return face;
   }
   /** No copy of a page may keep the --left/--right modifier: those two classes are how
    *  the turn controller finds the leaf to animate, and a nested copy earlier in the
