@@ -259,3 +259,14 @@
 @media(max-width:47.99rem){.book-top-cover-face{top:-.76rem;height:.84rem}.page-block-3d{top:-.64rem;height:.62rem}.book-page-top-face{height:.66rem}.book-card--selected .book-3d__volume,.book-card--activating .book-3d__volume{transform:translate3d(-28px,-3px,112px) rotateX(0deg) rotateY(var(--book-angle,3deg)) rotateZ(0deg) scale(1.006)}.book-card--selected .book-contact-shadow{transform:translate3d(-1.75rem,9px,0) rotateX(72deg) scaleX(1.64)}}
 @media(min-width:48rem) and (max-width:63.99rem){.book-card--selected .book-3d__volume,.book-card--activating .book-3d__volume{transform:translate3d(-42px,-4px,150px) rotateX(0deg) rotateY(var(--book-angle,3deg)) rotateZ(0deg) scale(1.007)}.book-card--selected .book-contact-shadow{transform:translate3d(-2.625rem,10px,0) rotateX(72deg) scaleX(1.72)}}
 .book-focus-label__progress{color:var(--color-primary);font-weight:800;opacity:1!important}
+
+/* Canonical shelf interaction: one genre, one board, one horizontal track.  This is
+   * deliberately last because historical visual iterations left several competing
+   * shelf rules above. */
+.genre-shelf>.shelf-stage{grid-column:1/-1;min-width:0}
+.genre-shelf .book-shelf__viewport{overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-x:contain;touch-action:pan-x;scroll-snap-type:x proximity}
+.genre-shelf .book-shelf{display:flex!important;flex-wrap:nowrap!important;width:max-content!important;min-width:100%!important;align-items:flex-end}
+.genre-shelf .book-shelf>.book-card{flex:0 0 var(--book-object-width)!important;white-space:normal}
+.book-focus-label{z-index:70;top:clamp(.2rem,1vw,.8rem);min-width:clamp(15rem,32vw,24rem);max-width:min(34rem,calc(100% - 1.25rem));gap:.26rem;padding:.78rem 1rem;border-radius:.45rem;font-size:1rem}
+.book-focus-label strong{font-size:clamp(1rem,1.45vw,1.35rem);line-height:1.2}.book-focus-label small{font-size:clamp(.82rem,1.05vw,1rem);line-height:1.25}.book-focus-label__progress{font-size:clamp(.88rem,1.1vw,1.05rem)!important}
+@media(max-width:47.99rem){.book-focus-label{top:.25rem;min-width:min(17rem,calc(100% - 1rem));max-width:calc(100% - 1rem);padding:.72rem .85rem}.book-focus-label strong{font-size:1.02rem}.book-focus-label small,.book-focus-label__progress{font-size:.86rem!important}}

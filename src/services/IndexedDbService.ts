@@ -18,13 +18,14 @@ export const STORE_NAMES = {
   metadataAuxiliary: "metadataAuxiliary",
   recoveryJournal: "recoveryJournal",
   localDiagnostics: "localDiagnostics",
+  readingReviews: "readingReviews",
 } as const;
 
 export type StoreName = typeof STORE_NAMES[keyof typeof STORE_NAMES];
 export type TransactionMode = "readonly" | "readwrite";
 
 export class IndexedDbService {
-  public static readonly SCHEMA_VERSION = 9;
+  public static readonly SCHEMA_VERSION = 10;
   private connection: Promise<IDBDatabase> | null = null;
   public constructor(private readonly databaseName = "lumeo-library", private readonly version = IndexedDbService.SCHEMA_VERSION) {}
 
@@ -56,6 +57,11 @@ export class IndexedDbService {
         if (!database.objectStoreNames.contains(STORE_NAMES.metadataAuxiliary)) database.createObjectStore(STORE_NAMES.metadataAuxiliary,{keyPath:"bookId"});
         if (!database.objectStoreNames.contains(STORE_NAMES.recoveryJournal)) database.createObjectStore(STORE_NAMES.recoveryJournal,{keyPath:"id"});
         if (!database.objectStoreNames.contains(STORE_NAMES.localDiagnostics)) database.createObjectStore(STORE_NAMES.localDiagnostics,{keyPath:"id"});
+        if (!database.objectStoreNames.contains(STORE_NAMES.readingReviews)) {
+          const store=database.createObjectStore(STORE_NAMES.readingReviews,{keyPath:"id"});
+          store.createIndex("userBook",["userId","bookId"],{unique:true});
+          store.createIndex("bookId","bookId",{unique:false});
+        }
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error ?? new Error("Não foi possível abrir o armazenamento local."));

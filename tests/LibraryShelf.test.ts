@@ -125,7 +125,7 @@ describe("BookShelf", () => {
   it("carouselHasEdgePadding",()=>assert.equal(BookShelfCompactionLayout.edgePaddingPixels,10));
   it("carouselSnapsAfterScroll",()=>assert.equal(BookShelfCompactionLayout.carouselSnapsAfterScroll,true));
   it("dragDoesNotSelectBook",()=>assert.equal(BookShelf.isTap(11,0),false));
-  it("scrollClearsFocusedBook",()=>assert.equal(BookShelf.scrollClearsFocusedBook,true));
+  it("scrollKeepsFocusedBook",()=>assert.equal(BookShelf.scrollClearsFocusedBook,false));
   it("shelfBoardDoesNotScroll",()=>assert.equal(ShelfBoard.independentFromTrack,true));
   it("bookHasTrue3DGeometry",()=>assert.equal(Book3DGeometry.trueThreeDimensionalGeometry,true));
   it("spineFaceHasPhysicalWidth",()=>{const geometry=new Book3DGeometry(11,16.5,1.35,1.35,.08,.16);assert.ok(geometry.spineRatio>=.1&&geometry.spineRatio<=.16);});
@@ -232,6 +232,13 @@ describe("GenreShelf", () => {
   it("emptyGenreHidden", () => assert.equal(GenreShelf.shouldRender([]), false));
   it("newGenreWithBookAppears", () => { const library = new Library(); const genre = new Genre("engenharia", "Engenharia"); library.addGenre(genre); assert.equal(GenreShelf.shouldRender(library.findBooksByGenre(genre.id)), false);
     library.addBook(book("novo", genre.id)); assert.equal(GenreShelf.shouldRender(library.findBooksByGenre(genre.id)), true); });
+  it("rendersOneHorizontalTrackPerGenre", () => {
+    const source = readFileSync(new URL("../src/components/GenreShelf.ts", import.meta.url), "utf8");
+    const css = readFileSync(new URL("../src/styles/library.css", import.meta.url), "utf8");
+    assert.match(source, /new BookShelf\(this\.books/);
+    assert.doesNotMatch(source, /AuthorShelfGroup/);
+    assert.match(css, /\.genre-shelf \.book-shelf\{display:flex!important;flex-wrap:nowrap!important/);
+  });
 });
 
 describe("estante 3D — referência física", () => {

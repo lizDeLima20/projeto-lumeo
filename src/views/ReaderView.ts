@@ -42,6 +42,8 @@ import{I18nManager}from"../i18n/I18nManager";import{ReaderInteractionController}
 import{ReaderChromeController}from"../reader/premium/ReaderChromeController";import{FocusReadingMode}from"../reader/premium/FocusReadingMode";import{ReaderProgressModel}from"../reader/premium/ReaderProgressModel";import{ReaderProgressBar}from"./ReaderProgressBar";import{ReaderCoverPageView}from"./ReaderCoverPageView";
 import{ImagePageTurnAnimator,type ImageTurnDirection}from"../reader/image/ImagePageTurnAnimator";
 import{DesktopReaderStateMachine}from"../reader/desktop/DesktopReaderStateMachine";
+import { ReadingReviewRepository } from "../repositories/ReadingReviewRepository";
+import { ReadingReviewDialog } from "./ReadingReviewDialog";
 
 export class ReaderView extends BaseView {
   private toolbar: ReaderToolbar | null = null;
@@ -67,10 +69,13 @@ export class ReaderView extends BaseView {
   private readonly chapterStudyController:ChapterStudyController;private chapterStudyView:ChapterStudyView|null=null;
   private readonly imageTurnAnimator=new ImagePageTurnAnimator();private imageTurnDirection:ImageTurnDirection|null=null;private imageTurnSnapshot:string|null=null;
   private readonly desktopState=new DesktopReaderStateMachine();
+  private readonly reviews: ReadingReviewRepository;
+  private completionReviewPrompted = false;
 
   public constructor(private readonly bookId: string, private readonly manager: ReaderManager,
     private readonly globalTheme: "light" | "dark", private readonly onBack: () => void,
-    private readonly onBookUpdated: (book: Book) => void, database:IndexedDbService, private readonly readerName?:string) { super();const highlightRepository=new HighlightRepository(database),bookmarkRepository=new BookmarkRepository(database);this.annotationRepository=new AnnotationRepository(database);this.highlights=new HighlightManager(highlightRepository);this.annotations=new AnnotationManager(this.annotationRepository);this.bookmarks=new BookmarkManager(bookmarkRepository);this.notebookService=new StudyNotebookService(highlightRepository,this.annotationRepository,bookmarkRepository);this.lookup=new StudyLookupManager(new StudyLookupCacheRepository(database));this.chapterStudyController=new ChapterStudyController(new ChapterStudySheetService(new ChapterStudySheetRepository(database)),"current",bookId); }
+    private readonly onBookUpdated: (book: Book) => void, database:IndexedDbService, private readonly readerName?:string,
+    private readonly readerUserId?:string) { super();const highlightRepository=new HighlightRepository(database),bookmarkRepository=new BookmarkRepository(database);this.annotationRepository=new AnnotationRepository(database);this.highlights=new HighlightManager(highlightRepository);this.annotations=new AnnotationManager(this.annotationRepository);this.bookmarks=new BookmarkManager(bookmarkRepository);this.notebookService=new StudyNotebookService(highlightRepository,this.annotationRepository,bookmarkRepository);this.lookup=new StudyLookupManager(new StudyLookupCacheRepository(database));this.chapterStudyController=new ChapterStudyController(new ChapterStudySheetService(new ChapterStudySheetRepository(database)),"current",bookId);this.reviews=new ReadingReviewRepository(database); }
 
   public render(): HTMLElement {
     const reader = this.createElement("section", "reader reader--controls-visible"); reader.dataset.readerTheme = this.globalTheme; reader.lang=this.i18n.locale;
@@ -136,7 +141,18 @@ export class ReaderView extends BaseView {
    *  Spreads then pair exactly the leaves a turn has just shown, from the cover onwards. */
   private desktopPosition():number{const page=this.reflow?.currentPageNumber??1;return page===1?(this.desktopState.isClosed?1:2):page+1;}
   private async moveDesktop(position:number):Promise<void>{if(!this.reflow||position===this.desktopPosition())return;if(position<=1)this.desktopState.restore(0);else this.desktopState.forceOpen();this.reflow.goTo(Math.min(this.reflow.totalPages,Math.max(1,position-1)));this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber>=this.reflow.totalPages);}
-  private async saveReflow(reachedEnd=false):Promise<void>{if(!this.reflow||!this.reflowBook)return;const anchor=this.reflow.readingAnchor,location=this.reflow instanceof LimaReaderEngine?`lima:${anchor.paragraphId}:${anchor.textOffset}`:undefined;this.reflowBook=await this.manager.saveReflow(this.reflowBook,this.reflow.currentPageNumber,this.reflow.totalPages,anchor.logicalOffset,reachedEnd,location);this.onBookUpdated(this.reflowBook);}
+  private async saveReflow(reachedEnd=false):Promise<void>{if(!this.reflow||!this.reflowBook)return;const anchor=this.reflow.readingAnchor,location=this.reflow instanceof LimaReaderEngine?`lima:${anchor.paragraphId}:${anchor.textOffset}`:undefined;this.reflowBook=await this.manager.saveReflow(this.reflowBook,this.reflow.currentPageNumber,this.reflow.totalPages,anchor.logicalOffset,reachedEnd,location);this.onBookUpdated(this.reflowBook);await this.offerCompletionReview(this.reflowBook);}
+
+  /** Completion is emitted by ReadingProgressService only after a real forward finish. */
+  private async offerCompletionReview(book: Book): Promise<void> {
+    if (this.completionReviewPrompted || book.readingStatus !== "finished" || !this.readerUserId || !this.element) return;
+    this.completionReviewPrompted = true;
+    if (await this.reviews.get(this.readerUserId, book.id)) return;
+    const dialog = new ReadingReviewDialog(async (rating, comment) => {
+      await this.reviews.save({ userId:this.readerUserId!, bookId:book.id, rating, comment:comment || undefined });
+    }).render();
+    this.element.append(dialog);
+  }
 
   private mountControls(title: string): void {
     if (!this.element) return;
@@ -159,6 +175,7 @@ export class ReaderView extends BaseView {
 
   private onPageRendered(state: ReaderPageState): void {
     this.currentPage = state.currentPage; this.totalPages = state.totalPages; this.onBookUpdated(state.book);
+    void this.offerCompletionReview(state.book);
     this.toolbar?.update(state.currentPage, state.totalPages, this.manager.settings.settings.zoom);
     this.updateProgress();
     if (this.imageTurnDirection && this.manager.settings.settings.animation === "page-turn" && this.canvas) this.imageTurnAnimator.play(this.canvas, this.imageTurnDirection, this.imageTurnSnapshot);

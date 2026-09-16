@@ -16,7 +16,20 @@ export class BookShelfCard3D {
     const title=document.createElement("strong"),author=document.createElement("span");title.className="book-card__title";title.textContent=this.book.title;author.className="book-card__author";author.textContent=this.book.author||"Autor desconhecido";info.append(title,author);
     if(this.book.progressPercent!==undefined){const progress=document.createElement("span"),bar=document.createElement("span"),label=document.createElement("span");progress.className="book-progress";bar.style.width=`${Math.min(100,Math.max(0,this.book.progressPercent))}%`;label.className="book-progress-label";label.textContent=`${Math.round(this.book.progressPercent)}% lido`;progress.append(bar);info.append(progress,label);}
     const interaction=new BookInteractionRegion();
-    const activate=(activation:"selected"|"activated")=>{const selected=activation==="selected";card.classList.toggle("book-card--selected",selected);if(selected&&this.mode!=="FRONT")shell.dataset.mode="FOCUSED_ANGLED";if(activation==="activated")card.classList.add("book-card--activating");this.onOpen(this.book.id);};
+    const activate=(activation:"selected"|"activated")=>{
+      /* A second press is an explicit physical return to the shelf.  Opening the
+         reader remains available from the focused book label, so the book itself
+         never unexpectedly leaves the shelf while the reader is being selected. */
+      if(activation==="activated"){
+        this.selection.deselect();
+        card.classList.remove("book-card--selected","book-card--activating");
+        this.onOpen(this.book.id);
+        return;
+      }
+      card.classList.add("book-card--selected");
+      if(this.mode!=="FRONT")shell.dataset.mode="FOCUSED_ANGLED";
+      this.onOpen(this.book.id);
+    };
     card.append(shell,info);shell.addEventListener("click",(event)=>{if(card.disabled)return;const activation=interaction.activate(this.selection,this.book.id,event.target,shell);if(activation==="ignored")return;event.stopPropagation();activate(activation);});
     this.bindDeleteMenu(card,shell);
     card.addEventListener("keydown",event=>{if(card.disabled||(event.key!=="Enter"&&event.key!==" "))return;event.preventDefault();activate(this.selection.activate(this.book.id));});return card;

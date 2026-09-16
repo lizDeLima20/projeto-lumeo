@@ -62,6 +62,9 @@ export const PT_BR = {
   "error.auth.required": "Autenticação necessária.", "error.network": "Não foi possível conectar ao servidor.", "error.request": "Falha na requisição.", "error.license.required": "Esta conta não possui uma licença ativa.",
   "error.indexedDb.saveFailed": "Não foi possível salvar os dados neste dispositivo.", "error.download.failed": "Não foi possível baixar o livro.",
   "format.pageOf": "Página {current} de {total}", "format.books": "{count} livro|{count} livros",
+  "reader.review.title": "Como foi sua leitura?", "reader.review.help": "Sua opinião fica salva neste livro.",
+  "reader.review.stars": "{count} estrelas", "reader.review.comment": "Comentário sobre a leitura",
+  "reader.review.commentPlaceholder": "Deixe uma opinião curta (opcional)", "reader.review.later": "Agora não", "reader.review.save": "Salvar avaliação",
 } as const;
 
 export type TranslationKey = keyof typeof PT_BR;

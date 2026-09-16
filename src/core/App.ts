@@ -49,6 +49,7 @@ import { HighlightRepository } from "../repositories/HighlightRepository";
 import { AnnotationRepository } from "../repositories/AnnotationRepository";
 import { BookmarkRepository } from "../repositories/BookmarkRepository";
 import { ChapterStudySheetRepository } from "../repositories/ChapterStudySheetRepository";
+import { ReadingReviewRepository } from "../repositories/ReadingReviewRepository";
 import { BookDetailsView } from "../views/BookDetailsView";
 import { BookEditView } from "../views/BookEditView";
 import { BookImportView } from "../views/BookImportView";
@@ -164,7 +165,8 @@ export class App {
     this.router.register("edit-book", (params) => new BookEditView(this.state, this.findBook(params.get("id")), this.genres, this.covers,
       (book) => void this.updateBook(book), () => this.router.navigate("book", { id: params.get("id") ?? "" })));
     this.router.register("reader", (params) => new ReaderView(params.get("id") ?? "", this.readerManager,
-      this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database, this.userName()));
+      this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database,
+      this.userName(), this.state.currentUser?.id));
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
         open: source => this.router.navigate("import", { source }) } : undefined, this.pwaInstall));
@@ -270,6 +272,7 @@ export class App {
       new AnnotationRepository(this.database),
       new BookmarkRepository(this.database),
       new ChapterStudySheetRepository(this.database),
+      new ReadingReviewRepository(this.database),
     ]);
   }
 

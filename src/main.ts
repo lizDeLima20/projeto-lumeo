@@ -9,6 +9,7 @@ import "./styles/book-physical.css";
 import "./styles/auth.css";
 import "./styles/home.css";
 import "./styles/reader.css";
+import "./styles/reading-review.css";
 import "./styles/catalog.css";
 import "./styles/privacy.css";
 import "./styles/native-launch-splash.css";

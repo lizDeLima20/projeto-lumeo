@@ -7,6 +7,7 @@ import { ReaderSettingsManager } from "../src/reader/ReaderSettingsManager";
 import { ReadingProgressService } from "../src/reader/ReadingProgressService";
 import { BookRepository } from "../src/repositories/BookRepository";
 import { ReadingProgressRepository } from "../src/repositories/ReadingProgressRepository";
+import { ReadingReviewRepository } from "../src/repositories/ReadingReviewRepository";
 import { IndexedDbService } from "../src/services/IndexedDbService";
 import { StorageService } from "../src/services/StorageService";
 
@@ -51,6 +52,18 @@ describe("ReadingProgressService", () => {
     const { service, book } = setup();
     const direct = await service.saveProgress(book, 10, 10, false); assert.equal(direct.readingStatus, "reading");
     const finished = await service.saveProgress(direct, 10, 10, true); assert.equal(finished.readingStatus, "finished");
+  });
+});
+
+describe("ReadingReviewRepository", () => {
+  it("persistsOneCompletionReviewPerUserAndBook", async () => {
+    const database = new IndexedDbService(`reader-review-${crypto.randomUUID()}`), reviews = new ReadingReviewRepository(database);
+    await reviews.save({ userId:"user-a", bookId:"book-a", rating:4, comment:"Muito bom" });
+    const saved = await reviews.get("user-a", "book-a");
+    assert.equal(saved?.rating, 4); assert.equal(saved?.comment, "Muito bom");
+    assert.equal(await reviews.get("user-b", "book-a"), null);
+    await reviews.deleteByBook("book-a");
+    assert.equal(await reviews.get("user-a", "book-a"), null);
   });
 });
 

@@ -1,0 +1,18 @@
+/* Completion review: mounted inside the Reader, therefore shared by browser PWA
+   and Capacitor's Android WebView without relying on browser chrome. */
+.reading-review-layer{position:fixed;z-index:120;inset:0;display:grid;place-items:center;background:rgba(22,15,12,.48);padding:1rem}
+.reading-review-dialog{width:min(27rem,100%);display:grid;gap:.9rem;border:1px solid color-mix(in srgb,#8a5a32 38%,transparent);border-radius:.85rem;color:var(--reader-ink,#302821);background:var(--reader-paper,#f7f0df);box-shadow:0 1.25rem 3rem rgba(0,0,0,.35);padding:1.2rem}
+.reading-review-dialog h2{margin:0;font:700 clamp(1.25rem,4vw,1.7rem)/1.2 Georgia,serif}
+.reading-review-dialog p{margin:0;color:color-mix(in srgb,currentColor 72%,transparent)}
+.reading-review-stars{display:flex;justify-content:center;gap:.3rem}
+.reading-review-star{min-width:2.55rem;min-height:2.55rem;border:0;border-radius:.45rem;color:#9a742d;background:transparent;font-size:1.85rem;line-height:1;cursor:pointer}
+.reading-review-star:hover,.reading-review-star:focus-visible{outline:2px solid #9a742d;outline-offset:2px}
+.reading-review-star.is-selected{color:#e5ad3f;text-shadow:0 .08rem .18rem rgba(91,56,17,.22)}
+.reading-review-dialog label{display:grid;gap:.38rem;font-weight:600}
+.reading-review-dialog textarea{min-height:5.75rem;resize:vertical;border:1px solid color-mix(in srgb,currentColor 25%,transparent);border-radius:.4rem;color:inherit;background:color-mix(in srgb,var(--reader-paper,#f7f0df) 86%,#fff);padding:.65rem;font:inherit}
+.reading-review-actions{display:flex;justify-content:flex-end;gap:.55rem}
+.reading-review-actions button{min-height:2.5rem;border-radius:.4rem;padding:.45rem .8rem;font:inherit;font-weight:700;cursor:pointer}
+.reading-review-actions button[type="button"]{color:inherit;background:transparent}
+.reading-review-actions button[type="submit"]{border:1px solid #6d4328;color:#fff;background:#6d4328}
+.reading-review-actions button:disabled{cursor:not-allowed;opacity:.52}
+@media(max-width:40rem){.reading-review-layer{align-items:end;padding:.75rem}.reading-review-dialog{border-radius:.7rem;padding:1rem}.reading-review-star{min-width:2.35rem;min-height:2.35rem}}
