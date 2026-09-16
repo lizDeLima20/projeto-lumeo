@@ -5,7 +5,7 @@ import type { CatalogDownloadLink } from "../services/CatalogService";
 import { CatalogImportFileMismatchError, type CatalogImportStage } from "../services/CatalogImportCoordinator";
 import { ApiError } from "../services/ApiClient";
 import type { CatalogDownloadService } from "../services/CatalogDownloadService";
-import { NativeBookDownloadError } from "../services/NativeBookDownload";
+import { NativeBookDownloadError, reportNativeDownloadDiagnostic } from "../services/NativeBookDownload";
 import { UnsupportedFileError } from "../importers/LocalFileImporter";
 import { BaseView } from "./BaseView";
 
@@ -42,11 +42,13 @@ export class CatalogBookView extends BaseView {
     let importedBookId: string | null = null;
     action.addEventListener("click", () => void (async () => {
       try {
+        this.logDownload("DOWNLOAD_REQUESTED", { bookId: book.bookId, target: this.downloads.target });
         if (importedBookId) { this.onOpenLocal(importedBookId); return; }
         if (controller) { controller.abort(); action.disabled = true; progress.textContent = this.t("ui.catalog.preparing"); return; }
         if (!link) {
           action.disabled = true; action.textContent = this.t("catalog.preparingDownload"); progress.textContent = "";
           link = await this.catalog.downloadLink(book.bookId);
+          this.logDownload("DOWNLOAD_URL_RECEIVED", { bookId: book.bookId, host: new URL(link.downloadUrl).host });
           if (this.downloads.target === "android-private-storage") {
             controller = new AbortController();
             action.disabled = false; action.textContent = this.t("ui.common.cancel");
@@ -67,6 +69,7 @@ export class CatalogBookView extends BaseView {
         await this.importSelectedFile(book, link, action, progress);
       } catch (error) {
         controller = null; action.disabled = false; action.textContent = this.t("ui.common.retry"); const code = this.technicalCode(error);
+        this.logDownload("DOWNLOAD_FAILED", { bookId: book.bookId, stage: "CATALOG_VIEW", errorCode: code ?? "UNKNOWN_ERROR", exceptionClass: error instanceof Error ? error.constructor.name : "Unknown" });
         const message = code === "IMPORT_FILE_INVALID" ? this.t("catalog.fileMismatch") : this.t("ui.catalog.downloadFailed");
         progress.textContent = `${message}${code ? ` (${code})` : ""}`;
       }
@@ -90,4 +93,5 @@ export class CatalogBookView extends BaseView {
   }
   private meta(root: HTMLElement, label: string, value: string): void { root.append(this.createElement("dt", "", label), this.createElement("dd", "", value)); }
   private formatSize(bytes: number): string { return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(bytes / 1024 / 1024) + " MB"; }
+  private logDownload(stage: string, details: Record<string, unknown>): void { reportNativeDownloadDiagnostic(stage, details); }
 }

@@ -1,12 +1,23 @@
 import{BookPageView}from"../../views/BookPageView";import{PageSpread,noNeighbours,type SpreadNeighbours}from"./PageSpread";import type{ReaderPage,ReaderParagraph}from"../reflow/ReaderDocument";
+export type DesktopCoverState = "closed" | "open";
+
 export class OpenBookLayout {
   public constructor(private readonly paragraph?:(value:ReaderParagraph)=>HTMLElement){}
-  public render(spread:PageSpread,neighbours:SpreadNeighbours=noNeighbours):HTMLElement{
+  public render(spread:PageSpread,neighbours:SpreadNeighbours=noNeighbours,coverState:DesktopCoverState="closed"):HTMLElement{
     const book=document.createElement("div");book.className="open-book-layout";
     const cover=spread.left?.cover?spread.left:spread.right?.cover?spread.right:null;
     if(cover){
-      book.classList.add("open-book-layout--cover");
+      book.classList.add("open-book-layout--cover", `open-book-layout--${coverState}`);
       const afterCover=spread.left?.cover?spread.right:spread.left;
+      if(coverState==="open") {
+        const back=new BookPageView(cover,"left",this.paragraph).render();
+        back.classList.remove("open-book-page--cover");
+        back.classList.add("open-book-page--left","open-book-page--cover-back");
+        const first=new BookPageView(afterCover,"right",this.paragraph).render();
+        first.classList.add("open-book-page--right");
+        book.append(back,first);
+        return book;
+      }
       if(afterCover){
         const under=new BookPageView(afterCover,"right",this.paragraph).render();
         under.className="open-book-page open-book-page--under-cover";

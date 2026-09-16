@@ -62,8 +62,8 @@ describe("BookShelf", () => {
   it("volumesSortedNumerically",()=>{const values=[new Book({...book("10","g"),volume:"10"}),new Book({...book("2","g"),volume:"2"}),new Book({...book("1","g"),volume:"1"})];assert.deepEqual(new AuthorShelfGroup().sortVolumes(values).map(value=>value.volume),["1","2","10"]);});
   it("spineTextRotatedAsUnit",()=>assert.equal(BookSpineRenderer.textOrientation,"ROTATED_UNIT"));
   it("angledModeUsesPerspective",()=>assert.equal(BookPerspectiveLayout.forCount(5).angle,81));
-  it("genericShelfShowsTitleAndAuthor",()=>assert.deepEqual(new BookContextLabelResolver().resolve(book("a","g"),{kind:"genre",label:"Ação"}),{title:"Livro a",subtitle:"Autor"}));
-  it("authorShelfHidesRepeatedAuthor",()=>assert.deepEqual(new BookContextLabelResolver().resolve(book("a","g"),{kind:"author",label:"Obras de Autor"}),{title:"Livro a",subtitle:undefined}));
+  it("genericShelfShowsTitleAuthorAndProgress",()=>assert.deepEqual(new BookContextLabelResolver().resolve(book("a","g"),{kind:"genre",label:"Ação"}),{title:"Livro a",subtitle:"Autor",progressPercent:0}));
+  it("authorShelfHidesRepeatedAuthorAndKeepsProgress",()=>assert.deepEqual(new BookContextLabelResolver().resolve(book("a","g"),{kind:"author",label:"Obras de Autor"}),{title:"Livro a",subtitle:undefined,progressPercent:0}));
   it("volumeDisplayedCorrectly",()=>{const value=new Book({...book("a","g"),volume:"2"});assert.equal(new BookContextLabelResolver().resolve(value,{kind:"genre",label:"Ação"}).title,"Livro a · Vol. 2");});
   it("quickPreviewUsesRealMetadata e missingSummaryDoesNotGenerateFakeSummary",()=>{assert.equal(BookQuickPreview.summary(new Book({...book("a","g"),summary:"Resumo real"})),"Resumo real");assert.equal(BookQuickPreview.summary(book("a","g")),"Resumo não disponível.");});
   it("focusedStateKeepsAngle",()=>assert.notEqual(BookFocusAnimator.angleFor("FOCUSED",-20,-12),0));

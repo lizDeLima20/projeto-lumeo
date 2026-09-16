@@ -39,6 +39,7 @@ import { DesktopLibraryFolderService } from "../services/DesktopLibraryFolderSer
 import { StoragePersistenceService } from "../services/StoragePersistenceService";
 import { StorageService } from "../services/StorageService";
 import { AccountPersistenceService, type RemoteLibraryBook } from "../services/AccountPersistenceService";
+import { reportNativeDownloadDiagnostic } from "../services/NativeBookDownload";
 import { ConnectivityManager } from "../pwa/ConnectivityManager";
 import { PwaInstallManager } from "../pwa/PwaInstallManager";
 import { LimaDocumentRepository } from "../repositories/LimaDocumentRepository";
@@ -142,28 +143,28 @@ export class App {
     this.router.register("home", () => new HomeView(this.state, this.userName(),
       () => this.router.navigate("library"), () => this.router.navigate("import")));
     this.router.register("library", () => new LibraryView(this.state,
-      (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.router.navigate("reader", { id: bookId }), (bookId) => void this.deleteBook(bookId, false)));
+      (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.openLibraryBook(bookId), (bookId) => void this.deleteBook(bookId, false)));
     this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId })));
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
-      () => this.router.navigate("explore"), (bookId) => this.router.navigate("reader", { id: bookId }),
+      () => this.router.navigate("explore"), (bookId) => this.openLibraryBook(bookId),
       (book, link) => this.prepareCatalogDownload(book, link),
       (book, link, progress, signal, downloadedFile) => this.addCatalogBook(book, link, progress, signal, downloadedFile), this.catalogDownloads));
     this.router.register("catalog-admin", () => new CatalogAdminView(this.catalog, () => this.router.navigate("explore")));
     this.router.register("genre", (params) => new GenreView(this.state, params.get("id") ?? "",
-      () => this.router.navigate("library"), (bookId) => this.router.navigate("reader", { id: bookId })));
+      () => this.router.navigate("library"), (bookId) => this.openLibraryBook(bookId)));
     this.router.register("import", (params) => {
       const storage = new ExternalLibraryStorage(this.database);
       const connections = new OneDriveConnections(storage, this.state.currentUser!.id);
       const coordinator = new OneDriveImportCoordinator(connections.downloads, this.imports, this.metadataExtractor, this.covers, new OperationRecoveryJournal(storage));
       return new BookImportView(this.state, this.imports, this.genres, this.collections, this.covers, this.metadataExtractor,
         (book) => void this.addBook(book), () => this.router.navigate("library"), (bookId) => this.deleteBook(bookId, false),
-        { connections, coordinator, initialSourceId: params.get("source") ?? undefined, openExisting: id => this.router.navigate("reader", { id }) });
+        { connections, coordinator, initialSourceId: params.get("source") ?? undefined, openExisting: id => this.openLibraryBook(id) });
     });
     this.router.register("book", (params) => this.detailsView(params.get("id") ?? ""));
     this.router.register("edit-book", (params) => new BookEditView(this.state, this.findBook(params.get("id")), this.genres, this.covers,
       (book) => void this.updateBook(book), () => this.router.navigate("book", { id: params.get("id") ?? "" })));
     this.router.register("reader", (params) => new ReaderView(params.get("id") ?? "", this.readerManager,
-      this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database));
+      this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database, this.userName()));
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
         open: source => this.router.navigate("import", { source }) } : undefined, this.pwaInstall));
@@ -172,7 +173,7 @@ export class App {
   private detailsView(id: string): BookDetailsView {
     const book = this.findBook(id);
     const genre = book ? this.state.genres.find((item) => item.id === book.genreId) ?? null : null;
-    return new BookDetailsView(book, genre, () => this.router.navigate("reader", { id }),
+    return new BookDetailsView(book, genre, () => this.openLibraryBook(id),
       () => this.router.navigate("edit-book", { id }), () => void this.deleteBook(id), () => this.router.navigate("library"),()=>void this.locateBookFile(id));
   }
 
@@ -222,6 +223,10 @@ export class App {
     for (const item of remote?.books ?? []) {
       if (books.some((book) => book.id === item.bookId)) continue;
       const book = this.remoteBook(item); if (!book) continue;
+      const remoteGenre = this.remoteGenre(item);
+      if (remoteGenre && !genres.some((genre) => genre.id === remoteGenre.id)) {
+        await this.genres.save(remoteGenre); genres.push(remoteGenre);
+      }
       await this.books.save(book); books.push(book);
     }
     this.state.library.replaceGenres(genres); this.state.library.replaceBooks(books);
@@ -292,9 +297,10 @@ export class App {
     }
     const file = downloadedFile ?? await new FileSystemFolderManager(this.database).selectDownloadedBook();
     if (!file) return null;
-    // Android downloads already carry catalogue metadata and must remain a
-    // one-tap flow: no Downloads folder or picker is involved.
-    const confirmed = downloadedFile ? catalogBook : await new CatalogGenreDialog(this.state, catalogBook).open();
+    // Every source reaches the same confirmation step. The cover comes from
+    // the actual file before the user commits title, author and genre.
+    const extractedCover = await this.covers.fromBookFile(file, link.format, catalogBook.title);
+    const confirmed = await new CatalogGenreDialog(this.state, catalogBook).open(extractedCover);
     if (!confirmed) return null;
     let genre = this.state.genres.find((item) => item.id === confirmed.genreId);
     if (!genre) { genre = new Genre(confirmed.genreId || crypto.randomUUID(), confirmed.genreName || "Sem gênero"); await this.genres.save(genre); this.state.library.addGenre(genre); }
@@ -306,14 +312,27 @@ export class App {
     }
     const coordinator = new CatalogImportCoordinator(this.imports, this.covers);
     this.logCatalogImport("IMPORT_STARTED", { bookId: catalogBook.bookId, format: link.format });
-    const saved = await coordinator.addDownloadedFile({ ...confirmed, genreId: genre.id }, link, file, progress, signal);
+    let saved: Book;
+    try { saved = await coordinator.addDownloadedFile({ ...confirmed, genreId: genre.id }, link, file, progress, signal, extractedCover); }
+    catch (error) {
+      reportNativeDownloadDiagnostic("IMPORT_FAILED", { bookId: catalogBook.bookId, errorCode: error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "IMPORT_FAILED", exceptionClass: error instanceof Error ? error.constructor.name : "Unknown" });
+      throw error;
+    }
     this.logCatalogImport("IMPORT_COMPLETED", { bookId: catalogBook.bookId, localBookId: saved.id });
     // Catalog collection metadata is optional; ImportManager already saved the original file,
     // cover and LIMA document locally. Keep library state authoritative for the shelf.
+    const libraryBook = collectionId ? new Book({ ...saved, collectionId }) : saved;
     if (collectionId) {
-      const adjusted = new Book({ ...saved, collectionId }); await this.libraryService.saveBook(adjusted); this.state.library.addBook(adjusted);
+      await this.libraryService.saveBook(libraryBook); this.state.library.addBook(libraryBook);
     } else this.state.library.addBook(saved);
-    void this.accountPersistence.saveBook(saved, this.state.genres.find((genre) => genre.id === saved.genreId)).catch(() => undefined);
+    // Mirror lightweight metadata before announcing success. The original file
+    // and its extracted cover remain local and never go to the backend.
+    const accountPreferences = this.preferences.fromState(this.state.onboardingCompleted, this.state.settings.theme, this.state.genres);
+    await this.preferences.save(accountPreferences);
+    await Promise.all([
+      this.accountPersistence.saveBook(libraryBook, this.state.genres.find((genre) => genre.id === libraryBook.genreId)),
+      this.accountPersistence.savePreferences(accountPreferences),
+    ]).catch(() => undefined);
     this.logCatalogImport("LIBRARY_REGISTERED", { bookId: catalogBook.bookId, localBookId: saved.id });
     this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
     if (!downloadedFile) this.router.navigate("library");
@@ -343,6 +362,17 @@ export class App {
   private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await new LocalBookFileStore(this.files).save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
 
   private findBook(id: string | null): Book | null { return id ? this.state.library.findBookById(id) ?? null : null; }
+
+  private openLibraryBook(id: string): void {
+    const book = this.findBook(id);
+    if (!book) return;
+    if (book.availability !== "AVAILABLE") {
+      if (book.catalogBookId) this.router.navigate("catalog-book", { id: book.catalogBookId });
+      else this.router.navigate("book", { id });
+      return;
+    }
+    this.router.navigate("reader", { id });
+  }
 
   private guardRoute(route: RouteName): RouteName {
     const publicRoutes: readonly RouteName[] = ["login", "register", "privacy"];
@@ -404,7 +434,7 @@ export class App {
     const title = text("title"), author = text("author"), genreId = text("genreId"), fileType = text("fileType");
     if (!title || !author || !genreId || (fileType !== "pdf" && fileType !== "epub")) return null;
     const number = (key: string): number => typeof data[key] === "number" && Number.isFinite(data[key]) ? data[key] as number : 0;
-    const cover = text("cover")?.startsWith("https://") ? text("cover")! : "";
+    const cover = text("cover")?.startsWith("https://") ? text("cover")! : this.covers.placeholder(title, fileType);
     return new Book({ id: item.bookId, title, author, genreId, cover, fileType, fileName: text("fileName") ?? `${title}.${fileType}`,
       fileSize: number("fileSize"), mimeType: text("mimeType") ?? (fileType === "pdf" ? "application/pdf" : "application/epub+zip"),
       readingStatus: data.readingStatus === "finished" ? "finished" : data.readingStatus === "reading" ? "reading" : "unread",
@@ -414,10 +444,15 @@ export class App {
       source: data.source === "catalog" || data.source === "google-drive" || data.source === "onedrive" || data.source === "url" ? data.source : "device",
       availability: "MISSING_FILE", offlineAvailability: "REMOTE_ONLY" });
   }
+  private remoteGenre(item: RemoteLibraryBook): Genre | null {
+    const genreId = typeof item.metadata.genreId === "string" ? item.metadata.genreId.trim() : "";
+    const name = typeof item.metadata.genreName === "string" ? item.metadata.genreName.trim() : "";
+    return genreId ? new Genre(genreId, name || "Sem gênero") : null;
+  }
   private showToast(message: string): void {
     const root = document.querySelector<HTMLElement>("#toast-root"); if (!root) return;
     root.textContent = message; root.className = "toast toast--visible";
     window.setTimeout(() => { root.className = "toast"; }, 5000);
   }
-  private logCatalogImport(stage: string, details: Record<string, unknown>): void { console.info(JSON.stringify({ event: "LUMEO_CATALOG_IMPORT", stage, ...details })); }
+  private logCatalogImport(stage: string, details: Record<string, unknown>): void { reportNativeDownloadDiagnostic(stage, details); }
 }

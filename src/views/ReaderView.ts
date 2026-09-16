@@ -40,6 +40,7 @@ import{StudyNotebookService}from"../reader/study/StudyNotebookService";import{St
 import{ChapterStudySheetRepository}from"../repositories/ChapterStudySheetRepository";import{ChapterStudySheetService}from"../reader/study/ChapterStudySheetService";import{ChapterStudyController}from"../reader/study/ChapterStudyController";import{ChapterStudyView}from"./ChapterStudyView";
 import{I18nManager}from"../i18n/I18nManager";import{ReaderInteractionController}from"../reader/interaction/ReaderInteractionController";
 import{ReaderChromeController}from"../reader/premium/ReaderChromeController";import{FocusReadingMode}from"../reader/premium/FocusReadingMode";import{ReaderProgressModel}from"../reader/premium/ReaderProgressModel";import{ReaderProgressBar}from"./ReaderProgressBar";import{ReaderCoverPageView}from"./ReaderCoverPageView";
+import{ImagePageTurnAnimator,type ImageTurnDirection}from"../reader/image/ImagePageTurnAnimator";
 
 export class ReaderView extends BaseView {
   private toolbar: ReaderToolbar | null = null;
@@ -63,10 +64,12 @@ export class ReaderView extends BaseView {
   private limaDocument:LimaDocument|null=null;private navigationPanel:NavigationPanel|null=null;private readonly navigationHistory=new BookNavigationHistory();
   private readonly notebookService:StudyNotebookService;private notebookView:StudyNotebookView|null=null;private readonly annotationRepository:AnnotationRepository;
   private readonly chapterStudyController:ChapterStudyController;private chapterStudyView:ChapterStudyView|null=null;
+  private readonly imageTurnAnimator=new ImagePageTurnAnimator();private imageTurnDirection:ImageTurnDirection|null=null;private imageTurnSnapshot:string|null=null;
+  private desktopCoverOpened=false;
 
   public constructor(private readonly bookId: string, private readonly manager: ReaderManager,
     private readonly globalTheme: "light" | "dark", private readonly onBack: () => void,
-    private readonly onBookUpdated: (book: Book) => void, database:IndexedDbService) { super();const highlightRepository=new HighlightRepository(database),bookmarkRepository=new BookmarkRepository(database);this.annotationRepository=new AnnotationRepository(database);this.highlights=new HighlightManager(highlightRepository);this.annotations=new AnnotationManager(this.annotationRepository);this.bookmarks=new BookmarkManager(bookmarkRepository);this.notebookService=new StudyNotebookService(highlightRepository,this.annotationRepository,bookmarkRepository);this.lookup=new StudyLookupManager(new StudyLookupCacheRepository(database));this.chapterStudyController=new ChapterStudyController(new ChapterStudySheetService(new ChapterStudySheetRepository(database)),"current",bookId); }
+    private readonly onBookUpdated: (book: Book) => void, database:IndexedDbService, private readonly readerName?:string) { super();const highlightRepository=new HighlightRepository(database),bookmarkRepository=new BookmarkRepository(database);this.annotationRepository=new AnnotationRepository(database);this.highlights=new HighlightManager(highlightRepository);this.annotations=new AnnotationManager(this.annotationRepository);this.bookmarks=new BookmarkManager(bookmarkRepository);this.notebookService=new StudyNotebookService(highlightRepository,this.annotationRepository,bookmarkRepository);this.lookup=new StudyLookupManager(new StudyLookupCacheRepository(database));this.chapterStudyController=new ChapterStudyController(new ChapterStudySheetService(new ChapterStudySheetRepository(database)),"current",bookId); }
 
   public render(): HTMLElement {
     const reader = this.createElement("section", "reader reader--controls-visible"); reader.dataset.readerTheme = this.globalTheme; reader.lang=this.i18n.locale;
@@ -81,7 +84,7 @@ export class ReaderView extends BaseView {
   public override unmount(): void {
     window.clearTimeout(this.controlsTimer); window.clearTimeout(this.resizeTimer);
     document.removeEventListener("keydown", this.handleKeydown); window.removeEventListener("resize", this.handleResize);
-    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();void this.reflow?.close();void this.manager.close(); super.unmount();
+    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();this.desktopView?.destroy();void this.reflow?.close();void this.manager.close(); super.unmount();
   }
 
   private async initialize(): Promise<void> {
@@ -113,12 +116,14 @@ export class ReaderView extends BaseView {
   private guardOverflow():void{if(!this.reflow||!this.stage)return;const pages=[...this.stage.querySelectorAll<HTMLElement>(".reflow-sheet--current:not(.reflow-sheet--cover),.open-book-page--left:not(.open-book-page--cover),.open-book-page--right:not(.open-book-page--cover)")];const spills=pages.some(page=>page.scrollHeight>page.clientHeight+1||page.scrollWidth>page.clientWidth+1);if(!spills){this.fitAttempts=0;return;}if(this.fitAttempts>=PageBoxMeasure.maxFitAttempts)return;this.fitAttempts++;this.fitSafety+=parseFloat(getComputedStyle(pages[0]!).lineHeight)||24;this.reflow.repaginate(this.paginationMetrics());this.renderReflowPages();this.guardOverflow();}
   private renderReflowPages():void{if(!this.reflow||!this.stage)return;const host=this.stage.querySelector<HTMLElement>(".reflow-pages");if(!host)return;this.turnController?.unbind();this.desktopView?.destroy();host.replaceChildren();const current=this.reflow.currentPageNumber;
     const doublePage=this.wantsSpread();
-    if(doublePage&&this.reflow.currentPage.cover){const cover=this.reflow.currentPage,next=this.reflow.pageAt(current+1);this.desktopView=new DesktopBookReaderView(cover,next,()=>void this.previous(),()=>void this.next(),paragraph=>this.renderParagraph(paragraph),{versoAfter:this.reflow.pageAt(current+2),underAfter:this.reflow.pageAt(current+3),versoBefore:null,underBefore:null});host.append(this.desktopView.render());this.bindSelection(host);this.currentPage=current;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();this.updateProgress();return;}
+    if(doublePage&&this.reflow.currentPage.cover){const cover=this.reflow.currentPage,next=this.reflow.pageAt(current+1),name=this.readerName?.trim()||this.i18n.t("ui.greeting.reader");this.desktopView=new DesktopBookReaderView(cover,next,()=>void this.previous(),()=>void this.next(),paragraph=>this.renderParagraph(paragraph),{versoAfter:this.reflow.pageAt(current+2),underAfter:this.reflow.pageAt(current+3),versoBefore:null,underBefore:null},{coverState:this.desktopCoverOpened?"open":"closed",greeting:{heading:this.i18n.t("ui.greeting.hello",{name}),copy:this.i18n.t("ui.greeting.goodReading")},onCoverOpen:()=>this.openDesktopCover(),onCoverClose:()=>this.closeDesktopCover()});host.append(this.desktopView.render());this.bindSelection(host);this.currentPage=current;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();this.updateProgress();return;}
     if(doublePage){const navigation=new OpenBookNavigationController(this.reflow.totalPages),start=navigation.spreadStart(current);const at=(page:number)=>page>=1?this.reflow!.pageAt(page):null;this.desktopView=new DesktopBookReaderView(start?this.reflow.pageAt(start):null,this.reflow.pageAt(start?start+1:1),()=>void this.moveDesktop(navigation.previous(current)),()=>void this.moveDesktop(navigation.next(current)),paragraph=>this.renderParagraph(paragraph),{versoAfter:at(start+2),underAfter:at(start+3),versoBefore:at(start-1),underBefore:at(start-2)});host.append(this.desktopView.render());this.bindSelection(host);this.currentPage=start||1;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();return;}
     this.reflow.window().forEach(page=>{const sheet=this.createElement("article",`reflow-sheet${page.cover?" reflow-sheet--cover":""}${page.index+1===current?" reflow-sheet--current":""}`);sheet.dataset.page=String(page.index+1);if(page.cover)sheet.append(this.renderCover(page.cover));else{page.paragraphs.forEach(paragraph=>sheet.append(this.renderParagraph(paragraph)));sheet.append(this.reflowPageNumber(page));if(page.index+1===current)sheet.append(this.reflowVerso(this.reflow!.pageAt(current+1)));}host.append(sheet);});this.bindSelection(host);
     const active=host.querySelector<HTMLElement>(".reflow-sheet--current");if(active&&this.manager.settings.settings.animation==="page-turn"){this.turnController=new PageTurnController(active,()=>void this.next(),()=>void this.previous());this.turnController.bind();}
     this.currentPage=this.reflow.currentPageNumber;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();this.updateProgress();}
-  private async moveDesktop(page:number):Promise<void>{if(!this.reflow||page===this.reflow.currentPageNumber)return;this.reflow.goTo(page);this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber>=this.reflow.totalPages);}
+  private openDesktopCover():void{this.desktopCoverOpened=true;this.renderReflow();}
+  private closeDesktopCover():void{this.desktopCoverOpened=false;this.renderReflow();}
+  private async moveDesktop(page:number):Promise<void>{if(!this.reflow||page===this.reflow.currentPageNumber)return;this.desktopCoverOpened=!this.reflow.currentPage.cover;this.reflow.goTo(page);this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber>=this.reflow.totalPages);}
   private async saveReflow(reachedEnd=false):Promise<void>{if(!this.reflow||!this.reflowBook)return;const anchor=this.reflow.readingAnchor,location=this.reflow instanceof LimaReaderEngine?`lima:${anchor.paragraphId}:${anchor.textOffset}`:undefined;this.reflowBook=await this.manager.saveReflow(this.reflowBook,this.reflow.currentPageNumber,this.reflow.totalPages,anchor.logicalOffset,reachedEnd,location);this.onBookUpdated(this.reflowBook);}
 
   private mountControls(title: string): void {
@@ -143,7 +148,10 @@ export class ReaderView extends BaseView {
   private onPageRendered(state: ReaderPageState): void {
     this.currentPage = state.currentPage; this.totalPages = state.totalPages; this.onBookUpdated(state.book);
     this.toolbar?.update(state.currentPage, state.totalPages, this.manager.settings.settings.zoom);
-    this.updateProgress();this.animatePage(state.reason === "previous" ? "previous" : "next"); this.showControls();
+    this.updateProgress();
+    if (this.imageTurnDirection && this.manager.settings.settings.animation === "page-turn" && this.canvas) this.imageTurnAnimator.play(this.canvas, this.imageTurnDirection, this.imageTurnSnapshot);
+    else if (state.reason !== "initial") this.animatePage(state.reason === "previous" ? "previous" : "next");
+    this.imageTurnDirection = null; this.imageTurnSnapshot = null; this.showControls();
   }
 
   private tapZones(): HTMLElement {
@@ -159,8 +167,8 @@ export class ReaderView extends BaseView {
     const zone = this.createElement("button", `reader-tap-zone ${className}`); zone.type = "button"; zone.setAttribute("aria-label", label); zone.addEventListener("click", () => { if(!this.interactions.consumeSuppressedClick()) action(); }); return zone;
   }
 
-  private async next(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.next(this.reflow.currentPageNumber));return;}const moved=this.reflow.next();if(moved){this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber===this.reflow.totalPages);}return;}await this.manager.navigation?.nextPage(); }
-  private async previous(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.previous(this.reflow.currentPageNumber));return;}if(this.reflow.previous()){this.renderReflow();await this.saveReflow();}return;}await this.manager.navigation?.previousPage(); }
+  private async next(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.next(this.reflow.currentPageNumber));return;}const moved=this.reflow.next();if(moved){this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber===this.reflow.totalPages);}return;}this.prepareImageTurn("next");await this.manager.navigation?.nextPage(); }
+  private async previous(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages);await this.moveDesktop(navigation.previous(this.reflow.currentPageNumber));return;}if(this.reflow.previous()){this.renderReflow();await this.saveReflow();}return;}this.prepareImageTurn("previous");await this.manager.navigation?.previousPage(); }
   private handleSwipe(event: TouchEvent): void {
     const touch = event.changedTouches[0]; if (!touch) return;
     const deltaX = touch.clientX - this.touchStartX; const deltaY = touch.clientY - this.touchStartY;
@@ -271,6 +279,13 @@ export class ReaderView extends BaseView {
     if (!this.canvas) return; const animation = this.manager.settings.settings.animation; if (animation === "carousel") return;
     this.canvas.classList.remove("reader-page--slide-next", "reader-page--slide-previous", "reader-page--turn-next", "reader-page--turn-previous");
     void this.canvas.offsetWidth; this.canvas.classList.add(`reader-page--${animation === "slide" ? "slide" : "turn"}-${direction}`);
+  }
+  private prepareImageTurn(direction: ImageTurnDirection): void {
+    if (!this.canvas || !this.manager.navigation) return;
+    const atStart = direction === "previous" && this.manager.navigation.currentPage <= 1;
+    const atEnd = direction === "next" && this.manager.navigation.currentPage >= this.manager.navigation.totalPages;
+    this.imageTurnDirection = atStart || atEnd ? null : direction;
+    this.imageTurnSnapshot = this.imageTurnDirection ? this.imageTurnAnimator.capture(this.canvas) : null;
   }
   private showControls(): void { this.chrome?.show(!this.settingsPanel?.isOpen); }
   private scheduleControlsHide(): void { this.chrome?.schedule(); }

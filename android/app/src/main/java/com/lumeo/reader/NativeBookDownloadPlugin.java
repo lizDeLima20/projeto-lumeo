@@ -1,6 +1,7 @@
 package com.lumeo.reader;
 
 import android.util.Log;
+import android.net.Uri;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -64,32 +65,43 @@ public class NativeBookDownloadPlugin extends Plugin {
         final String bookId = pluginCall.getString("bookId");
         final String url = pluginCall.getString("url");
         if (bookId == null || bookId.trim().isEmpty() || url == null || url.trim().isEmpty()) {
+            trace("DOWNLOAD_FAILED", "stage=REQUEST_VALIDATION errorCode=INVALID_DOWNLOAD_URL exceptionClass=IllegalArgumentException safeMessage=missing_request_data");
             pluginCall.reject("Dados do livro inválidos.", "DOWNLOAD_REQUEST_INVALID");
             return;
         }
         if (!url.startsWith("https://")) {
+            trace("DOWNLOAD_FAILED", "stage=REQUEST_VALIDATION errorCode=INVALID_DOWNLOAD_URL exceptionClass=IllegalArgumentException safeMessage=https_required");
             pluginCall.reject("A origem do livro precisa usar HTTPS.", "DOWNLOAD_URL_INVALID");
             return;
         }
         final String safeBookId = safeBookId(bookId);
         final File directory = downloadDirectory();
         if (!directory.exists() && !directory.mkdirs()) {
+            trace("DOWNLOAD_FAILED", "bookId=" + safeBookId + " stage=STORAGE_PREPARE errorCode=FILE_WRITE_FAILED exceptionClass=IOException safeMessage=directory_unavailable");
             pluginCall.reject("Não foi possível preparar o armazenamento local.", "DOWNLOAD_STORAGE_UNAVAILABLE");
             return;
         }
         final File existing = completedFile(directory, safeBookId);
         if (existing != null) {
+            trace("FINAL_FILE_SAVED", "bookId=" + safeBookId + " reused=true bytes=" + existing.length() + " mimeType=" + mimeTypeFor(existing));
             resolve(pluginCall, bookId, existing, null, mimeTypeFor(existing), true);
             return;
         }
         final Long expectedSize = pluginCall.getLong("expectedSize");
         final String expectedSha256 = normalizeHash(pluginCall.getString("sha256"));
-        final Request request = new Request.Builder().url(url).get().header("Accept", "application/pdf,application/epub+zip,application/octet-stream;q=0.8").build();
+        final Request request;
+        try {
+            request = new Request.Builder().url(url).get().header("Accept", "application/pdf,application/epub+zip,application/octet-stream;q=0.8").build();
+        } catch (IllegalArgumentException failure) {
+            trace("DOWNLOAD_FAILED", "bookId=" + safeBookId + " stage=REQUEST_BUILD errorCode=INVALID_DOWNLOAD_URL exceptionClass=IllegalArgumentException safeMessage=malformed_https_url");
+            pluginCall.reject("A URL do livro é inválida.", "DOWNLOAD_URL_INVALID");
+            return;
+        }
         final Call httpCall = http.newCall(request);
         // Log only the host and technical state: never the full signed URL,
         // session data, or book bytes.
-        Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=NATIVE_PLUGIN_CALLED bookId=" + safeBookId);
-        Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=DOWNLOAD_STARTED bookId=" + safeBookId + " sourceHost=" + request.url().host());
+        trace("PLUGIN_CALLED", "bookId=" + safeBookId);
+        trace("DOWNLOAD_STARTED", "bookId=" + safeBookId + " sourceHost=" + request.url().host());
         activeCalls.put(bookId, httpCall);
         executor.execute(() -> download(pluginCall, bookId, safeBookId, directory, httpCall, expectedSize, expectedSha256));
     }
@@ -104,27 +116,48 @@ public class NativeBookDownloadPlugin extends Plugin {
         final Call active = activeCalls.remove(bookId);
         if (active != null) active.cancel();
         deletePartFile(safeBookId(bookId));
+        trace("DOWNLOAD_FAILED", "bookId=" + safeBookId(bookId) + " stage=CANCEL errorCode=DOWNLOAD_CANCELLED exceptionClass=CancellationException safeMessage=user_cancelled");
         JSObject result = new JSObject();
         result.put("bookId", bookId);
         result.put("cancelled", true);
         pluginCall.resolve(result);
     }
 
+    /** Receives safe WebView-side checkpoints so a complete import trace is
+     * available through `adb logcat | grep LUMEO_NATIVE_DOWNLOAD`. */
+    @PluginMethod
+    public void logDiagnostic(PluginCall pluginCall) {
+        final String stage = safeStage(pluginCall.getString("stage"));
+        final String bookId = safeBookId(pluginCall.getString("bookId", "unknown"));
+        final String code = safeDiagnostic(pluginCall.getString("errorCode"));
+        final String exceptionClass = safeDiagnostic(pluginCall.getString("exceptionClass"));
+        final String detail = "bookId=" + bookId
+            + (code.isEmpty() ? "" : " errorCode=" + code)
+            + (exceptionClass.isEmpty() ? "" : " exceptionClass=" + exceptionClass);
+        trace(stage, detail);
+        pluginCall.resolve();
+    }
+
     private void download(PluginCall pluginCall, String bookId, String safeBookId, File directory, Call httpCall, Long expectedSize, String expectedSha256) {
         final File part = new File(directory, safeBookId + ".part");
-        try (Response response = httpCall.execute()) {
+        try {
+            trace("HTTP_REQUEST_STARTED", "bookId=" + safeBookId);
+            try (Response response = httpCall.execute()) {
             final int status = response.code();
             final int redirects = redirectCount(response);
             final String finalHost = response.request().url().host();
             final String rawContentType = response.header("Content-Type", "");
             final String rawContentLength = response.header("Content-Length", "unknown");
-            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=REDIRECT bookId=" + safeBookId + " finalHost=" + finalHost + " redirects=" + redirects);
-            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=HTTP_STATUS bookId=" + safeBookId + " status=" + status + " contentType=" + safeHeader(rawContentType) + " contentLength=" + safeHeader(rawContentLength));
+            trace("REDIRECT_RECEIVED", "bookId=" + safeBookId + " redirects=" + redirects);
+            trace("FINAL_HOST", "bookId=" + safeBookId + " host=" + finalHost);
+            trace("HTTP_STATUS", "bookId=" + safeBookId + " statusCode=" + status + " host=" + finalHost);
+            trace("CONTENT_TYPE", "bookId=" + safeBookId + " value=" + safeHeader(rawContentType));
+            trace("CONTENT_LENGTH", "bookId=" + safeBookId + " value=" + safeHeader(rawContentLength));
             if (redirects > 10) throw new DownloadFailure("DOWNLOAD_REDIRECT_ERROR", "A origem redirecionou a requisição muitas vezes.");
-            if (status != 200 && status != 206) throw new DownloadFailure("DOWNLOAD_HTTP_ERROR", "A origem retornou HTTP " + status + ".");
+            if (status != 200 && status != 206) throw new DownloadFailure(httpCode(status), "A origem retornou HTTP " + status + ".", status, finalHost);
             final String contentType = rawContentType.toLowerCase(Locale.ROOT);
             if (contentType.contains("text/html") || contentType.contains("application/xhtml")) {
-                throw new DownloadFailure("DOWNLOAD_HTML_RESPONSE", "A origem retornou uma página em vez do livro.");
+                throw new DownloadFailure("UNEXPECTED_HTML_RESPONSE", "A origem retornou uma página em vez do livro.", status, finalHost);
             }
             final ResponseBody body = response.body();
             if (body == null) throw new DownloadFailure("DOWNLOAD_EMPTY_RESPONSE", "A origem não retornou conteúdo.");
@@ -133,7 +166,7 @@ public class NativeBookDownloadPlugin extends Plugin {
             long downloaded = 0;
             final byte[] signature = new byte[8];
             int signatureLength = 0;
-            Log.i(TAG, "download.part bookId=" + safeBookId + " created=true");
+            trace("TEMP_FILE_CREATED", "bookId=" + safeBookId + " storage=filesDir/lumeo-books");
             try (BufferedInputStream input = new BufferedInputStream(body.byteStream()); FileOutputStream output = new FileOutputStream(part, false)) {
                 final byte[] buffer = new byte[64 * 1024];
                 int count;
@@ -151,38 +184,42 @@ public class NativeBookDownloadPlugin extends Plugin {
                 }
                 output.getFD().sync();
             }
-            if (downloaded <= 0) throw new DownloadFailure("DOWNLOAD_EMPTY_FILE", "O arquivo baixado está vazio.");
-            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=BYTES_RECEIVED bookId=" + safeBookId + " bytes=" + downloaded);
+            if (downloaded <= 0) throw new DownloadFailure("NETWORK_ERROR", "O arquivo baixado está vazio.", status, finalHost);
+            trace("BYTES_RECEIVED", "bookId=" + safeBookId + " bytes=" + downloaded);
+            trace("DOWNLOAD_COMPLETED", "bookId=" + safeBookId + " bytes=" + downloaded);
             if (expectedSize != null && expectedSize > 0 && downloaded != expectedSize) {
-                throw new DownloadFailure("DOWNLOAD_SIZE_MISMATCH", "O tamanho do arquivo não confere.");
+                throw new DownloadFailure("FILE_SIZE_INVALID", "O tamanho do arquivo não confere.", status, finalHost);
             }
+            trace("FILE_SIZE_VALID", "bookId=" + safeBookId + " expectedSize=" + (expectedSize == null ? "unknown" : expectedSize));
             final String mimeType = documentMimeType(signature, signatureLength, contentType);
             final String hash = hex(digest.digest());
-            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=FILE_VALIDATED bookId=" + safeBookId + " bytes=" + downloaded + " mimeType=" + mimeType + " expectedSha256=" + presence(expectedSha256));
+            trace("FILE_SIGNATURE_VALID", "bookId=" + safeBookId + " mimeType=" + mimeType);
             if (expectedSha256 != null && !expectedSha256.equals(hash)) {
-                throw new DownloadFailure("DOWNLOAD_HASH_MISMATCH", "A integridade do arquivo não confere.");
+                throw new DownloadFailure("FILE_SIZE_INVALID", "A integridade do arquivo não confere.", status, finalHost);
             }
             final File destination = new File(directory, safeBookId + ("application/pdf".equals(mimeType) ? ".pdf" : ".epub"));
-            moveAtomically(part, destination);
+            try { moveAtomically(part, destination); }
+            catch (IOException failure) { throw new DownloadFailure("FILE_MOVE_FAILED", "Não foi possível finalizar o arquivo.", status, finalHost, failure); }
             resolve(pluginCall, bookId, destination, hash, mimeType, false);
             notifyCompleted(bookId, destination, downloaded, hash, mimeType);
-            Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=FILE_SAVED bookId=" + safeBookId + " bytes=" + downloaded + " mimeType=" + mimeType);
+            trace("FINAL_FILE_SAVED", "bookId=" + safeBookId + " bytes=" + downloaded + " mimeType=" + mimeType + " storage=filesDir/lumeo-books");
+            }
         } catch (DownloadFailure failure) {
             deleteQuietly(part);
             notifyFailed(bookId, failure.code);
-            Log.w(TAG, "download.failed bookId=" + safeBookId + " code=" + failure.code);
+            trace("DOWNLOAD_FAILED", "bookId=" + safeBookId + " stage=HTTP_OR_VALIDATION errorCode=" + failure.code + " exceptionClass=" + failure.getClass().getSimpleName() + " safeMessage=" + safeMessage(failure.getMessage()) + httpDetails(failure));
             pluginCall.reject(failure.getMessage(), failure.code);
         } catch (IOException failure) {
             deleteQuietly(part);
-            final String code = httpCall.isCanceled() ? "DOWNLOAD_CANCELLED" : failure instanceof SocketTimeoutException ? "DOWNLOAD_TIMEOUT" : ioCode(failure);
+            final String code = httpCall.isCanceled() ? "DOWNLOAD_CANCELLED" : failure instanceof SocketTimeoutException ? "TIMEOUT" : ioCode(failure);
             notifyFailed(bookId, code);
-            Log.w(TAG, "download.failed bookId=" + safeBookId + " code=" + code + " exception=" + failure.getClass().getSimpleName() + " message=" + safeMessage(failure.getMessage()));
+            trace("DOWNLOAD_FAILED", "bookId=" + safeBookId + " stage=NETWORK_OR_STORAGE errorCode=" + code + " exceptionClass=" + failure.getClass().getSimpleName() + " safeMessage=" + safeMessage(failure.getMessage()));
             pluginCall.reject(httpCall.isCanceled() ? "Download cancelado." : "Não foi possível baixar o livro.", code);
         } catch (Exception failure) {
             deleteQuietly(part);
-            notifyFailed(bookId, "DOWNLOAD_UNKNOWN");
-            Log.w(TAG, "download.failed bookId=" + safeBookId + " code=DOWNLOAD_UNKNOWN exception=" + failure.getClass().getSimpleName());
-            pluginCall.reject("Não foi possível salvar o livro neste dispositivo.", "DOWNLOAD_UNKNOWN");
+            notifyFailed(bookId, "UNKNOWN_ERROR");
+            trace("DOWNLOAD_FAILED", "bookId=" + safeBookId + " stage=UNKNOWN errorCode=UNKNOWN_ERROR exceptionClass=" + failure.getClass().getSimpleName() + " safeMessage=" + safeMessage(failure.getMessage()));
+            pluginCall.reject("Não foi possível salvar o livro neste dispositivo.", "UNKNOWN_ERROR");
         } finally {
             activeCalls.remove(bookId);
         }
@@ -208,21 +245,24 @@ public class NativeBookDownloadPlugin extends Plugin {
         notifyListeners("bookDownloadProgress", event);
     }
     private void notifyCompleted(String bookId, File file, long size, String hash, String mimeType) {
-        JSObject event = new JSObject(); event.put("bookId", bookId); event.put("uri", file.toURI().toString()); event.put("size", size); event.put("sha256", hash); event.put("mimeType", mimeType); notifyListeners("bookDownloadCompleted", event);
+        JSObject event = new JSObject(); event.put("bookId", bookId); event.put("uri", privateFileUri(file)); event.put("size", size); event.put("sha256", hash); event.put("mimeType", mimeType); notifyListeners("bookDownloadCompleted", event);
     }
     private void notifyFailed(String bookId, String code) { JSObject event = new JSObject(); event.put("bookId", bookId); event.put("code", code); notifyListeners("bookDownloadFailed", event); }
     private void resolve(PluginCall call, String bookId, File file, String hash, String mimeType, boolean existing) {
-        JSObject result = new JSObject(); result.put("bookId", bookId); result.put("uri", file.toURI().toString()); result.put("size", file.length()); result.put("sha256", hash); result.put("mimeType", mimeType); result.put("existing", existing); call.resolve(result);
+        JSObject result = new JSObject(); result.put("bookId", bookId); result.put("uri", privateFileUri(file)); result.put("size", file.length()); result.put("sha256", hash); result.put("mimeType", mimeType); result.put("existing", existing); call.resolve(result);
     }
+    /** Capacitor maps this canonical file:/// URI to its local HTTPS bridge.
+     * File.toURI() yields file:/... on Java, which the WebView cannot fetch. */
+    private String privateFileUri(File file) { return Uri.fromFile(file).toString(); }
     private MessageDigest sha256() throws DownloadFailure { try { return MessageDigest.getInstance("SHA-256"); } catch (NoSuchAlgorithmException error) { throw new DownloadFailure("DOWNLOAD_HASH_UNAVAILABLE", "Não foi possível validar o arquivo."); } }
     private String documentMimeType(byte[] signature, int length, String responseType) throws DownloadFailure {
         final boolean pdf = length >= 5 && signature[0] == '%' && signature[1] == 'P' && signature[2] == 'D' && signature[3] == 'F' && signature[4] == '-';
         final boolean zip = length >= 4 && signature[0] == 'P' && signature[1] == 'K' && signature[2] == 3 && signature[3] == 4;
         if (pdf) return "application/pdf";
         if (zip) return "application/epub+zip";
-        if (responseType.contains("text/html")) throw new DownloadFailure("DOWNLOAD_HTML_RESPONSE", "A origem retornou uma página em vez do livro.");
+        if (responseType.contains("text/html")) throw new DownloadFailure("UNEXPECTED_HTML_RESPONSE", "A origem retornou uma página em vez do livro.");
         if (responseType.length() > 0 && !responseType.contains("pdf") && !responseType.contains("epub") && !responseType.contains("octet-stream")) throw new DownloadFailure("DOWNLOAD_INVALID_MIME", "A origem retornou um tipo de conteúdo inválido.");
-        throw new DownloadFailure("DOWNLOAD_INVALID_SIGNATURE", "O arquivo baixado não é um PDF ou EPUB válido.");
+        throw new DownloadFailure("INVALID_PDF", "O arquivo baixado não é um PDF ou EPUB válido.");
     }
     private String mimeTypeFor(File file) { return file.getName().endsWith(".epub") ? "application/epub+zip" : "application/pdf"; }
     private String normalizeHash(String value) { return value == null || value.trim().isEmpty() ? null : value.trim().toLowerCase(Locale.ROOT); }
@@ -234,12 +274,20 @@ public class NativeBookDownloadPlugin extends Plugin {
     private int redirectCount(Response response) { int count = 0; for (Response prior = response.priorResponse(); prior != null; prior = prior.priorResponse()) count++; return count; }
     private String safeHeader(String value) { return value == null ? "unknown" : value.replaceAll("[^A-Za-z0-9+./;=_ -]", "").substring(0, Math.min(100, value.replaceAll("[^A-Za-z0-9+./;=_ -]", "").length())); }
     private String presence(String value) { return value == null ? "absent" : "present"; }
-    private String abbreviatedHash(String value) { return value == null || value.length() < 12 ? presence(value) : value.substring(0, 12) + "…"; }
     private String safeMessage(String value) { if (value == null) return "none"; String safe = value.replaceAll("https?://\\S+", "[url]").replaceAll("[\\r\\n]", " "); return safe.substring(0, Math.min(160, safe.length())); }
-    private String ioCode(IOException failure) { String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(Locale.ROOT); return message.contains("no space") || message.contains("enospc") ? "DOWNLOAD_NO_SPACE" : "DOWNLOAD_IO_ERROR"; }
+    private String ioCode(IOException failure) { String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(Locale.ROOT); return message.contains("no space") || message.contains("enospc") ? "NO_SPACE" : "NETWORK_ERROR"; }
+    private String httpCode(int status) { return status == 401 ? "HTTP_401" : status == 403 ? "HTTP_403" : status == 404 ? "HTTP_404" : "HTTP_OTHER"; }
+    private String httpDetails(DownloadFailure failure) { return failure.statusCode == null ? "" : " statusCode=" + failure.statusCode + (failure.host == null ? "" : " host=" + failure.host); }
+    private void trace(String stage, String details) { Log.i(TAG, "LUMEO_NATIVE_DOWNLOAD stage=" + stage + (details.isEmpty() ? "" : " " + details)); }
+    private String safeStage(String value) { if (value == null) return "UNKNOWN"; final String safe = value.replaceAll("[^A-Z0-9_]", ""); return safe.substring(0, Math.min(64, safe.length())); }
+    private String safeDiagnostic(String value) { if (value == null) return ""; final String safe = value.replaceAll("[^A-Za-z0-9_.-]", ""); return safe.substring(0, Math.min(96, safe.length())); }
 
     private static final class DownloadFailure extends Exception {
         final String code;
-        DownloadFailure(String code, String message) { super(message); this.code = code; }
+        final Integer statusCode;
+        final String host;
+        DownloadFailure(String code, String message) { this(code, message, null, null, null); }
+        DownloadFailure(String code, String message, Integer statusCode, String host) { this(code, message, statusCode, host, null); }
+        DownloadFailure(String code, String message, Integer statusCode, String host, Throwable cause) { super(message, cause); this.code = code; this.statusCode = statusCode; this.host = host; }
     }
 }

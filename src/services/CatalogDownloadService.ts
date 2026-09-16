@@ -1,6 +1,5 @@
-import { Capacitor } from "@capacitor/core";
 import type { CatalogDownloadLink } from "./CatalogService";
-import { CapacitorNativeBookDownloadBridge } from "./NativeBookDownload";
+import { CapacitorNativeBookDownloadBridge, isNativeAndroidBookDownloadRuntime } from "./NativeBookDownload";
 
 export type CatalogDownloadProgress = (downloadedBytes: number, totalBytes: number | null) => void;
 
@@ -58,8 +57,10 @@ export class HybridCatalogDownloadService implements CatalogDownloadService {
     return (this.android ?? this.web).download(link, onProgress, signal);
   }
   private static androidService(): CatalogDownloadService | null {
-    if (typeof window === "undefined" || !Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return null;
-    if (!Capacitor.isPluginAvailable("NativeBookDownload")) return null;
+    if (!isNativeAndroidBookDownloadRuntime()) return null;
+    // Android must never silently fall back to a WebView download. A registered
+    // native plugin is authoritative even if Capacitor's generic marker is
+    // initialised late by this WebView.
     return new AndroidCatalogDownloadService(new CapacitorNativeBookDownloadBridge());
   }
 }
