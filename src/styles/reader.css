@@ -203,6 +203,10 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
    styles above: the cover uses the final spread's geometry in both states, so opening
    rotates around the fixed centre spine instead of recentering the whole book. */
 @media (min-width:64rem){
+  .reader-stage--reflow .reflow-pages:has(.desktop-book-reader){background:transparent!important}
+  .desktop-reader-desk{grid-template-rows:1fr!important}
+  .desktop-reader-greeting{grid-column:1!important;grid-row:1!important;display:grid!important;place-items:center!important;text-align:center!important}
+  .desktop-reader-greeting p{margin-inline:auto!important}
   .desktop-reader-book-slot,.desktop-book-reader--closed .desktop-reader-book-slot{
     grid-column:1 / -1!important;padding-left:0!important;place-items:center!important;
   }
@@ -211,7 +215,8 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
     width:calc(var(--desktop-page-width) * 2)!important;
     height:var(--desktop-page-height)!important;
     margin:0!important;
-    transform:rotateX(.45deg)!important;
+    /* Same transform in CLOSED and OPEN: the spine never recentres while opening. */
+    transform:translateY(calc(-1 * clamp(.75rem,1.75vh,1.35rem))) rotateX(.45deg)!important;
     transform-style:preserve-3d!important;
     overflow:visible!important;
   }
@@ -221,16 +226,18 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
     z-index:3!important;
   }
   .open-book-page--under-cover{
-    position:relative!important;inset:auto!important;display:block!important;grid-column:2!important;grid-row:1!important;
+    position:relative!important;inset:auto!important;display:none!important;grid-column:2!important;grid-row:1!important;
     z-index:1!important;visibility:hidden!important;
   }
-  .open-book-layout--closed:has(.page-turn--next) .open-book-page--under-cover{visibility:visible!important}
+  .open-book-layout--closed:has(.page-turn--next) .open-book-page--under-cover{display:block!important;visibility:visible!important}
   .open-book-layout--open-cover .open-book-page--cover-back{
     grid-column:1!important;grid-row:1!important;z-index:2!important;background:var(--reader-paper-lit)!important;
   }
   .open-book-page--cover-back .reader-cover-page,.open-book-page--cover-back .reader-cover-page img{
     filter:none!important;
   }
+  .open-book-page--cover-back{background:linear-gradient(135deg,#f5f0e5,#dfd6c4)!important}
+  .reader-hard-cover-lining{position:absolute;inset:.34rem;border:1px solid rgba(87,65,41,.16);background:linear-gradient(135deg,rgba(255,255,255,.64),rgba(217,204,181,.38));box-shadow:inset .18rem 0 .42rem rgba(64,42,22,.14)}
   /* A moving leaf crosses the gutter over both static pages.  It must not inherit the
      old desktop clipping rule, otherwise the right leaf disappears underneath left. */
   .open-book-page.page-turn-active,.open-book-layout--cover .open-book-page.page-turn-active{

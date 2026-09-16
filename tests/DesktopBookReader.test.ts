@@ -18,9 +18,10 @@ describe("OpenBookLayout",()=>{
     const replacements=source.match(/classList\.replace\(/g)??[];
     assert.equal(replacements.length,2,"verso e under precisam trocar a classe, nao acrescentar");
   });
-  it("a capa fechada não usa conteúdo real como verso",()=>{
-    assert.match(source,/leaf\.append\(this\.coverVerso\(cover\)\)/);
-    assert.match(source,/private coverVerso\(cover:ReaderPage\)/);
+  it("a capa fechada não usa conteúdo real ou a imagem da capa como verso",()=>{
+    assert.match(source,/leaf\.append\(this\.coverVerso\(\)\)/);
+    assert.match(source,/private hardCoverInside\(side:"left"\|"verso"\)/);
+    assert.equal(source.includes("coverVerso(cover"),false);
   });
 });
 
@@ -35,5 +36,10 @@ describe("camadas da folha desktop",()=>{
   it("a capa fechada ocupa a página direita da geometria final",()=>{
     assert.match(css,/\.open-book-layout--closed \.open-book-page--cover\{[\s\S]*grid-column:2!important/);
     assert.match(css,/\.open-book-layout--cover,\.open-book-layout--closed,\.open-book-layout--open-cover\{[\s\S]*width:calc\(var\(--desktop-page-width\) \* 2\)!important/);
+  });
+  it("o palco fechado não deixa uma folha branca atrás da capa",()=>{
+    assert.match(css,/\.reader-stage--reflow \.reflow-pages:has\(\.desktop-book-reader\)\{background:transparent!important\}/);
+    assert.match(css,/\.open-book-page--under-cover\{[\s\S]*display:none!important/);
+    assert.match(css,/\.open-book-layout--closed:has\(\.page-turn--next\) \.open-book-page--under-cover\{display:block!important/);
   });
 });

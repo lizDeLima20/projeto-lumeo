@@ -10,9 +10,7 @@ export class OpenBookLayout {
       book.classList.add("open-book-layout--cover", `open-book-layout--${coverState}`);
       const afterCover=spread.left?.cover?spread.right:spread.left;
       if(coverState==="open") {
-        const back=new BookPageView(cover,"left",this.paragraph).render();
-        back.classList.remove("open-book-page--cover");
-        back.classList.add("open-book-page--left","open-book-page--cover-back");
+        const back=this.hardCoverInside("left");
         const first=new BookPageView(afterCover,"right",this.paragraph).render();
         first.classList.add("open-book-page--right");
         book.append(back,first);
@@ -24,7 +22,7 @@ export class OpenBookLayout {
       const leaf=new BookPageView(cover,"cover",this.paragraph).render();
       /* The back of a physical cover is still the cover material, never page 1 or
        * copyright text. This prevents content leaking at the 90° crossover. */
-      leaf.append(this.coverVerso(cover));
+      leaf.append(this.coverVerso());
       book.append(leaf);
       return book;
     }
@@ -46,9 +44,16 @@ export class OpenBookLayout {
       inner.classList.replace(`open-book-page--${side}`,"open-book-page--verso");face.append(inner);}
     return face;
   }
-  private coverVerso(cover:ReaderPage):HTMLElement{
+  private coverVerso():HTMLElement{
     const face=document.createElement("div");face.className="page-turn-verso page-turn-verso--cover";face.setAttribute("aria-hidden","true");
-    const inner=new BookPageView(cover,"cover",this.paragraph).render();inner.classList.remove("open-book-page--cover");inner.classList.add("open-book-page--verso");face.append(inner);return face;
+    face.append(this.hardCoverInside("verso"));return face;
+  }
+  /** Interior of a hard cover: opaque material, never a second copy of the artwork
+   * and never document content. The same physical face is used in the open layout and
+   * in the reverse side of the cover while it turns. */
+  private hardCoverInside(side:"left"|"verso"):HTMLElement{
+    const face=document.createElement("article");face.className=`open-book-page open-book-page--${side} open-book-page--cover-back`;
+    face.setAttribute("aria-hidden","true");const lining=document.createElement("div");lining.className="reader-hard-cover-lining";face.append(lining);return face;
   }
   /** No copy of a page may keep the --left/--right modifier: those two classes are how
    *  the turn controller finds the leaf to animate, and a nested copy earlier in the
