@@ -33,6 +33,13 @@ describe("camadas da folha desktop",()=>{
     assert.match(rule,/z-index:40!important/);
     assert.match(rule,/overflow:visible!important/);
   });
+  it("prepara a página exposta antes do primeiro frame nas duas direções",()=>{
+    const engine=readFileSync("src/reader/page-turn/PageTurnEngine.ts","utf8");
+    assert.match(engine,/page-turn-under-active/);
+    assert.match(engine,/page-turn-active",direction===1\?"page-turn--next":"page-turn--previous/);
+    assert.match(css,/\.page-turn-active\.page-turn--next\) \.open-book-page--under-right/);
+    assert.match(css,/\.page-turn-active\.page-turn--previous\) \.open-book-page--under-left/);
+  });
   it("a capa fechada ocupa a página direita da geometria final",()=>{
     assert.match(css,/\.open-book-layout--closed \.open-book-page--cover\{[\s\S]*grid-column:2!important/);
     assert.match(css,/\.open-book-layout--cover,\.open-book-layout--closed,\.open-book-layout--open-cover\{[\s\S]*width:calc\(var\(--desktop-page-width\) \* 2\)!important/);

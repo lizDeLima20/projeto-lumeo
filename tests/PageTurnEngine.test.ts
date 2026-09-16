@@ -59,6 +59,13 @@ describe("PageCurlGeometry",()=>{
     assert.ok(rule.includes("transform-style:preserve-3d"),rule);
     assert.equal(rule.includes("filter:"),false,"filter e propriedade de agrupamento: achataria o 3D");
   });
+  it("a folha tem frente e verso físicos, nunca faces alternadas por display",()=>{
+    const css=readFileSync("src/styles/reader.css","utf8"),source=readFileSync("src/reader/page-turn/PageCurl.ts","utf8");
+    assert.match(css,/\.page-turn-strip__front,\.page-turn-strip__back\{[^}]*backface-visibility:hidden/);
+    assert.equal(css.includes(".page-turn-strip[data-face="),false);
+    assert.match(source,/rotateY\(180deg\)/);
+    assert.equal(source.includes("dataset.face"),false);
+  });
 });
 
 describe("acabamento do folhear",()=>{

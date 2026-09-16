@@ -79,13 +79,11 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .page-turn-curled>*:not(.page-turn-curl){visibility:hidden}
 .page-turn-curled::after,.page-turn-curled::before{display:none}
 .open-book-page>.page-turn-curl,.reflow-sheet>.page-turn-curl{position:absolute;inset:0;z-index:2;transform-style:preserve-3d;pointer-events:none;visibility:visible}
-.page-turn-strip{position:absolute;top:0;bottom:0;overflow:hidden;transform-origin:0 50%;background:var(--reader-paper-lit);will-change:transform}
+.page-turn-strip{position:absolute;top:0;bottom:0;overflow:hidden;transform-origin:0 50%;background:var(--reader-paper-lit);will-change:transform;transform-style:preserve-3d}
 /* Shading is baked into the strip's own opaque paper rather than laid over it. As a
    translucent overlay it was drawn twice wherever two strips overlap, and every seam
    came out as a dark hairline - the banding that read as a roll lying on the page. */
-.page-turn-strip__front,.page-turn-strip__back{position:absolute;inset:0;overflow:hidden;background-color:var(--reader-paper-lit);background-image:linear-gradient(90deg,rgba(22,15,7,var(--strip-shade-a,0)),rgba(22,15,7,var(--strip-shade-b,0)))}
-.page-turn-strip[data-face="front"] .page-turn-strip__back,
-.page-turn-strip[data-face="back"] .page-turn-strip__front{display:none}
+.page-turn-strip__front,.page-turn-strip__back{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;transform-style:preserve-3d;background-color:var(--reader-paper-lit);background-image:linear-gradient(90deg,rgba(22,15,7,var(--strip-shade-a,0)),rgba(22,15,7,var(--strip-shade-b,0)))}
 .page-turn-strip__inner{position:absolute;top:0;bottom:0;left:0;opacity:var(--strip-ink,1)}
 /* The crease darkening is the geometry shading itself - each strip takes the lamp in
    proportion to how squarely it faces the reader - not a band painted across the page. */
@@ -106,6 +104,10 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .open-book-page--under-right{grid-column:2}
 .open-book-layout:has(.page-turn--next) .open-book-page--under-right,
 .open-book-layout:has(.page-turn--previous) .open-book-page--under-left{visibility:visible}
+/* `begin()` marks the direction before its first rAF. The revealed page is therefore
+   * already composited under the leaf at 0%, not inserted after pointerup. */
+.open-book-layout:has(.page-turn-active.page-turn--next) .open-book-page--under-right,
+.open-book-layout:has(.page-turn-active.page-turn--previous) .open-book-page--under-left{visibility:visible}
 /* The leaf casts on whatever is under it, from the gutter outward. */
 .open-book-page{--under-shadow:0}
 .open-book-page:not(.page-turn-active),.reflow-sheet:not(.page-turn-active){isolation:isolate}

@@ -68,11 +68,12 @@ export class PageCurl {
       root.transform=`translate3d(${shiftX}px,${strip.y}px,${strip.z}px) rotateY(${angle}deg)`;
       nodes.root.style.setProperty("--strip-shade-a",shadeLeft.toFixed(3));
       nodes.root.style.setProperty("--strip-shade-b",shadeRight.toFixed(3));
-      nodes.root.dataset.face=strip.showsBack?"back":"front";
       nodes.root.style.setProperty("--strip-ink",strip.ink.toFixed(3));
-      /* Mirroring happens on the content, whose box never moves, so its axis is stable. */
+      /* The faces are real planes. The back rotates with the paper itself; using
+       * display:none to swap cloned text at 90deg was what made the sheet look like a
+       * transparent card on some desktop compositors. */
       nodes.front.style.transform=`translateX(${-left}px)`;
-      nodes.back.style.transform=`translateX(${-left}px) scaleX(-1)`;
+      nodes.back.style.transform=`translateX(${-left}px) rotateY(180deg)`;
     }
     return plan;
   }

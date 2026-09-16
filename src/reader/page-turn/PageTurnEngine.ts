@@ -24,10 +24,13 @@ export class PageTurnEngine {
   public constructor(private readonly page:HTMLElement,private readonly under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.3,private readonly curl=new PageCurl()){}
 
   public get state():PageTurnState{return this.stateValue;}
-  public begin(x:number,time=performance.now()):boolean{
+  public begin(x:number,time=performance.now(),direction:TurnDirection=this.direction):boolean{
     if(this.stateValue!=="IDLE")return false;
-    this.stateValue="DRAGGING";this.gesture.start(x,time);
-    this.page.classList.add("page-turn-active");this.page.style.willChange="transform";
+    this.stateValue="DRAGGING";this.direction=direction;this.gesture.start(x,time);
+    this.page.classList.add("page-turn-active",direction===1?"page-turn--next":"page-turn--previous");this.page.style.willChange="transform";
+    /* The page below is part of the scene before the first visual frame.  This is
+       * deliberately done in begin(), not when the gesture finishes. */
+    this.under?.classList.add("page-turn-under-active");
     this.curl.mount(this.page);
     return true;
   }
@@ -56,8 +59,7 @@ export class PageTurnEngine {
     return progress>=this.threshold||Math.abs(velocityX)>=PageTurnEngine.flickVelocity&&(direction===1?velocityX<0:velocityX>0);
   }
   public async programmatic(direction:TurnDirection):Promise<boolean>{
-    if(!this.begin(direction===1?this.page.clientWidth:0))return false;
-    this.direction=direction;
+    if(!this.begin(direction===1?this.page.clientWidth:0,performance.now(),direction))return false;
     const start=this.geometry.atProgress(.08,this.page.clientWidth,direction);
     this.apply(start);await this.settle(true,start);this.commit(direction);this.reset();return true;
   }
@@ -104,6 +106,6 @@ export class PageTurnEngine {
     this.curl.unmount();
     this.page.style.transform="";this.page.style.transformOrigin="";this.page.style.willChange="";
     this.page.classList.remove("page-turn-active","page-turn--next","page-turn--previous");
-    this.shadows.clear(this.page,this.under);this.stateValue="IDLE";
+    this.shadows.clear(this.page,this.under);this.under?.classList.remove("page-turn-under-active");this.stateValue="IDLE";
   }
 }
