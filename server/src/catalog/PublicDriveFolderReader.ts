@@ -17,7 +17,7 @@ export class PublicDriveFolderReader {
       const fileId = match[1]!;
       if (seen.has(fileId)) continue;
       seen.add(fileId);
-      values.push({ fileId, name: this.decode(match[2]!).replace(/\s+(?:PDF|EPUB|JSON)\s+Shared$/i, "").trim() });
+      values.push({ fileId, name: this.decode(match[2]!).replace(/\s+(?:PDF|EPUB|JSON|Unknown)\s+Shared$/i, "").trim() });
     }
     return values;
   }

@@ -22,8 +22,9 @@ export class CatalogApplicationService {
       bookId: book.bookId,
       driveFileId: info.driveFileId,
       resourceKey: book.resourceKey ?? null,
-      downloadUrl: info.downloadUrl,
-      downloadUrls: info.downloadUrls,
+      // The catalogue's own link comes first; the derived Drive links remain fallbacks.
+      downloadUrl: book.downloadUrl ?? info.downloadUrl,
+      downloadUrls: book.downloadUrl ? [book.downloadUrl, ...info.downloadUrls.filter((url) => url !== book.downloadUrl)] : info.downloadUrls,
       title: book.title,
       author: book.author,
       genreId: book.genreId,

@@ -1,5 +1,5 @@
 import type { CatalogSourceProvider } from "./CatalogSourceProvider.js";
-import type { CatalogBookRecord, CatalogPage, CatalogQuery, CatalogSourceDiagnostic } from "./types.js";
+import type { CatalogBookRecord, CatalogGenre, CatalogPage, CatalogQuery, CatalogSourceDiagnostic } from "./types.js";
 
 /** Aggregates independent public sources without exposing their account/provider to readers. */
 export class HybridCatalogSourceProvider {
@@ -31,7 +31,14 @@ export class HybridCatalogSourceProvider {
     const filtered = books.filter((book) => this.matches(book, query));
     const page = filtered.slice(query.offset, query.offset + query.limit + 1);
     console.info(JSON.stringify({ event: "CATALOG_PIPELINE_COUNTS", sourceCounts, totalFoundInSources: sourceCounts.reduce((total, source) => total + source.items, 0), afterDeduplication: books.length, afterFilters: filtered.length, returnedByApi: Math.min(query.limit, page.length), requestedOffset: query.offset }));
-    return { items: page.slice(0, query.limit), nextCursor: page.length > query.limit ? String(query.offset + query.limit) : null };
+    return { items: page.slice(0, query.limit), nextCursor: page.length > query.limit ? String(query.offset + query.limit) : null, genres: HybridCatalogSourceProvider.genres(books) };
+  }
+
+  /** Every genre present across the loaded sources, so each can be offered as a filter. */
+  private static genres(books: readonly CatalogBookRecord[]): readonly CatalogGenre[] {
+    const genres = new Map<string, string>();
+    for (const book of books) if (book.genreId && book.genreId !== "sem-genero" && !genres.has(book.genreId)) genres.set(book.genreId, book.genreName);
+    return [...genres].map(([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
   }
 
   public async get(bookId: string, locale?: string): Promise<CatalogBookRecord | null> {

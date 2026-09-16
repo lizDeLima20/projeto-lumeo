@@ -57,6 +57,17 @@ export class GoogleCatalogDriveClient {
     while (true) { const { done, value } = await reader.read(); if (done) break; if (value) { received += value.byteLength; if (received > this.maxFileBytes) throw new ApiError(413, "CATALOG_FILE_TOO_LARGE", "Um arquivo do catálogo ultrapassa o limite permitido."); hash.update(value); if (prefix.length < 8) prefix = this.concatPrefix(prefix, value); } }
     this.assertSignature(file.format, prefix); return hash.digest("hex");
   }
+  /** A genre folder's catalog.json through the Drive API; null when the folder has none. */
+  public async readCatalogJson(folderId = this.folderId): Promise<unknown | null> {
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", `'${folderId.replace(/'/g, "\\'")}' in parents and name = 'catalog.json' and trashed = false`);
+    url.searchParams.set("fields", "files(id,name)"); url.searchParams.set("pageSize", "10"); url.searchParams.set("supportsAllDrives", "true"); url.searchParams.set("includeItemsFromAllDrives", "true");
+    const listing = await this.authorized(url); if (!listing.ok) throw this.driveError(listing.status);
+    const file = ((await listing.json()) as { files?: Array<{ id: string }> }).files?.[0];
+    if (!file) return null;
+    const response = await this.media(file.id);
+    try { return await response.json() as unknown; } catch { throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json não possui JSON válido."); }
+  }
   public static publicDownloadUrl(fileId: string): string { return new GoogleDrivePublicUrlResolver().resolve(fileId, "pdf").downloadUrl; }
 
   private async visitFolder(folderId: string, visited: Set<string>, books: Map<string, CatalogDriveFile>, audit: CatalogSourceAudit): Promise<void> {

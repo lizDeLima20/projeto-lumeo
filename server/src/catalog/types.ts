@@ -11,6 +11,9 @@ export interface CatalogSourceConfig {
   mode: CatalogSourceMode;
   enabled: boolean;
   priority: number;
+  /** A genre folder (books/, covers/, catalog.json): every book it lists belongs to
+   * this genre, whatever each entry says. */
+  genre?: string;
 }
 
 export interface CatalogSourceDiagnostic {
@@ -41,6 +44,8 @@ export interface CatalogBookRecord {
   sourceFileName?: string | null;
   fileSize: number | null;
   driveFileId: string;
+  /** Download link published in catalog.json, preferred over one derived from driveFileId. */
+  downloadUrl?: string | null;
   resourceKey?: string | null;
   storageAccountId: string;
   sha256: string | null;
@@ -52,7 +57,8 @@ export interface CatalogBookRecord {
   status: CatalogBookStatus;
 }
 
-export interface CatalogPage { items: readonly CatalogBookRecord[]; nextCursor: string | null; }
+export interface CatalogGenre { id: string; name: string; }
+export interface CatalogPage { items: readonly CatalogBookRecord[]; nextCursor: string | null; genres?: readonly CatalogGenre[]; }
 export interface CatalogQuery { offset: number; limit: number; locale?: string; query?: string; genreId?: string; author?: string; format?: CatalogFormat; collection?: string; }
 /** Metadata needed by the browser to download a public Drive file directly.
  * The BFF deliberately never proxies PDF or EPUB bytes. */

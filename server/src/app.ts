@@ -21,6 +21,8 @@ import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js"
 import { CatalogSourceRegistry } from "./catalog/CatalogSourceRegistry.js";
 import { HybridCatalogSourceProvider } from "./catalog/HybridCatalogSourceProvider.js";
 import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalogProvider.js";
+import { StructuredDriveCatalogProvider } from "./catalog/StructuredDriveCatalogProvider.js";
+import { PublicDriveFolderReader } from "./catalog/PublicDriveFolderReader.js";
 import { UserPersistenceRepository } from "./repositories/UserPersistenceRepository.js";
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
@@ -46,7 +48,10 @@ export class ServerApp {
       // server account is configured, every catalogue source is read through
       // the paginated Drive API instead.
       const authorizedSources = config.googleCatalogServiceAccountJson.trim()
-        ? config.catalogSources.map((source) => new AuthorizedDriveCatalogProvider(source, () => createDrive(source.folderId)))
+        ? config.catalogSources.map((source) => source.mode === "structured"
+          // A structured source is defined by its catalog.json, read through the same account.
+          ? new StructuredDriveCatalogProvider(source, new PublicDriveFolderReader(), fetch, { read: (folderId) => createDrive(folderId).readCatalogJson() })
+          : new AuthorizedDriveCatalogProvider(source, () => createDrive(source.folderId)))
         : null;
       controller = new ApiController(
         auth,

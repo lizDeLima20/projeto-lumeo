@@ -11,6 +11,8 @@ export class CatalogExplorerView extends BaseView {
   private readonly classified: HTMLElement = document.createElement("div");
   private readonly unclassified: HTMLElement = document.createElement("div");
   private status: HTMLElement | null = null;
+  /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
+  private addCatalogGenre: (id: string, label: string) => void = () => undefined;
   public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void) { super(); this.catalog = api; }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog page-shell");
@@ -21,6 +23,7 @@ export class CatalogExplorerView extends BaseView {
     const selectGenre = (id: string): void => { selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
     const addGenre = (id: string, label: string): void => { if (availableGenres.has(id)) return; availableGenres.add(id); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
     addGenre("", "Todos"); addGenre("sem-genero", this.t("ui.catalog.unclassified")); this.state.genres.forEach((value) => addGenre(value.id, value.name));
+    this.addCatalogGenre = addGenre;
     controls.append(search, genres);
     const list = this.createElement("div", "catalog__sections");
     this.classified.className = "catalog__grid"; this.unclassified.className = "catalog__grid";
@@ -38,6 +41,7 @@ export class CatalogExplorerView extends BaseView {
     if (this.loading || this.cursor === "end") return; this.loading = true; more.disabled = true; this.status!.textContent = this.t("ui.common.loading");
     try {
       const page = await this.catalog.list({ cursor: this.cursor ?? undefined, query: query.trim() || undefined, genreId: genreId || undefined });
+      page.genres?.forEach((genre) => this.addCatalogGenre(genre.id, genre.name));
       page.items.filter((book) => !this.loaded.has(book.bookId)).forEach((book) => {
         this.loaded.add(book.bookId);
         (this.isUnclassified(book) ? this.unclassified : this.classified).append(this.card(book));

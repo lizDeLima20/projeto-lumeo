@@ -31,4 +31,6 @@ export class CatalogBook {
 export interface CatalogPage {
   items: readonly CatalogBookData[];
   nextCursor: string | null;
+  /** Genres present in the catalogue sources, each one a filter. */
+  genres?: ReadonlyArray<{ id: string; name: string }>;
 }

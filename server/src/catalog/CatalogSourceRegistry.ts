@@ -52,7 +52,7 @@ export function catalogSourcesFromEnvironment(raw: string | undefined, legacyFol
       const source = entry as Partial<CatalogSourceConfig>;
       if (typeof source.sourceId !== "string" || !/^[a-z0-9-]{3,80}$/i.test(source.sourceId) || typeof source.locale !== "string" || !source.locale.trim() || typeof source.folderId !== "string" || !/^[A-Za-z0-9_-]{10,}$/.test(source.folderId)) return [];
       const mode = source.mode === "legacy" || source.mode === "structured" || source.mode === "auto" ? source.mode : "auto";
-      return [{ sourceId: source.sourceId, locale: source.locale.trim(), folderId: source.folderId, mode, enabled: source.enabled !== false, priority: Number.isFinite(source.priority) ? Math.trunc(source.priority as number) : 100 }];
+      return [{ sourceId: source.sourceId, locale: source.locale.trim(), folderId: source.folderId, mode, enabled: source.enabled !== false, priority: Number.isFinite(source.priority) ? Math.trunc(source.priority as number) : 100, ...(typeof source.genre === "string" && source.genre.trim() ? { genre: source.genre.trim() } : {}) }];
     });
     return sources.length ? sources : fallback;
   } catch { return fallback; }
