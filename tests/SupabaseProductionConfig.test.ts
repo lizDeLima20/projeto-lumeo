@@ -39,4 +39,13 @@ describe("configuração Supabase produção", () => {
     assert.match(sql, /licenses_status_idx/);
     assert.match(sql, /created_at_idx/);
   });
+
+  it("librarySyncUsesUserScopedMetadataAndNeverBookBytes", async () => {
+    const sql = await readFile(new URL("../supabase/migrations/202609160001_account_library_sync.sql", import.meta.url), "utf8");
+    assert.match(sql, /user_library_books/);
+    assert.match(sql, /source_updated_at/);
+    assert.match(sql, /user_library_books_select_own/);
+    assert.match(sql, /auth\.uid\(\) = user_id/);
+    assert.doesNotMatch(sql, /bytea|storage\.objects/i);
+  });
 });

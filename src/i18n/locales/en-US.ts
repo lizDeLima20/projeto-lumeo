@@ -49,4 +49,5 @@ export const EN_US: TranslationCatalog = {
   "ui.book.readingProgress": "{percent}% read",
   "ui.greeting.reader": "Reader", "ui.greeting.readerHello": "Hello!", "ui.greeting.readerDeskCopy": "I wish you a good reading session and productive study.",
   "reader.review.title": "How was your reading?", "reader.review.help": "Rate this book and, if you wish, leave a short comment.", "reader.review.stars": "{count} star|{count} stars", "reader.review.comment": "Your opinion (optional)", "reader.review.commentPlaceholder": "Write a short comment", "reader.review.later": "Maybe later", "reader.review.save": "Save rating",
+  "ui.book.downloadOnDevice": "Download on this device", "ui.book.fileRemote": "This book is in your library, but has not been downloaded on this device yet.",
 };

@@ -15,12 +15,12 @@ export class CatalogImportFileMismatchError extends Error {
 export class CatalogImportCoordinator {
   private readonly validator = new LocalFileImporter();
   public constructor(private readonly imports: ImportManager, private readonly covers: CoverService) {}
-  public async addDownloadedFile(book: CatalogBookData, download: CatalogDownloadLink, file: File, onStage: (stage: CatalogImportStage, progress?: number | null) => void, signal?: AbortSignal, confirmedCover?: string): Promise<Book> {
+  public async addDownloadedFile(book: CatalogBookData, download: CatalogDownloadLink, file: File, onStage: (stage: CatalogImportStage, progress?: number | null) => void, signal?: AbortSignal, confirmedCover?: string, replaceBookId?: string): Promise<Book> {
     onStage("validating"); const imported = await this.validator.import(file, "catalog"); await this.assertMatches(download, imported.file);
     const cover = confirmedCover || await this.covers.fromBookFile(imported.file, imported.fileType, book.title);
     onStage("saving");
     const saved = await this.imports.save(imported, { title: book.title, author: book.author, genreId: book.genreId,
-      readingStatus: "unread", cover, volume: book.volume, series: book.collection, description: book.description }, undefined, { signal, catalogBookId: book.bookId });
+      readingStatus: "unread", cover, volume: book.volume, series: book.collection, description: book.description }, undefined, { signal, catalogBookId: book.bookId, bookId: book.bookId, replaceBookId });
     onStage("complete", 100); return saved;
   }
 

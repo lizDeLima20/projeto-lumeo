@@ -9,13 +9,13 @@ export class ReadingReviewRepository {
     return (await this.database.request<ReadingReview | undefined>(STORE_NAMES.readingReviews, "readonly", store => store.get(key))) ?? null;
   }
 
-  public async save(review: Omit<ReadingReview, "id" | "createdAt" | "updatedAt">): Promise<ReadingReview> {
+  public async save(review: Omit<ReadingReview, "id" | "createdAt" | "updatedAt"> & Partial<Pick<ReadingReview, "createdAt" | "updatedAt">>): Promise<ReadingReview> {
     const now = new Date().toISOString(), existing = await this.get(review.userId, review.bookId);
     const value: ReadingReview = {
       ...review,
       id: ReadingReviewRepository.key(review.userId, review.bookId),
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
+      createdAt: existing?.createdAt ?? review.createdAt ?? now,
+      updatedAt: review.updatedAt ?? now,
     };
     await this.database.request(STORE_NAMES.readingReviews, "readwrite", store => store.put(value));
     return value;

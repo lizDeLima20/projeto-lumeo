@@ -150,6 +150,9 @@ export class ReaderView extends BaseView {
     if (await this.reviews.get(this.readerUserId, book.id)) return;
     const dialog = new ReadingReviewDialog(async (rating, comment) => {
       await this.reviews.save({ userId:this.readerUserId!, bookId:book.id, rating, comment:comment || undefined });
+      // The Reader callback also mirrors only this review metadata to the
+      // account; original pages and the source file remain local.
+      this.onBookUpdated(book);
     }).render();
     this.element.append(dialog);
   }

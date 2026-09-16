@@ -31,7 +31,8 @@ export class CatalogBookView extends BaseView {
     const metadata = this.createElement("dl", "catalog-detail__metadata"); this.meta(metadata, this.t("ui.catalog.genre"), book.genreName); this.meta(metadata, this.t("ui.catalog.format"), book.format.toUpperCase());
     if (book.fileSize) this.meta(metadata, this.t("ui.catalog.size"), this.formatSize(book.fileSize)); if (book.collection) this.meta(metadata, this.t("ui.catalog.collection"), book.collection); if (book.volume) this.meta(metadata, this.t("ui.catalog.volumeLabel"), book.volume);
     copy.append(metadata); if (book.description) copy.append(this.createElement("p", "catalog-detail__description", book.description));
-    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const hasLocalFile = local?.availability === "AVAILABLE"; const action = this.createElement("button", "button button--primary catalog-detail__action", hasLocalFile ? this.t("ui.catalog.open") : this.t("catalog.download")); action.type = "button";
+    const local = this.state.books.find((item) => item.catalogBookId === book.bookId); const hasLocalFile = local?.availability === "AVAILABLE";
+    const action = this.createElement("button", "button button--primary catalog-detail__action", hasLocalFile ? this.t("ui.catalog.open") : local ? this.t("ui.book.downloadOnDevice") : this.t("catalog.download")); action.type = "button";
     const progress = this.createElement("p", "catalog__status"); progress.setAttribute("role", "status");
     if (local && hasLocalFile) action.addEventListener("click", () => this.onOpenLocal(local.id)); else this.configureDownloadFlow(book, action, progress);
     copy.append(action, progress); root.append(cover, copy); return root;

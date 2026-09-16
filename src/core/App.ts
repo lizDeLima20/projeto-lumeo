@@ -123,7 +123,7 @@ export class App {
     await this.restoreTheme();
     this.connectivity.bind();
     this.pwaInstall.bind();
-    this.connectivity.subscribe((status)=>{if(status==="OFFLINE")this.showToast(I18nManager.shared.t("offline.status"));if(status==="RECONNECTING")this.showToast(I18nManager.shared.t("offline.reconnecting"));});
+    this.connectivity.subscribe((status)=>{if(status==="OFFLINE")this.showToast(I18nManager.shared.t("offline.status"));if(status==="RECONNECTING"){this.showToast(I18nManager.shared.t("offline.reconnecting"));if(this.isAuthenticated())void this.syncLocalLibrary();}});
     await this.devices.initialize();
     await this.auth.initialize();
     if (this.state.authStatus === "authenticated" || this.state.authStatus === "AUTHENTICATED") {
@@ -176,7 +176,8 @@ export class App {
     const book = this.findBook(id);
     const genre = book ? this.state.genres.find((item) => item.id === book.genreId) ?? null : null;
     return new BookDetailsView(book, genre, () => this.openLibraryBook(id),
-      () => this.router.navigate("edit-book", { id }), () => void this.deleteBook(id), () => this.router.navigate("library"),()=>void this.locateBookFile(id));
+      () => this.router.navigate("edit-book", { id }), () => void this.deleteBook(id), () => this.router.navigate("library"),()=>void this.locateBookFile(id),
+      () => { if (book?.catalogBookId) this.router.navigate("catalog-book", { id: book.catalogBookId }); });
   }
 
   private async afterAuthentication(): Promise<void> {
@@ -221,20 +222,31 @@ export class App {
       if (genres.some((genre) => genre.id === item.id)) continue;
       const genre = new Genre(item.id, item.name); await this.genres.save(genre); genres.push(genre);
     }
-    const books = [...restored.books];
+    const byId = new Map(restored.books.map(book => [book.id, book]));
+    const reviews = new ReadingReviewRepository(this.database), userId = this.state.currentUser?.id;
     for (const item of remote?.books ?? []) {
-      if (books.some((book) => book.id === item.bookId)) continue;
-      const book = this.remoteBook(item); if (!book) continue;
+      const remoteBook = this.remoteBook(item); if (!remoteBook) continue;
       const remoteGenre = this.remoteGenre(item);
       if (remoteGenre && !genres.some((genre) => genre.id === remoteGenre.id)) {
         await this.genres.save(remoteGenre); genres.push(remoteGenre);
       }
-      await this.books.save(book); books.push(book);
+      const localBook = byId.get(item.bookId) ?? [...byId.values()].find(book => book.catalogBookId === item.bookId);
+      const usesRemoteState = !localBook || remoteBook.updatedAt > localBook.updatedAt;
+      const book = usesRemoteState ? this.mergeRemoteBook(remoteBook, localBook) : localBook;
+      if (book !== localBook) await this.books.save(book);
+      byId.set(book.id, book);
+      const review = userId ? this.remoteReview(item, userId, book.id) : null;
+      if (review) { const localReview = await reviews.get(userId!, book.id); if (!localReview || Date.parse(review.updatedAt) > Date.parse(localReview.updatedAt)) await reviews.save(review); }
+      if (usesRemoteState) await this.restoreRemoteProgress(book);
     }
+    const books = [...byId.values()];
     this.state.library.replaceGenres(genres); this.state.library.replaceBooks(books);
     this.state.onboardingCompleted = preferences?.onboardingCompleted ?? genres.length > 0;
     if (preferences) { this.state.settings.theme = preferences.theme; this.applyTheme(preferences.theme); await this.preferences.save(preferences); }
     this.state.notify();
+    // Offline writes are retained in local metadata. A successful authenticated
+    // startup/reconnect retries them without ever uploading the original file.
+    void this.syncLocalLibrary();
   }
 
   private configureLocalLibrary(userId: string): void {
@@ -278,7 +290,7 @@ export class App {
 
   private async addBook(book: Book): Promise<void> {
     this.state.library.addBook(book); this.state.notify();
-    void this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId)).catch(() => undefined);
+    void this.persistRemoteBook(book).catch(() => undefined);
     void new StoragePersistenceService().requestAfterImport();
     this.router.navigate("book", { id: book.id }); this.showToast("Livro adicionado à biblioteca.");
   }
@@ -316,7 +328,8 @@ export class App {
     const coordinator = new CatalogImportCoordinator(this.imports, this.covers);
     this.logCatalogImport("IMPORT_STARTED", { bookId: catalogBook.bookId, format: link.format });
     let saved: Book;
-    try { saved = await coordinator.addDownloadedFile({ ...confirmed, genreId: genre.id }, link, file, progress, signal, extractedCover); }
+    const remoteCopy = this.state.books.find(item => item.catalogBookId === catalogBook.bookId && item.availability !== "AVAILABLE");
+    try { saved = await coordinator.addDownloadedFile({ ...confirmed, genreId: genre.id }, link, file, progress, signal, extractedCover, remoteCopy?.id); }
     catch (error) {
       reportNativeDownloadDiagnostic("IMPORT_FAILED", { bookId: catalogBook.bookId, errorCode: error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "IMPORT_FAILED", exceptionClass: error instanceof Error ? error.constructor.name : "Unknown" });
       throw error;
@@ -333,7 +346,7 @@ export class App {
     const accountPreferences = this.preferences.fromState(this.state.onboardingCompleted, this.state.settings.theme, this.state.genres);
     await this.preferences.save(accountPreferences);
     await Promise.all([
-      this.accountPersistence.saveBook(libraryBook, this.state.genres.find((genre) => genre.id === libraryBook.genreId)),
+      this.persistRemoteBook(libraryBook),
       this.accountPersistence.savePreferences(accountPreferences),
     ]).catch(() => undefined);
     this.logCatalogImport("LIBRARY_REGISTERED", { bookId: catalogBook.bookId, localBookId: saved.id });
@@ -345,7 +358,7 @@ export class App {
   private async updateBook(book: Book): Promise<void> {
     await this.libraryService.saveBook(book);
     this.state.library.replaceBooks(this.state.books.map((item) => item.id === book.id ? book : item));
-    void this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId)).catch(() => undefined);
+    void this.persistRemoteBook(book).catch(() => undefined);
     this.state.notify(); this.router.navigate("book", { id: book.id }); this.showToast("Livro atualizado.");
   }
 
@@ -353,13 +366,14 @@ export class App {
     this.state.library.replaceBooks(this.state.books.map((item) => item.id === book.id ? book : item));
     // Reader progress updates the Book record asynchronously. Mirror only its
     // lightweight metadata; the file, annotations and highlights stay local.
-    void this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId)).catch(() => undefined);
+    void this.persistRemoteBook(book).catch(() => undefined);
     this.state.notify();
   }
 
   private async deleteBook(id: string, navigate = true): Promise<void> {
+    const book = this.findBook(id);
     await this.libraryService.deleteBook(id);
-    void this.accountPersistence.deleteBook(id).catch(() => undefined);
+    void this.accountPersistence.deleteBook(book?.catalogBookId ?? id).catch(() => undefined);
     this.state.library.removeBook(id); this.state.notify(); if(navigate)this.router.navigate("library"); this.showToast("Livro e arquivo removidos.");
   }
   private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await new LocalBookFileStore(this.files).save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
@@ -432,6 +446,19 @@ export class App {
     await this.auth.logout(); this.state.library.replaceBooks([]); this.state.library.replaceGenres([]);
     this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
   }
+  private persistRemoteBook(book: Book): Promise<void> {
+    const userId = this.state.currentUser?.id; if (!userId) return Promise.resolve();
+    return new ReadingReviewRepository(this.database).get(userId, book.id)
+      .then(review => this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId), review))
+      .then(() => this.connectivity.markReconnected());
+  }
+  private async syncLocalLibrary(): Promise<void> {
+    if (!this.state.currentUser || !this.connectivity.online) return;
+    await Promise.all(this.state.books.map(async book => {
+      const review = await new ReadingReviewRepository(this.database).get(this.state.currentUser!.id, book.id);
+      await this.accountPersistence.saveBook(book, this.state.genres.find(genre => genre.id === book.genreId), review);
+    })).then(() => this.connectivity.markReconnected()).catch(() => undefined);
+  }
   private remoteBook(item: RemoteLibraryBook): Book | null {
     const data = item.metadata; const text = (key: string): string | null => typeof data[key] === "string" && (data[key] as string).trim() ? (data[key] as string).trim() : null;
     const title = text("title"), author = text("author"), genreId = text("genreId"), fileType = text("fileType");
@@ -445,7 +472,26 @@ export class App {
       volume: text("volume") ?? undefined, series: text("series") ?? undefined, description: text("description") ?? undefined,
       publicationYear: number("publicationYear") || undefined, catalogBookId: text("catalogBookId") ?? undefined,
       source: data.source === "catalog" || data.source === "google-drive" || data.source === "onedrive" || data.source === "url" ? data.source : "device",
+      createdAt: text("addedAt") ? new Date(text("addedAt")!) : new Date(item.updatedAt), updatedAt: new Date(item.updatedAt),
       availability: "MISSING_FILE", offlineAvailability: "REMOTE_ONLY" });
+  }
+  private mergeRemoteBook(remote: Book, local: Book | undefined): Book {
+    if (!local) return remote;
+    return new Book({ ...remote, id: local.id, cover: local.cover || remote.cover, availability: local.availability, offlineAvailability: local.offlineAvailability,
+      conversionStatus: local.conversionStatus, documentMode: local.documentMode, textCapability: local.textCapability, limaCapability: local.limaCapability });
+  }
+  private remoteReview(item: RemoteLibraryBook, userId: string, localBookId: string) {
+    const value = item.metadata.review; if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const review = value as Record<string, unknown>, rating = review.rating;
+    if (!Number.isInteger(rating) || Number(rating) < 1 || Number(rating) > 5 || typeof review.updatedAt !== "string" || !Number.isFinite(Date.parse(review.updatedAt))) return null;
+    return { userId, bookId: localBookId, rating: Number(rating) as 1|2|3|4|5, comment: typeof review.comment === "string" ? review.comment.slice(0, 500) : undefined,
+      createdAt: typeof review.createdAt === "string" && Number.isFinite(Date.parse(review.createdAt)) ? review.createdAt : review.updatedAt, updatedAt: review.updatedAt };
+  }
+  private async restoreRemoteProgress(book: Book): Promise<void> {
+    const location = book.currentLocation; if (!location) return;
+    const currentPage = /^\d+$/.test(location) ? Math.max(1, Number(location)) : 1;
+    const totalPages = Math.max(currentPage, book.progressPercent ? Math.round(currentPage * 100 / book.progressPercent) : 1);
+    await this.progress.save({ bookId: book.id, currentPage, totalPages, currentLocation: location, progressPercent: book.progressPercent ?? 0, updatedAt: book.updatedAt.toISOString() });
   }
   private remoteGenre(item: RemoteLibraryBook): Genre | null {
     const genreId = typeof item.metadata.genreId === "string" ? item.metadata.genreId.trim() : "";

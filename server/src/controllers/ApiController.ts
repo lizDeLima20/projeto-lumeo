@@ -47,8 +47,8 @@ export class ApiController {
       }
       if (request.method === "POST" && path === "/api/user-state/library") {
         const body = await this.body(request);
-        await this.requiredPersistence().saveBook(user.id, this.libraryBook(body.book));
-        return this.json(response, 200, { ok: true });
+        const book = await this.requiredPersistence().saveBook(user.id, this.libraryBook(body.book));
+        return this.json(response, 200, { ok: true, book });
       }
       if (request.method === "POST" && path === "/api/user-state/library/delete") {
         const body = await this.body(request);
@@ -206,7 +206,8 @@ export class ApiController {
     if (!bookId || bookId.length > 160 || !metadata || typeof metadata !== "object" || Array.isArray(metadata)) throw new ApiError(400, "INVALID_LIBRARY_BOOK", "Livro inválido.");
     const encoded = JSON.stringify(metadata);
     if (Buffer.byteLength(encoded) > 12_000) throw new ApiError(413, "LIBRARY_METADATA_TOO_LARGE", "Metadados do livro excedem o limite.");
-    return { bookId, metadata: metadata as Record<string, unknown> };
+    const updatedAt = typeof input.updatedAt === "string" && Number.isFinite(Date.parse(input.updatedAt)) ? input.updatedAt : typeof (metadata as Record<string, unknown>).updatedAt === "string" ? (metadata as Record<string, unknown>).updatedAt as string : new Date().toISOString();
+    return { bookId, metadata: metadata as Record<string, unknown>, updatedAt };
   }
   private async assertCatalogLicense(userId: string): Promise<void> {
     const license = await this.licenses.getForUser(userId);

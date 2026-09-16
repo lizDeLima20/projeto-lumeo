@@ -17,7 +17,7 @@ import { BookDownloadError, StartTelemetry } from "../diagnostics/StartTelemetry
 interface BookFileStorage { save(bookId:string,file:Blob):Promise<unknown>; delete(bookId:string):Promise<unknown>; get?(bookId:string):Promise<Blob|null>; saveLima?(bookId:string,file:Blob):Promise<unknown>; }
 
 export interface ImportMetadata { title: string; author: string; genreId: string; collectionId?: string; readingStatus: ReadingStatus; cover: string; volume?: string; series?: string; description?: string; publicationYear?: number; documentMode?: BookDocumentMode; textCapability?: BookTextCapability; limaCapability?: BookLimaCapability; }
-export interface SaveImportOptions { allowPossibleVersion?: boolean; replaceBookId?: string; signal?: AbortSignal; journal?: OperationRecoveryJournal; operationId?: string; catalogBookId?: string; }
+export interface SaveImportOptions { allowPossibleVersion?: boolean; replaceBookId?: string; bookId?: string; signal?: AbortSignal; journal?: OperationRecoveryJournal; operationId?: string; catalogBookId?: string; }
 export class DuplicateBookImportError extends Error { public constructor(public readonly decision: Extract<DuplicateDecision,{kind:"duplicate"}>) { super("Este livro já está na sua biblioteca."); } }
 export class BookVersionConflictError extends Error { public constructor(public readonly decision: Extract<DuplicateDecision,{kind:"possible-version"}>) { super("Já existe outra versão deste livro na biblioteca."); } }
 
@@ -42,10 +42,10 @@ export class ImportManager {
     checkCancelled(options.signal);
     await this.assertCapacity(imported.file.size);
     const decision = await this.inspect(imported, metadata);
-    if (decision.kind === "duplicate") throw new DuplicateBookImportError(decision);
+    if (decision.kind === "duplicate" && !options.replaceBookId) throw new DuplicateBookImportError(decision);
     if (decision.kind === "possible-version" && !options.allowPossibleVersion && !options.replaceBookId) throw new BookVersionConflictError(decision);
     const now = new Date();
-    const book = new Book({ id: crypto.randomUUID(), ...metadata, fileType: imported.fileType,
+    const book = new Book({ id: options.replaceBookId ?? options.bookId ?? crypto.randomUUID(), ...metadata, fileType: imported.fileType,
       fileName: imported.file.name, fileSize: imported.file.size, mimeType: imported.file.type,
       createdAt: now, updatedAt: now, catalogBookId: options.catalogBookId, source: imported.source });
     checkCancelled(options.signal);

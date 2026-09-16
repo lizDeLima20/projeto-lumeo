@@ -7,7 +7,7 @@ import { BaseView } from "./BaseView";
 export class BookDetailsView extends BaseView {
   public constructor(private readonly book: Book | null, private readonly genre: Genre | null,
     private readonly onRead: () => void, private readonly onEdit: () => void,
-    private readonly onDelete: () => void, private readonly onBack: () => void,private readonly onLocate?:()=>void) { super(); }
+    private readonly onDelete: () => void, private readonly onBack: () => void,private readonly onLocate?:()=>void,private readonly onDownloadOnDevice?:()=>void) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "page-shell details-page");
     const back = this.createElement("button", "back-link", this.t("ui.library.back")); back.type = "button"; back.addEventListener("click", this.onBack); section.append(back);
@@ -20,7 +20,7 @@ export class BookDetailsView extends BaseView {
     const actions = this.createElement("div", "form-actions");
     const read=this.action(this.t("ui.book.read"), "button button--primary", this.onRead);read.disabled=this.book.availability!=="AVAILABLE";actions.append(read, this.action(this.t("ui.book.edit"), "button button--secondary", this.onEdit), this.action(this.t("ui.common.delete"), "button button--danger", () => {
       if (window.confirm(this.t("ui.book.deleteConfirm",{title:this.book?.title??""}))) this.onDelete();
-    }));if(this.book.availability!=="AVAILABLE"){content.append(this.createElement("p","page-subtitle",this.book.availability==="MISSING_FILE"?this.t("ui.book.fileMissing"):this.t("ui.book.fileInvalid")));actions.append(this.action(this.t("ui.book.locateFile"),"button button--secondary",()=>this.onLocate?.()));}
+    }));if(this.book.availability!=="AVAILABLE"){const fromCatalog=Boolean(this.book.catalogBookId);content.append(this.createElement("p","page-subtitle",fromCatalog?this.t("ui.book.fileRemote"):this.book.availability==="MISSING_FILE"?this.t("ui.book.fileMissing"):this.t("ui.book.fileInvalid")));actions.append(this.action(fromCatalog?this.t("ui.book.downloadOnDevice"):this.t("ui.book.locateFile"),"button button--secondary",()=>fromCatalog?this.onDownloadOnDevice?.():this.onLocate?.()));}
     content.append(actions); layout.append(preview, content); section.append(layout); return section;
   }
   private meta(): HTMLElement {
