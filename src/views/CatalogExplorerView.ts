@@ -13,7 +13,7 @@ export class CatalogExplorerView extends BaseView {
   private status: HTMLElement | null = null;
   /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
   private addCatalogGenre: (id: string, label: string) => void = () => undefined;
-  public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void) { super(); this.catalog = api; }
+  public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void) { super(); this.catalog = api; }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog page-shell");
     const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
@@ -34,7 +34,16 @@ export class CatalogExplorerView extends BaseView {
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
     let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
     search.addEventListener("input", reload); more.addEventListener("click", () => void this.load(search.value, selectedGenre, more));
-    section.append(heading, controls, list, status, more); void this.load("", "", more); return section;
+    section.append(heading, controls, list, status, more); void this.load("", "", more); void this.offerSourceManagement(heading); return section;
+  }
+  /** Administrators reach "Fontes do catálogo" from here; everyone else never sees the link. */
+  private async offerSourceManagement(heading: HTMLElement): Promise<void> {
+    if (!this.onManageSources) return;
+    try {
+      if (!(await this.catalog.adminStatus()).isAdmin) return;
+      const link = this.createElement("button", "button button--secondary catalog__admin-link", this.t("ui.catalog.sources.title")); link.type = "button";
+      link.addEventListener("click", () => this.onManageSources?.()); heading.append(link);
+    } catch { /* No admin link when the status cannot be read. */ }
   }
   private reset(): void { this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); this.unclassified.replaceChildren(); }
   private async load(query: string, genreId: string, more: HTMLButtonElement): Promise<void> {

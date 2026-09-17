@@ -13,6 +13,12 @@ interface StructuredBook {
 }
 interface StructuredDocument { version?: unknown; locale?: unknown; books?: unknown; }
 
+/** What a catalog.json yielded: the numbers the admin screen shows when a folder is tested. */
+export interface CatalogSourceInspection {
+  entries: number; validBooks: number; withSynopsis: number; validCovers: number;
+  mobiIgnored: number; unsupportedIgnored: number; invalidEntries: number; duplicates: number;
+}
+
 /** Reads a folder's catalog.json. Returns null when the folder has none. */
 export interface CatalogJsonReader { read(folderId: string): Promise<unknown | null>; }
 
@@ -32,7 +38,7 @@ export class PublicCatalogJsonReader implements CatalogJsonReader {
 /** Controlled Drive source described by a catalog.json. Book and cover bytes stay in Drive. */
 export class StructuredDriveCatalogProvider implements CatalogSourceProvider {
   public readonly provider = "structured" as const;
-  private cache: { expiresAt: number; books: readonly CatalogBookRecord[] } | null = null;
+  private cache: { expiresAt: number; books: readonly CatalogBookRecord[]; inspection: CatalogSourceInspection } | null = null;
   private readonly urls = new GoogleDrivePublicUrlResolver();
   private readonly catalog: CatalogJsonReader;
   public constructor(public readonly source: CatalogSourceConfig, folder = new PublicDriveFolderReader(), fetcher: typeof fetch = fetch, catalog?: CatalogJsonReader) {
@@ -46,25 +52,38 @@ export class StructuredDriveCatalogProvider implements CatalogSourceProvider {
     return { items: page.slice(0, query.limit), nextCursor: page.length > query.limit ? String(query.offset + query.limit) : null };
   }
   public async get(bookId: string): Promise<CatalogBookRecord | null> { return (await this.books()).find((book) => book.bookId === bookId) ?? null; }
+  public async inspect(): Promise<CatalogSourceInspection> { await this.books(); return this.cache!.inspection; }
   public diagnostic(): CatalogSourceDiagnostic { return { sourceId: this.source.sourceId, locale: this.source.locale, mode: "structured", provider: this.provider }; }
 
   private async books(): Promise<readonly CatalogBookRecord[]> {
     if (this.cache && this.cache.expiresAt > Date.now()) return this.cache.books;
     const document = await this.catalog.read(this.source.folderId);
-    if (document === null) throw new ApiError(503, "CATALOG_SOURCE_UNAVAILABLE", "A fonte estruturada não possui catalog.json.");
+    if (document === null) throw new ApiError(404, "CATALOG_JSON_NOT_FOUND", "A pasta não possui catalog.json.");
     // Genre folders publish a bare array; the first structured sources wrap it in { books }.
     const entries = Array.isArray(document) ? document : (document as StructuredDocument | null)?.books;
     if (!Array.isArray(entries)) throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json não possui livros válidos.");
     const now = new Date().toISOString(), seen = new Set<string>();
-    let unsupported = 0;
+    const inspection: CatalogSourceInspection = { entries: entries.length, validBooks: 0, withSynopsis: 0, validCovers: 0, mobiIgnored: 0, unsupportedIgnored: 0, invalidEntries: 0, duplicates: 0 };
     const books = entries.flatMap((entry): CatalogBookRecord[] => {
-      const book = this.record((entry ?? {}) as StructuredBook, now);
-      if (!book) { unsupported++; return []; }
-      if (seen.has(book.bookId)) return [];
-      seen.add(book.bookId); return [book];
+      const value = (entry && typeof entry === "object" ? entry : {}) as StructuredBook;
+      const book = this.record(value, now);
+      if (!book) {
+        // Only EPUB and PDF have a reader. Other formats are counted, never shown.
+        const format = this.string(value.format)?.toLowerCase();
+        if (format === "mobi") inspection.mobiIgnored++;
+        else if (format && format !== "pdf" && format !== "epub") inspection.unsupportedIgnored++;
+        else inspection.invalidEntries++;
+        return [];
+      }
+      if (seen.has(book.bookId)) { inspection.duplicates++; return []; }
+      seen.add(book.bookId);
+      if (book.description) inspection.withSynopsis++;
+      if (this.httpsUrl(value.coverUrl) || this.string(value.coverDriveFileId)) inspection.validCovers++;
+      return [book];
     });
-    this.cache = { expiresAt: Date.now() + 5 * 60_000, books };
-    console.info(JSON.stringify({ event: "STRUCTURED_CATALOG_LOADED", sourceId: this.source.sourceId, locale: this.source.locale, count: books.length, skipped: unsupported }));
+    inspection.validBooks = books.length;
+    this.cache = { expiresAt: Date.now() + 5 * 60_000, books, inspection };
+    console.info(JSON.stringify({ event: "STRUCTURED_CATALOG_LOADED", sourceId: this.source.sourceId, locale: this.source.locale, count: books.length, mobiIgnored: inspection.mobiIgnored, unsupportedIgnored: inspection.unsupportedIgnored, invalidEntries: inspection.invalidEntries, duplicates: inspection.duplicates }));
     return books;
   }
 

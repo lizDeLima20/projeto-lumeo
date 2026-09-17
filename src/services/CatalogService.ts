@@ -21,6 +21,15 @@ export interface CatalogDownloadLink {
   expiresAt: string | null;
 }
 
+export type CatalogSourceHealth = "OK" | "EMPTY" | "NO_ACCESS" | "NO_CATALOG" | "INVALID_CATALOG" | "DISABLED";
+export interface CatalogSourceReport {
+  folderId: string; folderFound: boolean; catalogFound: boolean; status: CatalogSourceHealth;
+  inspection: { entries: number; validBooks: number; withSynopsis: number; validCovers: number; mobiIgnored: number; unsupportedIgnored: number; invalidEntries: number; duplicates: number } | null;
+}
+/** A catalogue genre: a name and the Google Drive folder that holds its catalog.json. */
+export interface CatalogGenreSource { id: string; genre: string; driveFolderUrl: string; folderId: string; enabled: boolean; report: CatalogSourceReport; }
+export interface CatalogGenreSourceInput { genre: string; driveFolderUrl: string; enabled?: boolean; }
+
 export interface CatalogSyncReport { lastSyncedAt: string; total: number; created: number; updated: number; duplicates: number; failures: number; unavailable: number; }
 
 export interface CatalogQuery {
@@ -55,4 +64,11 @@ export class CatalogService {
   }
   public adminStatus(): Promise<{ isAdmin: boolean }> { return this.api.get("/catalog/admin/status"); }
   public sync(): Promise<CatalogSyncReport> { return this.api.post("/catalog/sync", {}); }
+  public async sources(): Promise<readonly CatalogGenreSource[]> { return (await this.api.get<{ sources: CatalogGenreSource[] }>("/catalog/sources")).sources; }
+  public createSource(input: CatalogGenreSourceInput): Promise<CatalogGenreSource> { return this.api.post("/catalog/sources", input); }
+  public updateSource(id: string, input: Partial<CatalogGenreSourceInput>): Promise<CatalogGenreSource> { return this.api.post(`/catalog/sources/${encodeURIComponent(id)}`, input); }
+  public removeSource(id: string): Promise<{ ok: true }> { return this.api.post(`/catalog/sources/${encodeURIComponent(id)}/delete`, {}); }
+  /** Reads a folder before it is saved; nothing is stored. */
+  public testSource(driveFolderUrl: string, genre?: string): Promise<CatalogSourceReport> { return this.api.post("/catalog/sources/test", { driveFolderUrl, genre }); }
+  public testSavedSource(id: string): Promise<CatalogSourceReport> { return this.api.post(`/catalog/sources/${encodeURIComponent(id)}/test`, {}); }
 }

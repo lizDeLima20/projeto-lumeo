@@ -7,6 +7,7 @@ import { LicenseService } from "../services/LicenseService.js";
 import type { ApiResponse, AuthenticatedRequest } from "../types/http.js";
 import { RequestValidator } from "../validation/RequestValidator.js";
 import { CatalogApplicationService } from "../catalog/CatalogApplicationService.js";
+import type { CatalogSourceAdminService } from "../catalog/CatalogSourceAdminService.js";
 import type { PersistedGenre, PersistedLibraryBook, PersistedPreferences, UserPersistenceStore } from "../repositories/UserPersistenceRepository.js";
 
 export class ApiController {
@@ -19,6 +20,7 @@ export class ApiController {
     private readonly profiles: ProfileStore,
     private readonly catalog?: CatalogApplicationService,
     private readonly persistence?: UserPersistenceStore,
+    private readonly catalogSources?: CatalogSourceAdminService,
   ) {}
 
   public async handle(request: AuthenticatedRequest, response: ApiResponse, path: string): Promise<void> {
@@ -77,6 +79,27 @@ export class ApiController {
       if (catalogDownload && request.method === "GET") {
         await this.assertCatalogLicense(user.id);
         return this.json(response, 200, await this.requiredCatalog().download(decodeURIComponent(catalogDownload[1]!), this.catalogQuery(request).locale));
+      }
+      // Catalogue genre folders: admin only, checked inside the service.
+      if (path === "/api/catalog/sources" && request.method === "GET") {
+        await this.assertCatalogLicense(user.id);
+        return this.json(response, 200, { sources: await this.requiredCatalogSources().list(user.id) });
+      }
+      if (path === "/api/catalog/sources" && request.method === "POST") {
+        await this.assertCatalogLicense(user.id);
+        return this.json(response, 201, await this.requiredCatalogSources().create(user.id, await this.body(request)));
+      }
+      if (path === "/api/catalog/sources/test" && request.method === "POST") {
+        await this.assertCatalogLicense(user.id);
+        return this.json(response, 200, await this.requiredCatalogSources().test(user.id, await this.body(request)));
+      }
+      const catalogSource = path.match(/^\/api\/catalog\/sources\/([^/]+)(?:\/(test|delete))?$/);
+      if (catalogSource && request.method === "POST") {
+        await this.assertCatalogLicense(user.id);
+        const id = decodeURIComponent(catalogSource[1]!), action = catalogSource[2];
+        if (action === "test") return this.json(response, 200, await this.requiredCatalogSources().testSaved(user.id, id));
+        if (action === "delete") { await this.requiredCatalogSources().remove(user.id, id); return this.json(response, 200, { ok: true }); }
+        return this.json(response, 200, await this.requiredCatalogSources().update(user.id, id, await this.body(request)));
       }
       if (path === "/api/catalog/sync" && request.method === "POST") {
         await this.assertCatalogLicense(user.id);
@@ -177,6 +200,10 @@ export class ApiController {
     response.statusCode = status;
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.end(JSON.stringify(data));
+  }
+  private requiredCatalogSources(): CatalogSourceAdminService {
+    if (!this.catalogSources) throw new ApiError(503, "CATALOG_SOURCES_UNAVAILABLE", "As fontes do catálogo não estão disponíveis.");
+    return this.catalogSources;
   }
   private requiredCatalog(): CatalogApplicationService {
     if (!this.catalog) throw new ApiError(503, "CATALOG_NOT_CONFIGURED", "O catálogo ainda não está configurado no servidor.");

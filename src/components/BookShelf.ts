@@ -3,7 +3,7 @@ import { BookCard } from "./BookCard";
 import { BookSelectionController } from "./BookSelectionController";
 import { BookPerspectiveLayout } from "./BookPerspectiveLayout";
 import { ShelfBoard } from "./ShelfBoard";
-import { BookFocusAnimator } from "./BookFocusAnimator";import{BookContextLabelResolver,type ShelfContext}from"./BookContextLabelResolver";import{ShelfFocusLabel}from"./ShelfFocusLabel";import{BookQuickPreview}from"./BookQuickPreview";
+import { BookFocusAnimator } from "./BookFocusAnimator";import{BookContextLabelResolver,type ShelfContext}from"./BookContextLabelResolver";import{ShelfFocusLabel}from"./ShelfFocusLabel";
 import { BookSeriesResolver } from "./BookSeriesResolver";
 
 export class BookShelf {
@@ -47,7 +47,7 @@ export class BookShelf {
     const cards = [...row.querySelectorAll<HTMLElement>(".book-card")];
     cards.forEach(card=>{const id=card.dataset.bookId??"",state=this.selection.state(id);this.animator.transition(card,state,()=>this.selection.settle(id));card.classList.remove("book-card--neighbor-before","book-card--neighbor-after");});
   }
-  private updateLabel(bookId:string,stage:HTMLElement,viewport:HTMLElement):void{stage.querySelector(".book-focus-label")?.remove();const book=this.books.find(value=>value.id===bookId),card=viewport.querySelector<HTMLElement>(`[data-book-id="${CSS.escape(bookId)}"]`);if(!book||!card||card.classList.contains("book-card--activating"))return;const data=new BookContextLabelResolver().resolve(book,this.context),label=new ShelfFocusLabel().render(data,()=>document.body.append(new BookQuickPreview(book,this.context,()=>this.onActivate(book.id)).render()));stage.append(label);}
+  private updateLabel(bookId:string,stage:HTMLElement,viewport:HTMLElement):void{stage.querySelector(".book-focus-label")?.remove();const book=this.books.find(value=>value.id===bookId),card=viewport.querySelector<HTMLElement>(`[data-book-id="${CSS.escape(bookId)}"]`);if(!book||!card||card.classList.contains("book-card--activating"))return;const data=new BookContextLabelResolver().resolve(book,this.context),label=new ShelfFocusLabel().render(data,()=>this.onActivate(book.id));stage.append(label);}
   private clearFocus(row:HTMLElement,stage:HTMLElement):void{if(!this.selection.deselect())return;this.updateSelection(row);this.removeLabel(stage);}
   private removeLabel(stage:HTMLElement):void{const label=stage.querySelector<HTMLElement>(".book-focus-label");if(label){label.classList.add("book-focus-label--leaving");window.setTimeout(()=>label.remove(),180);}}
 }

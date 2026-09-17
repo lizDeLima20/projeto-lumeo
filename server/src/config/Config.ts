@@ -1,6 +1,5 @@
 import { ApiError } from "../errors/ApiError.js";
 import { catalogSourcesFromEnvironment } from "../catalog/CatalogSourceRegistry.js";
-import { withCatalogGenreSources } from "../catalog/CatalogGenreSources.js";
 import type { CatalogSourceConfig } from "../catalog/types.js";
 
 export interface ServerConfig {
@@ -57,7 +56,7 @@ export class Config {
       // override; the default keeps this published public source usable locally.
       googleCatalogFolderId,
       // Public metadata only. The fallback preserves the published legacy source.
-      catalogSources: withCatalogGenreSources(catalogSourcesFromEnvironment(environment.GOOGLE_CATALOG_SOURCES_JSON, googleCatalogFolderId)),
+      catalogSources: catalogSourcesFromEnvironment(environment.GOOGLE_CATALOG_SOURCES_JSON, googleCatalogFolderId),
       // JSON or base64 JSON are accepted only in backend environment variables.
       googleCatalogServiceAccountJson: environment.GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON ?? "",
       catalogSyncMaxFileBytes: Number(environment.CATALOG_SYNC_MAX_FILE_BYTES ?? 104_857_600),

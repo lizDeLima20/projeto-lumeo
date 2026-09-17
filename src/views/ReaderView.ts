@@ -70,7 +70,9 @@ export class ReaderView extends BaseView {
   private readonly imageTurnAnimator=new ImagePageTurnAnimator();private imageTurnDirection:ImageTurnDirection|null=null;private imageTurnSnapshot:string|null=null;
   private readonly desktopState=new DesktopReaderStateMachine();
   private readonly reviews: ReadingReviewRepository;
-  private completionReviewPrompted = false;
+  private imageBook: Book | null = null;
+  private completionSequence: HTMLElement | null = null;
+  private completionClosing = false;
 
   public constructor(private readonly bookId: string, private readonly manager: ReaderManager,
     private readonly globalTheme: "light" | "dark", private readonly onBack: () => void,
@@ -110,6 +112,7 @@ export class ReaderView extends BaseView {
       this.element?.classList.add("reader--image-mode");this.stage.append(this.createElement("p","reader-image-mode-notice",this.i18n.t("reader.imageMode.notice")));
       const book = await this.manager.openImageReader(this.bookId, this.canvas, () => this.stageSize(), (incorrect) => this.requestPassword(incorrect),
         (state) => this.onPageRendered(state));
+      this.imageBook = book;
       this.element.querySelector(".reader-loading")?.remove(); this.mountControls(book.title);
       document.addEventListener("keydown", this.handleKeydown); window.addEventListener("resize", this.handleResize); this.scheduleControlsHide();
     } catch (error) { this.showError(this.errorMessage(error)); }
@@ -140,21 +143,51 @@ export class ReaderView extends BaseView {
    *  page 1 beside it, and from there every page sits one place later than its number.
    *  Spreads then pair exactly the leaves a turn has just shown, from the cover onwards. */
   private desktopPosition():number{const page=this.reflow?.currentPageNumber??1;return page===1?(this.desktopState.isClosed?1:2):page+1;}
-  private async moveDesktop(position:number):Promise<void>{if(!this.reflow||position===this.desktopPosition())return;if(position<=1)this.desktopState.restore(0);else this.desktopState.forceOpen();this.reflow.goTo(Math.min(this.reflow.totalPages,Math.max(1,position-1)));this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber>=this.reflow.totalPages);}
-  private async saveReflow(reachedEnd=false):Promise<void>{if(!this.reflow||!this.reflowBook)return;const anchor=this.reflow.readingAnchor,location=this.reflow instanceof LimaReaderEngine?`lima:${anchor.paragraphId}:${anchor.textOffset}`:undefined;this.reflowBook=await this.manager.saveReflow(this.reflowBook,this.reflow.currentPageNumber,this.reflow.totalPages,anchor.logicalOffset,reachedEnd,location);this.onBookUpdated(this.reflowBook);await this.offerCompletionReview(this.reflowBook);}
+  private async moveDesktop(position:number):Promise<void>{
+    if(!this.reflow)return;
+    if(position===this.desktopPosition()){
+      if(this.reflow.currentPageNumber>=this.reflow.totalPages)await this.beginCompletionSequence();
+      return;
+    }
+    if(position<=1)this.desktopState.restore(0);else this.desktopState.forceOpen();
+    this.reflow.goTo(Math.min(this.reflow.totalPages,Math.max(1,position-1)));
+    this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber>=this.reflow.totalPages);
+  }
+  private async saveReflow(reachedEnd=false):Promise<void>{if(!this.reflow||!this.reflowBook)return;const anchor=this.reflow.readingAnchor,location=this.reflow instanceof LimaReaderEngine?`lima:${anchor.paragraphId}:${anchor.textOffset}`:undefined;this.reflowBook=await this.manager.saveReflow(this.reflowBook,this.reflow.currentPageNumber,this.reflow.totalPages,anchor.logicalOffset,reachedEnd,location);this.onBookUpdated(this.reflowBook);}
 
-  /** Completion is emitted by ReadingProgressService only after a real forward finish. */
-  private async offerCompletionReview(book: Book): Promise<void> {
-    if (this.completionReviewPrompted || book.readingStatus !== "finished" || !this.readerUserId || !this.element) return;
-    this.completionReviewPrompted = true;
-    if (await this.reviews.get(this.readerUserId, book.id)) return;
-    const dialog = new ReadingReviewDialog(async (rating, comment) => {
-      await this.reviews.save({ userId:this.readerUserId!, bookId:book.id, rating, comment:comment || undefined });
-      // The Reader callback also mirrors only this review metadata to the
-      // account; original pages and the source file remain local.
-      this.onBookUpdated(book);
-    }).render();
-    this.element.append(dialog);
+  /** The review is the book's final spread: it is only mounted after the reader
+   * deliberately turns past the last content leaf, never when that leaf first renders. */
+  private async beginCompletionSequence(): Promise<void> {
+    if (this.completionSequence || this.completionClosing || !this.stage) return;
+    if (this.reflow) await this.saveReflow(true);
+    const book = this.reflowBook ?? this.imageBook;
+    if (!book) return;
+    const sequence = this.createElement("section", "reader-completion-sequence");
+    sequence.setAttribute("aria-label", this.i18n.t("reader.review.title"));
+    const closingBook = this.createElement("div", "reader-completion-book");
+    const back = this.createElement("div", "reader-completion-back");
+    back.setAttribute("aria-hidden", "true");
+    const finalPage = this.createElement("div", "reader-completion-page");
+    if (this.readerUserId) {
+      finalPage.append(new ReadingReviewDialog(async (rating, comment) => {
+        await this.reviews.save({ userId:this.readerUserId!, bookId:book.id, rating, comment:comment || undefined });
+        // App-level persistence mirrors review metadata to the current account.
+        this.onBookUpdated(book);
+      }).renderEmbedded(() => this.closeCompletionSequence()));
+    } else {
+      const closing = this.createElement("button", "reader-completion-close", this.i18n.t("ui.common.close"));
+      closing.type = "button"; closing.addEventListener("click", () => this.closeCompletionSequence());
+      finalPage.append(closing);
+    }
+    closingBook.append(back, finalPage); sequence.append(closingBook); this.stage.append(sequence);
+    this.completionSequence = sequence;
+    sequence.querySelector<HTMLElement>("button, textarea")?.focus();
+  }
+
+  private closeCompletionSequence(): void {
+    if (!this.completionSequence || this.completionClosing) return;
+    this.completionClosing = true; this.completionSequence.classList.add("reader-completion-sequence--closing");
+    window.setTimeout(() => this.onBack(), 520);
   }
 
   private mountControls(title: string): void {
@@ -177,8 +210,7 @@ export class ReaderView extends BaseView {
   }
 
   private onPageRendered(state: ReaderPageState): void {
-    this.currentPage = state.currentPage; this.totalPages = state.totalPages; this.onBookUpdated(state.book);
-    void this.offerCompletionReview(state.book);
+    this.currentPage = state.currentPage; this.totalPages = state.totalPages; this.imageBook = state.book; this.onBookUpdated(state.book);
     this.toolbar?.update(state.currentPage, state.totalPages, this.manager.settings.settings.zoom);
     this.updateProgress();
     if (this.imageTurnDirection && this.manager.settings.settings.animation === "page-turn" && this.canvas) this.imageTurnAnimator.play(this.canvas, this.imageTurnDirection, this.imageTurnSnapshot);
@@ -199,7 +231,16 @@ export class ReaderView extends BaseView {
     const zone = this.createElement("button", `reader-tap-zone ${className}`); zone.type = "button"; zone.setAttribute("aria-label", label); zone.addEventListener("click", () => { if(!this.interactions.consumeSuppressedClick()) action(); }); return zone;
   }
 
-  private async next(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages+1);await this.moveDesktop(navigation.next(this.desktopPosition()));return;}const moved=this.reflow.next();if(moved){this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber===this.reflow.totalPages);}return;}this.prepareImageTurn("next");await this.manager.navigation?.nextPage(); }
+  private async next(): Promise<void> {
+    if(this.completionSequence)return;
+    if(this.reflow){
+      if(this.reflow.currentPageNumber>=this.reflow.totalPages){await this.beginCompletionSequence();return;}
+      if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages+1);await this.moveDesktop(navigation.next(this.desktopPosition()));return;}
+      const moved=this.reflow.next();if(moved){this.renderReflow();await this.saveReflow(this.reflow.currentPageNumber===this.reflow.totalPages);}return;
+    }
+    if(this.manager.navigation&&this.manager.navigation.currentPage>=this.manager.navigation.totalPages){await this.beginCompletionSequence();return;}
+    this.prepareImageTurn("next");await this.manager.navigation?.nextPage();
+  }
   private async previous(): Promise<void> { if(this.reflow){if(this.wantsSpread()){const navigation=new OpenBookNavigationController(this.reflow.totalPages+1);await this.moveDesktop(navigation.previous(this.desktopPosition()));return;}if(this.reflow.previous()){this.renderReflow();await this.saveReflow();}return;}this.prepareImageTurn("previous");await this.manager.navigation?.previousPage(); }
   private handleSwipe(event: TouchEvent): void {
     const touch = event.changedTouches[0]; if (!touch) return;

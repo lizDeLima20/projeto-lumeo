@@ -16,3 +16,21 @@
 .reading-review-actions button[type="submit"]{border:1px solid #6d4328;color:#fff;background:#6d4328}
 .reading-review-actions button:disabled{cursor:not-allowed;opacity:.52}
 @media(max-width:40rem){.reading-review-layer{align-items:end;padding:.75rem}.reading-review-dialog{border-radius:.7rem;padding:1rem}.reading-review-star{min-width:2.35rem;min-height:2.35rem}}
+
+/* The end rating is a real final spread in the Reader, not an overlay that interrupts
+   * the last page. Its dark left board is the closed back cover; the review lives on
+   * the facing paper page and closes with the book when it is dismissed or saved. */
+.reader-completion-sequence{position:absolute;z-index:80;inset:0;display:grid;place-items:center;overflow:auto;background:rgba(27,16,9,.56);padding:clamp(.75rem,3vw,2rem);animation:reader-completion-arrive .34s ease-out both}
+.reader-completion-book{display:grid;grid-template-columns:minmax(5rem,.72fr) minmax(17rem,1fr);width:min(100%,54rem);min-height:min(75dvh,38rem);transform-style:preserve-3d;filter:drop-shadow(0 1.2rem 1.55rem rgba(0,0,0,.38))}
+.reader-completion-back{position:relative;min-width:0;border-radius:.45rem 0 0 .45rem;background:linear-gradient(105deg,#1e1009,#5d321b 42%,#29140a);box-shadow:inset -.4rem 0 .7rem rgba(0,0,0,.3),inset .08rem 0 rgba(255,211,145,.2)}
+.reader-completion-back::after{position:absolute;inset:.4rem 0 .4rem auto;width:.7rem;background:linear-gradient(90deg,rgba(8,4,2,.5),rgba(249,229,194,.23),rgba(16,8,3,.36));content:""}
+.reader-completion-page{display:grid;place-items:center;min-width:0;border-radius:0 .45rem .45rem 0;background:var(--reader-paper-lit,var(--reader-paper,#f7f0df));box-shadow:inset .35rem 0 .65rem rgba(53,30,12,.16);padding:clamp(1rem,3vw,2.4rem)}
+.reading-review-dialog--embedded{width:min(100%,29rem);border:0;border-radius:0;background:transparent;box-shadow:none;padding:0;text-align:center}
+.reading-review-dialog--embedded .reading-review-actions{justify-content:center;flex-wrap:wrap}
+.reading-review-like{border:1px solid color-mix(in srgb,#9a742d 48%,transparent);color:#6d4328;background:transparent}
+.reading-review-like.is-selected{border-color:#8b5130;color:#fff;background:#8b5130}
+.reader-completion-close{min-height:2.6rem;border:1px solid #6d4328;color:#fff;background:#6d4328;padding:.55rem 1rem}
+.reader-completion-sequence--closing{animation:reader-completion-close .5s cubic-bezier(.65,0,.35,1) forwards;pointer-events:none}
+@keyframes reader-completion-arrive{from{opacity:0;transform:translateX(4%)}to{opacity:1;transform:none}}
+@keyframes reader-completion-close{to{opacity:0;transform:scaleX(.04) translateX(45%);transform-origin:right center}}
+@media(max-width:48rem){.reader-completion-sequence{align-items:end;padding:.7rem}.reader-completion-book{grid-template-columns:2.25rem minmax(0,1fr);width:min(100%,31rem);min-height:0}.reader-completion-back{min-height:28rem}.reader-completion-page{min-height:28rem;padding:1.1rem}.reading-review-dialog--embedded{gap:.65rem}.reading-review-dialog--embedded textarea{min-height:4.5rem}.reading-review-dialog--embedded .reading-review-actions{gap:.35rem}.reading-review-dialog--embedded .reading-review-actions button{padding:.42rem .6rem}}

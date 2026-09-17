@@ -19,6 +19,9 @@ import { CatalogRepository } from "./catalog/CatalogRepository.js";
 import { CatalogApplicationService } from "./catalog/CatalogApplicationService.js";
 import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js";
 import { CatalogSourceRegistry } from "./catalog/CatalogSourceRegistry.js";
+import { CatalogSourceRepository } from "./catalog/CatalogSourceRepository.js";
+import { ConfiguredCatalogSources } from "./catalog/CatalogGenreSources.js";
+import { CatalogSourceAdminService } from "./catalog/CatalogSourceAdminService.js";
 import { HybridCatalogSourceProvider } from "./catalog/HybridCatalogSourceProvider.js";
 import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalogProvider.js";
 import { StructuredDriveCatalogProvider } from "./catalog/StructuredDriveCatalogProvider.js";
@@ -42,25 +45,27 @@ export class ServerApp {
       }
       const supabase = new SupabaseService(config);
       const auth = new AuthService(supabase.auth);
-      const catalogSources = new CatalogSourceRegistry(config.catalogSources);
       const createDrive = (folderId = config.googleCatalogFolderId) => new GoogleCatalogDriveClient(config.googleCatalogServiceAccountJson, folderId, config.catalogSyncMaxFileBytes);
-      // Public Drive HTML exposes only its initially rendered rows. When the
-      // server account is configured, every catalogue source is read through
-      // the paginated Drive API instead.
-      const authorizedSources = config.googleCatalogServiceAccountJson.trim()
-        ? config.catalogSources.map((source) => source.mode === "structured"
-          // A structured source is defined by its catalog.json, read through the same account.
-          ? new StructuredDriveCatalogProvider(source, new PublicDriveFolderReader(), fetch, { read: (folderId) => createDrive(folderId).readCatalogJson() })
-          : new AuthorizedDriveCatalogProvider(source, () => createDrive(source.folderId)))
-        : null;
+      // Environment sources plus the genre folders saved in the admin screen.
+      const sourceStore = new CatalogSourceRepository(supabase.admin);
+      const configuredSources = new ConfiguredCatalogSources(config.catalogSources, sourceStore);
+      // Public Drive HTML exposes only its initially rendered rows. When the server account is
+      // configured, folders are read through the paginated Drive API instead: a structured
+      // folder by its catalog.json, any other by listing its files.
+      const catalogSources = new CatalogSourceRegistry(() => configuredSources.all(), config.googleCatalogServiceAccountJson.trim() ? {
+        legacy: (source) => new AuthorizedDriveCatalogProvider(source, () => createDrive(source.folderId)),
+        structured: (source) => new StructuredDriveCatalogProvider(source, new PublicDriveFolderReader(), fetch, { read: (folderId) => createDrive(folderId).readCatalogJson() }),
+      } : undefined);
+      const catalogStore = new CatalogRepository(supabase.admin);
       controller = new ApiController(
         auth,
         new AuthMiddleware(auth),
         new DeviceService(new DeviceRepository(supabase.admin), config.deviceHashSecret),
         new LicenseService(new LicenseRepository(supabase.admin), config),
         new ProfileRepository(supabase.admin),
-        new CatalogApplicationService(new CatalogRepository(supabase.admin), () => createDrive(), new HybridCatalogSourceProvider(async (locale) => authorizedSources ? authorizedSources.filter((source) => !locale || source.source.locale === locale) : catalogSources.providers(locale))),
+        new CatalogApplicationService(catalogStore, () => createDrive(), new HybridCatalogSourceProvider((locale) => catalogSources.providers(locale))),
         new UserPersistenceRepository(supabase.admin),
+        new CatalogSourceAdminService(sourceStore, configuredSources, catalogSources, (userId) => catalogStore.isAdmin(userId)),
       );
       return controller;
     };
@@ -75,6 +80,7 @@ export class ServerApp {
       "/api/device/replace": { windowMs: 60_000, max: 5 },
       "/api/me": { windowMs: 60_000, max: 60 },
       "/api/catalog/sync": { windowMs: 60_000, max: 2 },
+      "/api/catalog/sources/test": { windowMs: 60_000, max: 10 },
     });
 
     return async (request, response) => {

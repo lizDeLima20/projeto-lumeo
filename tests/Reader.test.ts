@@ -67,6 +67,24 @@ describe("ReadingReviewRepository", () => {
   });
 });
 
+describe("Reader completion sequence", () => {
+  it("showsTheReviewOnlyAfterTheFinalLeafIsTurned", async () => {
+    const reader = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/views/ReaderView.ts", import.meta.url), "utf8"));
+    assert.match(reader, /beginCompletionSequence/);
+    assert.match(reader, /currentPageNumber>=this\.reflow\.totalPages/);
+    assert.match(reader, /navigation\.currentPage>=this\.manager\.navigation\.totalPages/);
+    assert.doesNotMatch(reader, /offerCompletionReview/);
+  });
+  it("usesTheExistingReviewRepositoryInsideTheClosingSpread", async () => {
+    const reader = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/views/ReaderView.ts", import.meta.url), "utf8"));
+    const dialog = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/views/ReadingReviewDialog.ts", import.meta.url), "utf8"));
+    const styles = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/styles/reading-review.css", import.meta.url), "utf8"));
+    assert.match(reader, /this\.reviews\.save\(\{ userId:this\.readerUserId!/);
+    assert.match(dialog, /renderEmbedded/);
+    assert.match(styles, /reader-completion-sequence/);
+  });
+});
+
 describe("ReaderSettingsManager", () => {
   it("zoomIn, zoomOut e zoomLimits", async () => {
     const settings = new ReaderSettingsManager(new StorageService()); await settings.initialize("light");

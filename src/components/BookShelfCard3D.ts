@@ -17,12 +17,10 @@ export class BookShelfCard3D {
     if(this.book.progressPercent!==undefined){const progress=document.createElement("span"),bar=document.createElement("span"),label=document.createElement("span");progress.className="book-progress";bar.style.width=`${Math.min(100,Math.max(0,this.book.progressPercent))}%`;label.className="book-progress-label";label.textContent=`${Math.round(this.book.progressPercent)}% lido`;progress.append(bar);info.append(progress,label);}
     const interaction=new BookInteractionRegion();
     const activate=(activation:"selected"|"activated")=>{
-      /* A second press is an explicit physical return to the shelf.  Opening the
-         reader remains available from the focused book label, so the book itself
-         never unexpectedly leaves the shelf while the reader is being selected. */
+      /* Selection is stable until a real outside press.  A second press on the
+         same visible volume opens it; it must never turn into a deselection. */
       if(activation==="activated"){
-        this.selection.deselect();
-        card.classList.remove("book-card--selected","book-card--activating");
+        card.classList.add("book-card--selected","book-card--activating");
         this.onOpen(this.book.id);
         return;
       }
