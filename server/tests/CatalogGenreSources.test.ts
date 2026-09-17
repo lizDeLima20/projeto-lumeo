@@ -44,7 +44,7 @@ class MemorySourceStore implements CatalogSourceStore {
 const drive = (folders: Record<string, unknown>): CatalogJsonReader => ({
   read: async (folderId) => { const value = folders[folderId]; if (value instanceof Error) throw value; if (value === undefined) throw new Error("CATALOG_PUBLIC_SOURCE_UNAVAILABLE"); return value; },
 });
-const ARTES = "1Yc2qLF5v5j163qtkqK0pnwKxL-uERNF0", ADMINISTRACAO = "1ObXreEgmEAQGwjKW7-ImnlX92YZ9VcNj";
+const ARTES = "1Yc2qLF5v5j163qtkqK0pnwKxL-uERNF0", ADMINISTRACAO = "10bXreEgmEAQGwjKW7-lnnIX92YZ9VcNj";
 
 function setup(folders: Record<string, unknown>, admin = true) {
   const store = new MemorySourceStore(), reader = drive(folders);

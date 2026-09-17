@@ -1,6 +1,6 @@
--- Correct the seed used before the folder link was confirmed.  This is metadata
--- only: the Lumeo BFF reads catalog.json and returns direct Google Drive URLs;
--- no EPUB/PDF bytes pass through Supabase or the BFF.
+-- The original folder link was transcribed incorrectly. Keep existing
+-- installations aligned with the verified Drive folder containing books/,
+-- covers/ and catalog.json.
 update public.catalog_sources
 set
   drive_folder_url = 'https://drive.google.com/drive/folders/10bXreEgmEAQGwjKW7-lnnIX92YZ9VcNj',

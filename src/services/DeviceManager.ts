@@ -46,6 +46,6 @@ export class DeviceManager {
     return `Lumeo em ${platform || "navegador"}`;
   }
   private isAuthenticated(): boolean {
-    return this.state.authStatus === "authenticated" || this.state.authStatus === "AUTHENTICATED" || this.state.authStatus === "OFFLINE_AUTHENTICATED";
+    return ["authenticated", "AUTHENTICATED", "OFFLINE_AUTHENTICATED", "SESSION_RESTORED", "USER_DATA_LOADING", "READY"].includes(this.state.authStatus);
   }
 }

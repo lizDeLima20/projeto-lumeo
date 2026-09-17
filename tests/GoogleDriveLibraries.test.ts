@@ -92,7 +92,7 @@ it("validLocalSessionDoesNotRefresh", async () => {
   const storage = new Memory(), state = new AppState(); let calls = 0;
   await storage.save<AuthSession>("auth-session", { user: { id: "u", email: "test@example.com" }, accessToken: "fake", refreshToken: "", expiresAt: null });
   await new AuthManager({ post: async () => { calls++; }, setAccessToken: () => undefined } as never, storage as never, state).initialize();
-  assert.equal(calls, 0); assert.equal(state.authStatus, "authenticated");
+  assert.equal(calls, 0); assert.equal(state.authStatus, "SESSION_RESTORED");
 });
 
 it("mobileCompatibleDownloadRetriesNetworkFailureAndNeverUsesChromeExtension", async () => {

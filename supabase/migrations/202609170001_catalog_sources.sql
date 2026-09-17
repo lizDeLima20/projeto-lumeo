@@ -37,7 +37,7 @@ for each row execute function public.set_updated_at();
 insert into public.catalog_sources (genre, drive_folder_url, folder_id)
 values
   ('Artes e música', 'https://drive.google.com/drive/folders/1Yc2qLF5v5j163qtkqK0pnwKxL-uERNF0', '1Yc2qLF5v5j163qtkqK0pnwKxL-uERNF0'),
-  ('Administração e economia', 'https://drive.google.com/drive/folders/1ObXreEgmEAQGwjKW7-ImnlX92YZ9VcNj', '1ObXreEgmEAQGwjKW7-ImnlX92YZ9VcNj')
+  ('Administração e economia', 'https://drive.google.com/drive/folders/10bXreEgmEAQGwjKW7-lnnIX92YZ9VcNj', '10bXreEgmEAQGwjKW7-lnnIX92YZ9VcNj')
 on conflict do nothing;
 
 -- Grant the admin screen to an account deliberately, in the SQL editor:

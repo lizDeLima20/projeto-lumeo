@@ -9,10 +9,13 @@ export class ApiError extends Error {
 export class ApiClient {
   private accessToken: string | null = null;
   private installationId: string | null = null;
+  private refreshSession: (() => Promise<void>) | null = null;
 
   public constructor(private readonly baseUrl: string) {}
   public setAccessToken(token: string | null): void { this.accessToken = token; }
   public setInstallationId(id: string): void { this.installationId = id; }
+  /** Registered by AuthManager. A request retries once only after a real refresh. */
+  public setSessionRefreshHandler(handler: (() => Promise<void>) | null): void { this.refreshSession = handler; }
 
   public get<T>(path: string, authenticated = true): Promise<T> {
     return this.request<T>(path, { method: "GET" }, authenticated);
@@ -23,13 +26,7 @@ export class ApiClient {
 
   /** Streams a protected book download while keeping its credentials out of URLs. */
   public async download(path: string, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
-    const headers = this.authHeaders(true);
-    let response: Response;
-    try { response = await fetch(`${this.baseUrl}${path}`, { headers, signal }); }
-    catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") throw error;
-      throw new ApiError(0, "NETWORK_ERROR", I18nManager.shared.messageForErrorCode("NETWORK_ERROR")!);
-    }
+    const response = await this.fetchWithRefresh(path, { signal }, true);
     if (!response.ok) await this.throwResponseError(response);
     const contentLength = Number(response.headers.get("content-length")) || 0;
     const chunks: BlobPart[] = []; let received = 0;
@@ -49,13 +46,31 @@ export class ApiClient {
   }
 
   private async request<T>(path: string, init: RequestInit, authenticated: boolean): Promise<T> {
-    const headers = this.authHeaders(authenticated); headers.set("Content-Type", "application/json");
-    let response: Response;
-    try { response = await fetch(`${this.baseUrl}${path}`, { ...init, headers }); }
-    catch { throw new ApiError(0, "NETWORK_ERROR", I18nManager.shared.messageForErrorCode("NETWORK_ERROR")!); }
+    const response = await this.fetchWithRefresh(path, init, authenticated);
     const data = await response.json() as T | ApiErrorBody;
     if (!response.ok) this.throwBodyError(response.status, data as ApiErrorBody);
     return data as T;
+  }
+  private async fetchWithRefresh(path: string, init: RequestInit, authenticated: boolean): Promise<Response> {
+    let response = await this.send(path, init, authenticated);
+    // An isolated 401 is commonly an expired access token. Refresh once and
+    // replay the same request; never create a refresh/retry loop.
+    if (authenticated && response.status === 401 && this.refreshSession) {
+      try { await this.refreshSession(); }
+      catch { return response; }
+      response = await this.send(path, init, authenticated);
+    }
+    return response;
+  }
+  private async send(path: string, init: RequestInit, authenticated: boolean): Promise<Response> {
+    const headers = this.authHeaders(authenticated);
+    const supplied = new Headers(init.headers); supplied.forEach((value, key) => headers.set(key, value));
+    if (init.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    try { return await fetch(`${this.baseUrl}${path}`, { ...init, headers }); }
+    catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      throw new ApiError(0, "NETWORK_ERROR", I18nManager.shared.messageForErrorCode("NETWORK_ERROR")!);
+    }
   }
 
   private authHeaders(authenticated: boolean): Headers {

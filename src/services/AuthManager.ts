@@ -7,12 +7,19 @@ export type SignupResult = AuthSession | { requiresEmailConfirmation: true };
 
 export class AuthManager {
   private static readonly SESSION_KEY = "auth-session";
-  public constructor(private readonly api: ApiClient, private readonly storage: StorageService, private readonly state: AppState) {}
+  private refreshInFlight: Promise<void> | null = null;
+  public constructor(private readonly api: ApiClient, private readonly storage: StorageService, private readonly state: AppState) {
+    // Small test doubles from older callers need not implement the optional
+    // retry hook; the production ApiClient always does.
+    (this.api as Partial<ApiClient>).setSessionRefreshHandler?.(() => this.refreshPersistedSession());
+  }
 
   public async initialize(): Promise<void> {
-    this.state.authStatus = "UNKNOWN";
+    this.state.authStatus = "AUTH_INITIALIZING";
+    this.log("AUTH_BOOT_START");
     const saved = await this.storage.load<AuthSession>(AuthManager.SESSION_KEY);
     if (!saved || !saved.user?.id || !saved.user?.email || !saved.accessToken) return this.clearSession();
+    this.log("SESSION_FOUND");
     const expired = !!saved.expiresAt && saved.expiresAt * 1000 < Date.now() + 30_000;
     // Supabase refresh tokens are opaque but always substantially larger than
     // the request validator's minimum. A short/stale persisted value cannot
@@ -20,10 +27,12 @@ export class AuthManager {
     if (expired && saved.refreshToken.trim().length < 16) return this.clearSession();
     if(import.meta.env?.DEV)await this.rememberDevUser(saved.user);
     try {
-      const session = expired
-        ? await this.api.post<AuthSession>("/auth/refresh", { refreshToken: saved.refreshToken }, false)
-        : saved;
+      if (expired) this.log("ACCESS_TOKEN_EXPIRED");
+      const session = expired ? await this.refresh(saved) : saved;
       await this.applySession(session);
+      this.state.authStatus = "SESSION_RESTORED";
+      this.log("SESSION_RESTORED");
+      this.state.notify();
     } catch (error) {
       if (error instanceof ApiError && error.code === "NETWORK_ERROR") {
         this.restoreOffline(saved);
@@ -64,7 +73,7 @@ export class AuthManager {
     if(import.meta.env?.DEV){const remembered=await this.storage.load<string>(this.devUserKey(session.user.email));if(remembered)session={...session,user:{...session.user,id:remembered}};else await this.rememberDevUser(session.user);}
     this.api.setAccessToken(session.accessToken);
     this.state.currentUser = session.user;
-    this.state.authStatus = "authenticated";
+    this.state.authStatus = "AUTHENTICATED";
     await this.storage.save(AuthManager.SESSION_KEY, session);
     this.state.notify();
   }
@@ -87,6 +96,27 @@ export class AuthManager {
     this.state.licenseStatus = "offline_grace";
     this.state.notify();
   }
+  private async refreshPersistedSession(): Promise<void> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+    this.refreshInFlight = (async () => {
+      const saved = await this.storage.load<AuthSession>(AuthManager.SESSION_KEY);
+      if (!saved?.refreshToken || saved.refreshToken.trim().length < 16) throw new ApiError(401, "SESSION_EXPIRED", "Sua sessão expirou.");
+      try { await this.applySession(await this.refresh(saved)); }
+      catch (error) {
+        if (error instanceof ApiError && (error.status === 400 || error.status === 401) && this.isRefreshRejection(error.code)) await this.clearSession();
+        throw error;
+      }
+    })().finally(() => { this.refreshInFlight = null; });
+    return this.refreshInFlight;
+  }
+  private async refresh(saved: AuthSession): Promise<AuthSession> {
+    this.state.authStatus = "REFRESHING"; this.log("REFRESH_STARTED"); this.state.notify();
+    try {
+      const session = await this.api.post<AuthSession>("/auth/refresh", { refreshToken: saved.refreshToken }, false);
+      this.log("REFRESH_SUCCESS"); return session;
+    } catch (error) { this.log("REFRESH_FAILED"); throw error; }
+  }
+  private log(event: "AUTH_BOOT_START" | "SESSION_FOUND" | "ACCESS_TOKEN_EXPIRED" | "REFRESH_STARTED" | "REFRESH_SUCCESS" | "REFRESH_FAILED" | "SESSION_RESTORED"): void { console.info(JSON.stringify({ event })); }
   private isRefreshRejection(code: string): boolean {
     return ["SESSION_EXPIRED", "AUTH_INVALID_CREDENTIALS", "AUTH_REQUIRED", "AUTH_REFRESH_INVALID", "INVALID_REFRESH_TOKEN", "INVALID_TOKEN", "INVALID"].includes(code);
   }

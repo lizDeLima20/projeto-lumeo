@@ -126,10 +126,17 @@ export class App {
     this.connectivity.subscribe((status)=>{if(status==="OFFLINE")this.showToast(I18nManager.shared.t("offline.status"));if(status==="RECONNECTING"){this.showToast(I18nManager.shared.t("offline.reconnecting"));if(this.isAuthenticated())void this.syncLocalLibrary();}});
     await this.devices.initialize();
     await this.auth.initialize();
-    if (this.state.authStatus === "authenticated" || this.state.authStatus === "AUTHENTICATED") {
+    if (this.isAuthenticated()) {
+      this.state.authStatus = "USER_DATA_LOADING"; this.state.notify();
       try { await this.resolveDevice(); }
-      catch (error) { this.showToast(error instanceof ApiError ? error.message : "Não foi possível restaurar sua sessão."); }
+      catch (error) {
+        // Offline readers still restore their per-user IndexedDB/OPFS library.
+        if ((error instanceof ApiError && error.code === "NETWORK_ERROR") || !this.connectivity.online) {
+          if (this.state.currentUser) { this.configureLocalLibrary(this.state.currentUser.id); await this.hydrateLibrary(); }
+        } else this.showToast(error instanceof ApiError ? error.message : "Não foi possível restaurar sua sessão.");
+      }
     }
+    if (this.isAuthenticated()) { this.state.authStatus = "READY"; console.info(JSON.stringify({ event: "AUTH_READY" })); this.state.notify(); }
     this.router.start(this.isAuthenticated() ? this.nextProtectedRoute() : "login");
   }
 
@@ -195,6 +202,7 @@ export class App {
         const me = await this.api.get<{ license: { status: "active" | "inactive" } }>("/me");
         this.state.licenseStatus = me.license.status;
         if (me.license.status === "active" && this.state.currentUser) {
+          console.info(JSON.stringify({ event: "USER_LOADED" }));
           this.configureLocalLibrary(this.state.currentUser.id);
           await this.hydrateLibrary();
         }
@@ -244,6 +252,7 @@ export class App {
     this.state.onboardingCompleted = preferences?.onboardingCompleted ?? genres.length > 0;
     if (preferences) { this.state.settings.theme = preferences.theme; this.applyTheme(preferences.theme); await this.preferences.save(preferences); }
     this.state.notify();
+    console.info(JSON.stringify({ event: "LIBRARY_RESTORED", books: books.length }));
     // Offline writes are retained in local metadata. A successful authenticated
     // startup/reconnect retries them without ever uploading the original file.
     void this.syncLocalLibrary();
@@ -439,12 +448,13 @@ export class App {
     I18nManager.shared.localizeTree(this.footerRoot);
   }
 
-  private isAuthenticated(): boolean { return this.state.authStatus === "authenticated" || this.state.authStatus === "AUTHENTICATED" || this.state.authStatus === "OFFLINE_AUTHENTICATED"; }
+  private isAuthenticated(): boolean { return ["authenticated", "AUTHENTICATED", "OFFLINE_AUTHENTICATED", "SESSION_RESTORED", "USER_DATA_LOADING", "READY"].includes(this.state.authStatus); }
   private hasUsableLicense(): boolean { return this.state.licenseStatus === "active" || this.state.licenseStatus === "offline_grace" || this.state.licenseStatus === "grace"; }
 
   private async logout(): Promise<void> {
-    await this.auth.logout(); this.state.library.replaceBooks([]); this.state.library.replaceGenres([]);
-    this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
+    // Sign-out invalidates only the remote session. OPFS, IndexedDB and the
+    // per-user library database are intentionally retained for offline use.
+    await this.auth.logout(); this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
   }
   private persistRemoteBook(book: Book): Promise<void> {
     const userId = this.state.currentUser?.id; if (!userId) return Promise.resolve();
