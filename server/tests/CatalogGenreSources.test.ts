@@ -186,6 +186,21 @@ describe("livros de uma pasta de gênero", () => {
     assert.match(book!.coverUrl!, /^https:\/\/drive\.google\.com\/thumbnail\?id=cover-file-1-abcdef/);
   });
 
+  it("o mesmo livro pode pertencer a dois gêneros, sem sumir do segundo", async () => {
+    const shared = entry(11, "epub", { synopsis: "Em dois gêneros." });
+    const aventura = genreSourceConfig({ id: "00000000-0000-4000-8000-00000000000a", genre: "Aventura", driveFolderUrl: "", folderId: ARTES, locale: "pt-BR", enabled: true, createdAt: "", updatedAt: "" });
+    const pessoal = genreSourceConfig({ id: "00000000-0000-4000-8000-00000000000b", genre: "Desenvolvimento pessoal", driveFolderUrl: "", folderId: ADMINISTRACAO, locale: "pt-BR", enabled: true, createdAt: "", updatedAt: "" });
+    const documents = drive({ [ARTES]: [shared, entry(12, "epub")], [ADMINISTRACAO]: [shared, entry(13, "pdf")] });
+    const providers = [aventura, pessoal].map((source) => new StructuredDriveCatalogProvider(source, undefined, undefined, documents));
+    const hybrid = new HybridCatalogSourceProvider(async () => providers);
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 50, locale: "pt-BR", genreId: "aventura" })).items.map((book) => book.bookId), [shared.bookId, entry(12, "epub").bookId]);
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 50, locale: "pt-BR", genreId: "desenvolvimento-pessoal" })).items.map((book) => book.bookId), [shared.bookId, entry(13, "pdf").bookId]);
+    // Without a genre filter the shared book is listed once, not twice.
+    const all = await hybrid.list({ offset: 0, limit: 50, locale: "pt-BR" });
+    assert.deepEqual(all.items.map((book) => book.bookId), [shared.bookId, entry(12, "epub").bookId, entry(13, "pdf").bookId]);
+    assert.deepEqual(all.genres, [{ id: "aventura", name: "Aventura" }, { id: "desenvolvimento-pessoal", name: "Desenvolvimento pessoal" }]);
+  });
+
   it("o download devolve só links do Drive para o navegador, com o do catálogo primeiro", async () => {
     const provider = new StructuredDriveCatalogProvider(source, undefined, undefined, drive({ [ARTES]: [entry(9, "epub")] }));
     const service = new CatalogApplicationService({} as CatalogStore, () => { throw new Error("not used"); }, new HybridCatalogSourceProvider(async () => [provider]));

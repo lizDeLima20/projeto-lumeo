@@ -22,16 +22,30 @@ export class HybridCatalogSourceProvider {
       }
       sourceCounts.push({ sourceId: provider.source.sourceId, items: result.value.items.length, pages: result.value.pages, failed: false });
       for (const book of result.value.items) {
-        const identity = book.sha256 ? `sha:${book.sha256}` : `drive:${provider.source.sourceId}:${book.driveFileId}`;
-        if (seen.has(identity) || this.providersByBookId.has(book.bookId)) continue;
-        seen.add(identity); books.push(book); this.providersByBookId.set(book.bookId, provider);
+        // A book belongs to every genre whose catalogue lists it: the same content in two
+        // genre folders is two memberships, not a duplicate. Only repeats inside one genre drop.
+        const identity = `${book.genreId}|${HybridCatalogSourceProvider.contentIdentity(book, provider)}`;
+        if (seen.has(identity)) continue;
+        seen.add(identity); books.push(book);
+        if (!this.providersByBookId.has(book.bookId)) this.providersByBookId.set(book.bookId, provider);
       }
     });
     if (providers.length > 0 && pages.every((result) => result.status === "rejected")) throw new Error(`CATALOG_ALL_SOURCES_FAILED:${HybridCatalogSourceProvider.errorCode((pages[0] as PromiseRejectedResult).reason)}`);
-    const filtered = books.filter((book) => this.matches(book, query));
+    // Without a genre filter each book is listed once, under the first genre that lists it.
+    const shown = new Set<string>();
+    const filtered = books.filter((book) => this.matches(book, query)).filter((book) => {
+      if (query.genreId) return true;
+      const identity = HybridCatalogSourceProvider.contentIdentity(book, this.providersByBookId.get(book.bookId));
+      if (shown.has(identity) || shown.has(`id:${book.bookId}`)) return false;
+      shown.add(identity); shown.add(`id:${book.bookId}`); return true;
+    });
     const page = filtered.slice(query.offset, query.offset + query.limit + 1);
     console.info(JSON.stringify({ event: "CATALOG_PIPELINE_COUNTS", sourceCounts, totalFoundInSources: sourceCounts.reduce((total, source) => total + source.items, 0), afterDeduplication: books.length, afterFilters: filtered.length, returnedByApi: Math.min(query.limit, page.length), requestedOffset: query.offset }));
     return { items: page.slice(0, query.limit), nextCursor: page.length > query.limit ? String(query.offset + query.limit) : null, genres: HybridCatalogSourceProvider.genres(books) };
+  }
+
+  private static contentIdentity(book: CatalogBookRecord, provider: CatalogSourceProvider | undefined): string {
+    return book.sha256 ? `sha:${book.sha256}` : `drive:${provider?.source.sourceId ?? ""}:${book.driveFileId}`;
   }
 
   /** Every genre present across the loaded sources, so each can be offered as a filter. */

@@ -23,12 +23,18 @@ export interface ReaderPreferences {
   pageAnimation: ReaderPageAnimation;
   imagePreset: "original" | "scannedText" | "oldDocument" | "manga";
   imageProfile: ImageProfile;
+  /** Pomodoro Lumeo: focus/break cycle and a daily page goal. Off until the reader turns it on. */
+  pomodoroEnabled: boolean;
+  pomodoroFocusMinutes: number;
+  pomodoroBreakMinutes: number;
+  dailyPagesGoal: number;
 }
 
 export const DEFAULT_READER_PREFERENCES: ReaderPreferences = {
   fontFamily: "classic", fontSize: 18, fontWeight: 400, textColor: "soft-black",
   lineSpacing: "normal", margins: "normal", paperTheme: "ivory", readerBrightness: 100, readingMode: "standard",
   pageLayout: "double", pageAnimation: "page-turn", imagePreset: "original", imageProfile: "normal",
+  pomodoroEnabled: false, pomodoroFocusMinutes: 25, pomodoroBreakMinutes: 5, dailyPagesGoal: 20,
 };
 
 export const spacingValues: Record<ReaderSpacing, { lineHeight: number; paragraphSpacing: number }> = {

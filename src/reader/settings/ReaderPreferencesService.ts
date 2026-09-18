@@ -17,6 +17,14 @@ export class ReaderPreferencesService {
   private normalize(value: ReaderPreferences): ReaderPreferences {
     const animation = value.pageAnimation === ("none" as string) ? "page-turn" : value.pageAnimation;
     return { ...value, pageAnimation: animation, fontSize: Math.min(36, Math.max(13, Math.round(value.fontSize))),
-      readerBrightness: Math.min(100, Math.max(15, Math.round(value.readerBrightness))) };
+      readerBrightness: Math.min(100, Math.max(15, Math.round(value.readerBrightness))),
+      pomodoroEnabled: value.pomodoroEnabled === true,
+      pomodoroFocusMinutes: this.clamp(value.pomodoroFocusMinutes, 5, 90, 25),
+      pomodoroBreakMinutes: this.clamp(value.pomodoroBreakMinutes, 1, 30, 5),
+      dailyPagesGoal: this.clamp(value.dailyPagesGoal, 1, 500, 20) };
+  }
+  private clamp(value: unknown, min: number, max: number, fallback: number): number {
+    const number = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
+    return Math.min(max, Math.max(min, number));
   }
 }
