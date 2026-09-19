@@ -5,6 +5,8 @@ import { LayoutSettingsController } from "../reader/settings/LayoutSettingsContr
 import { PaperSettingsController } from "../reader/settings/PaperSettingsController";
 import { ImageSettingsController, type ReaderImagePreset } from "../reader/settings/ImageSettingsController";
 import { I18nManager, type SupportedLocale, type TranslationKey } from "../i18n/I18nManager";
+import { ReaderDisplay } from "../services/ReaderDisplay";
+import { ReadingReminder, type ReadingReminderDay, type ReadingReminderState } from "../services/ReadingReminder";
 import type { PomodoroSettingsController } from "../reader/settings/PomodoroSettingsController";
 import type { ReadingDay } from "../reader/pomodoro/ReadingDayTracker";
 
@@ -27,7 +29,8 @@ export class ReaderSettingsPanel {
     const close = this.button("×", "Fechar painel", () => this.close()); close.className = "reader-settings__close"; header.append(close); panel.append(header);
     panel.append(this.languageSection(), this.textSection(), this.paperSection(), this.layoutSection(), this.imageSection(), this.animationSection());
     if (this.pomodoro) panel.append(this.pomodoroSection(this.pomodoro));
-    const study = document.createElement("p"); study.className = "reader-settings__future"; study.textContent = this.i18n.t("reader.study"); panel.append(study); fragment.append(this.backdrop, panel); return fragment;
+    if (ReadingReminder.available) panel.append(this.readingReminderSection());
+    fragment.append(this.backdrop, panel); return fragment;
   }
   public open(): void { this.panel?.classList.add("reader-settings--open"); this.backdrop?.classList.add("reader-settings-backdrop--open"); this.panel?.setAttribute("aria-hidden", "false"); this.onVisibilityChange(true); this.panel?.querySelector<HTMLElement>("button,select,input")?.focus(); }
   public close(): void { this.panel?.classList.remove("reader-settings--open"); this.backdrop?.classList.remove("reader-settings-backdrop--open"); this.panel?.setAttribute("aria-hidden", "true"); this.onVisibilityChange(false); }
@@ -37,15 +40,66 @@ export class ReaderSettingsPanel {
   public refresh(): void { const parent=this.panel?.parentElement,wasOpen=this.isOpen;this.backdrop?.remove();this.panel?.remove();if(!parent)return;parent.append(this.render());if(wasOpen)this.open(); }
   private textSection(): HTMLElement {
     const body = this.section(this.i18n.t("reader.text"), true); if (!this.adaptive) { const note = document.createElement("p"); note.className = "reader-settings__note"; note.textContent = this.i18n.t("ui.reader.adaptiveOnly"); body.append(note); return body; }
-    body.append(this.select(this.i18n.t("reader.font"), [["classic",this.i18n.t("reader.font.classic")],["modern",this.i18n.t("reader.font.modern")],["sans",this.i18n.t("reader.font.sans")],["accessible",this.i18n.t("reader.font.accessible")]], this.preferences().fontFamily, "reader-font-preview", value => void this.changed(this.fonts.changeFont(value as ReaderFontFamily), true)),
-      this.slider(this.i18n.t("reader.fontSize"), 13, 36, this.preferences().fontSize, "A−", "A+", value => void this.changed(this.fonts.changeFontSize(value), true)),
+    body.append(this.select(this.i18n.t("reader.font"), [["book",this.i18n.t("reader.font.book")],["classic",this.i18n.t("reader.font.classic")],["modern",this.i18n.t("reader.font.modern")],["sans",this.i18n.t("reader.font.sans")],["accessible",this.i18n.t("reader.font.accessible")]], this.preferences().fontFamily, "reader-font-preview", value => void this.changed(this.fonts.changeFont(value as ReaderFontFamily), true)),
+      this.fontSteps(),
       this.segment(this.i18n.t("reader.weight"), [["300",this.i18n.t("reader.weight.light")],["400",this.i18n.t("reader.weight.normal")],["700",this.i18n.t("reader.weight.strong")]], String(this.preferences().fontWeight), value => void this.changed(this.fonts.changeFontWeight(Number(value) as 300|400|700), true)),
       this.segment(this.i18n.t("reader.color"), [["soft-black",this.i18n.t("reader.color.softBlack")],["graphite",this.i18n.t("reader.color.graphite")],["dark-brown",this.i18n.t("reader.color.darkBrown")],["night-beige",this.i18n.t("reader.color.nightBeige")]], this.preferences().textColor, value => void this.changed(this.fonts.changeTextColor(value as ReaderTextColor), false)),
       this.segment(this.i18n.t("reader.spacing"), [["compact",this.i18n.t("reader.spacing.compact")],["normal",this.i18n.t("reader.spacing.normal")],["comfortable",this.i18n.t("reader.spacing.comfortable")],["wide",this.i18n.t("reader.spacing.wide")]], this.preferences().lineSpacing, value => void this.changed(this.fonts.changeSpacing(value as ReaderSpacing), true)));
     return body;
   }
   private languageSection():HTMLElement{const body=this.section(this.i18n.t("reader.language"));body.append(this.select(this.i18n.t("reader.language"),this.i18n.options().map(option=>[option.value,option.label]),this.i18n.locale,"reader-language-select",value=>void this.i18n.setLocale(value as SupportedLocale)));return body;}
-  private paperSection(): HTMLElement { const body=this.section(this.i18n.t("reader.paper")); const real=this.button(this.i18n.t("reader.bookReal"),this.i18n.t("reader.bookReal"),()=>void this.changed(this.papers.enableBookReal(),false));real.className=`button button--secondary reader-book-real${this.preferences().readingMode==="book-real"?" reader-book-real--active":""}`;const help=document.createElement("p");help.className="reader-settings__note";help.textContent=this.i18n.t("reader.bookReal.help"); body.append(this.segment(this.i18n.t("reader.background"), [["pure-white",this.i18n.t("reader.paper.pureWhite")],["ivory",this.i18n.t("reader.paper.ivory")],["cream",this.i18n.t("reader.paper.cream")],["sepia",this.i18n.t("reader.paper.sepia")]],this.preferences().paperTheme,value=>void this.changed(this.papers.changePaper(value as ReaderPaper),false),"paper-options"),this.slider(this.i18n.t("reader.brightness"),15,100,this.preferences().readerBrightness,"15%","100%",value=>void this.changed(this.papers.changeBrightness(value),false)),real,help);return body; }
+  private paperSection(): HTMLElement { return ReaderDisplay.available ? this.readerThemeSection() : this.webPaperSection(); }
+  /** Papel, Claro, Sépia, Escuro - the same four themes on every platform, each shown with
+   *  a small swatch of its real page colour so the choice is not just a word. */
+  private static readonly themes: ReadonlyArray<[string, TranslationKey, string]> = [["paper", "reader.theme.paper", "#f6f1e7"], ["pure-white", "reader.theme.light", "#fbfbf9"], ["sepia", "reader.theme.sepia", "#f1e3c8"], ["dark", "reader.theme.dark", "#1c1b19"]];
+  private themeSegment(modifier = ""): HTMLElement {
+    const themes = ReaderSettingsPanel.themes;
+    const current = themes.some(([key]) => key === this.preferences().paperTheme) ? this.preferences().paperTheme : "paper";
+    const segment = this.segment(this.i18n.t("reader.theme"), themes.map(([key, label]) => [key, this.i18n.t(label)]), current, value => void this.changed(this.papers.changePaper(value as ReaderPaper), false), `paper-options reader-theme-options ${modifier}`.trim());
+    segment.querySelectorAll<HTMLInputElement>("input").forEach((input) => { const swatch = document.createElement("span"); swatch.className = "reader-theme-swatch"; swatch.style.background = themes.find(([key]) => key === input.value)?.[2] ?? ""; swatch.setAttribute("aria-hidden", "true"); input.after(swatch); });
+    return segment;
+  }
+  /** Android e-reader: the reading theme and the window's own brightness. */
+  private readerThemeSection(): HTMLElement {
+    const body = this.section(this.i18n.t("reader.theme"));
+    body.append(this.themeSegment(), this.brightnessControl());
+    return body;
+  }
+  /** "Brilho de leitura": live on the window while dragging, saved when released. */
+  private brightnessControl(): HTMLElement {
+    const field = document.createElement("div"); field.className = "reader-setting-field reader-brightness-field";
+    field.append(this.label(this.i18n.t("reader.screenBrightness")));
+    const system = document.createElement("label"); system.className = "reader-pomodoro-settings__toggle";
+    const follow = document.createElement("input"); follow.type = "checkbox"; follow.checked = this.preferences().screenBrightness === null;
+    system.append(follow, document.createTextNode(this.i18n.t("reader.screenBrightness.system")));
+    const row = document.createElement("span"); row.className = "reader-slider";
+    const input = document.createElement("input"); input.type = "range"; input.className = "reader-brightness";
+    input.min = String(ReaderDisplay.minPercent); input.max = String(ReaderDisplay.maxPercent); input.step = "1";
+    input.value = String(this.preferences().screenBrightness ?? 60); input.disabled = follow.checked; input.setAttribute("aria-label", this.i18n.t("reader.screenBrightness"));
+    row.append(this.i18n.t("reader.screenBrightness.min"), input, this.i18n.t("reader.screenBrightness.max"));
+    const help = document.createElement("p"); help.className = "reader-settings__note"; help.textContent = this.i18n.t("reader.screenBrightness.help");
+    input.addEventListener("input", () => void ReaderDisplay.apply(Number(input.value)));
+    input.addEventListener("change", () => void this.papers.changeScreenBrightness(Number(input.value)));
+    follow.addEventListener("change", () => {
+      input.disabled = follow.checked;
+      const value = follow.checked ? null : Number(input.value);
+      void ReaderDisplay.apply(value); void this.papers.changeScreenBrightness(value);
+    });
+    field.append(system, row, help);
+    return field;
+  }
+  /** A− / A+ in single steps, with the size shown between them. */
+  private fontSteps(): HTMLElement {
+    const field = document.createElement("div"); field.className = "reader-setting-field";
+    field.append(this.label(this.i18n.t("reader.fontSize")));
+    const row = document.createElement("div"); row.className = "reader-font-steps";
+    const size = document.createElement("output"); size.value = `${this.preferences().fontSize} px`;
+    const step = (delta: number) => { const next = Math.min(36, Math.max(13, this.preferences().fontSize + delta)); if (next === this.preferences().fontSize) return; size.value = `${next} px`; void this.changed(this.fonts.changeFontSize(next), true); };
+    const smaller = this.button("A−", this.i18n.t("reader.fontSize.decrease"), () => step(-1)), larger = this.button("A+", this.i18n.t("reader.fontSize.increase"), () => step(1));
+    larger.style.fontSize = "1.15rem";
+    row.append(smaller, size, larger); field.append(row); return field;
+  }
+  private webPaperSection(): HTMLElement { const body=this.section(this.i18n.t("reader.paper")); const real=this.button(this.i18n.t("reader.bookReal"),this.i18n.t("reader.bookReal"),()=>void this.changed(this.papers.enableBookReal(),false));real.className=`button button--secondary reader-book-real${this.preferences().readingMode==="book-real"?" reader-book-real--active":""}`;const help=document.createElement("p");help.className="reader-settings__note";help.textContent=this.i18n.t("reader.bookReal.help"); body.append(this.themeSegment(),this.slider(this.i18n.t("reader.brightness"),15,100,this.preferences().readerBrightness,"15%","100%",value=>void this.changed(this.papers.changeBrightness(value),false)),real,help);return body; }
   private layoutSection():HTMLElement { const body=this.section(this.i18n.t("reader.layout"));const doubleAllowed=this.layouts.allowsTwoPages(window.innerWidth);const layout=this.segment(this.i18n.t("reader.pages"),[["single",this.i18n.t("reader.onePage")],["double",this.i18n.t("reader.twoPages")]],doubleAllowed?this.preferences().pageLayout:"single",value=>void this.changed(this.layouts.changeLayout(value as ReaderPageLayout,window.innerWidth),true));const double=layout.querySelector<HTMLInputElement>('input[value="double"]');if(double){double.disabled=!doubleAllowed;double.parentElement?.classList.toggle("is-disabled",!doubleAllowed);double.parentElement?.setAttribute("title",doubleAllowed?"":this.i18n.t("ui.reader.spreadAvailable"));}body.append(layout);if(this.adaptive)body.append(this.segment(this.i18n.t("reader.margins"),[["narrow",this.i18n.t("reader.margin.narrow")],["normal",this.i18n.t("reader.margin.normal")],["wide",this.i18n.t("reader.margin.wide")]],this.preferences().margins,value=>void this.changed(this.layouts.changeMargins(value as ReaderMargins),true)));return body; }
   private animationSection():HTMLElement { const body=this.section(this.i18n.t("reader.animation"));body.append(this.segment(this.i18n.t("reader.pageTurn"),[["page-turn",this.i18n.t("reader.animation.pageTurn")],["slide",this.i18n.t("reader.animation.slide")],["carousel",this.i18n.t("reader.animation.carousel")]],this.preferences().pageAnimation,value=>void this.changed(this.animations.changeAnimation(value as ReaderPageAnimation),false)));return body; }
   /** Pomodoro Lumeo: on/off, focus and break lengths, the daily page goal, and today's numbers. */
@@ -57,16 +111,59 @@ export class ReaderSettingsPanel {
     toggle.append(enabled, document.createTextNode(this.i18n.t("reader.pomodoro.enable")));
     const fields = document.createElement("div"); fields.className = "reader-pomodoro-settings__fields"; fields.hidden = !enabled.checked;
     enabled.addEventListener("change", () => { fields.hidden = !enabled.checked; void this.changed(pomodoro.controller.toggle(enabled.checked), false); });
-    fields.append(
+    // Exactly one goal drives a session: Tempo shows its own two fields, Páginas its own one.
+    // Never both at once - that is the whole point of choosing a type first.
+    const timeFields = document.createElement("div"); timeFields.className = "reader-pomodoro-settings__group";
+    timeFields.append(
       this.number(this.i18n.t("reader.pomodoro.focus"), 5, 90, this.preferences().pomodoroFocusMinutes, (value) => void this.changed(pomodoro.controller.changeFocus(value), false)),
-      this.number(this.i18n.t("reader.pomodoro.break"), 1, 30, this.preferences().pomodoroBreakMinutes, (value) => void this.changed(pomodoro.controller.changeBreak(value), false)),
-      this.number(this.i18n.t("reader.pomodoro.goal"), 1, 500, this.preferences().dailyPagesGoal, (value) => void this.changed(pomodoro.controller.changeDailyGoal(value), false)));
+      this.number(this.i18n.t("reader.pomodoro.break"), 1, 30, this.preferences().pomodoroBreakMinutes, (value) => void this.changed(pomodoro.controller.changeBreak(value), false)));
+    const pagesFields = document.createElement("div"); pagesFields.className = "reader-pomodoro-settings__group";
+    pagesFields.append(
+      this.number(this.i18n.t("reader.pomodoro.goal"), 1, 500, this.preferences().dailyPagesGoal, (value) => void this.changed(pomodoro.controller.changeDailyGoal(value), false)),
+      this.number(this.i18n.t("reader.pomodoro.break"), 1, 30, this.preferences().pomodoroBreakMinutes, (value) => void this.changed(pomodoro.controller.changeBreak(value), false)));
+    const showGoalType = (value: "time" | "pages"): void => { timeFields.hidden = value !== "time"; pagesFields.hidden = value !== "pages"; };
+    const goalType = this.segment(this.i18n.t("reader.pomodoro.goalType"), [["time", this.i18n.t("reader.pomodoro.goalType.time")], ["pages", this.i18n.t("reader.pomodoro.goalType.pages")]],
+      this.preferences().pomodoroGoalType, (value) => { showGoalType(value as "time" | "pages"); void this.changed(pomodoro.controller.changeGoalType(value as "time" | "pages"), false); });
+    showGoalType(this.preferences().pomodoroGoalType);
+    fields.append(goalType, timeFields, pagesFields);
     const today = document.createElement("p"); today.className = "reader-pomodoro-settings__today"; today.setAttribute("aria-live", "polite");
     void pomodoro.today().then((day) => {
       const count = (key: TranslationKey, value: number) => { const [one = "", other] = this.i18n.t(key, { count: value }).split("|"); return value === 1 ? one : other ?? one; };
       today.textContent = `${this.i18n.t("reader.pomodoro.today")}: ${[this.i18n.t("reader.pomodoro.minutes", { count: Math.floor(day.readingSeconds / 60) }), count("reader.pomodoro.pages", day.pagesRead), count("reader.pomodoro.pauses", day.pauses), count("reader.pomodoro.resumes", day.resumes)].join(" · ")}`;
     }).catch(() => undefined);
     body.append(help, toggle, fields, today);
+    return body;
+  }
+  /** Android-only: the native plugin owns persistence and AlarmManager, so it still fires after WebView shutdown. */
+  private readingReminderSection(): HTMLElement {
+    const body = this.section(this.i18n.t("reader.reminder.title")); body.classList.add("reader-reminder-settings");
+    const toggle = document.createElement("label"); toggle.className = "reader-setting-field reader-pomodoro-settings__toggle";
+    const enabled = document.createElement("input"); enabled.type = "checkbox";
+    toggle.append(enabled, document.createTextNode(this.i18n.t("reader.reminder.enable")));
+    const fields = document.createElement("div"); fields.className = "reader-pomodoro-settings__fields"; fields.hidden = true;
+    const time = document.createElement("input"); time.type = "time"; time.className = "input"; time.value = "09:00"; time.setAttribute("aria-label", this.i18n.t("reader.reminder.time"));
+    const timeField = document.createElement("label"); timeField.className = "reader-setting-field"; timeField.append(this.label(this.i18n.t("reader.reminder.time")), time);
+    const days = document.createElement("fieldset"); days.className = "reader-reminder-settings__days"; const legend = document.createElement("legend"); legend.textContent = this.i18n.t("reader.reminder.days"); days.append(legend);
+    const inputs = new Map<ReadingReminderDay, HTMLInputElement>();
+    const labels = ["reader.reminder.sun", "reader.reminder.mon", "reader.reminder.tue", "reader.reminder.wed", "reader.reminder.thu", "reader.reminder.fri", "reader.reminder.sat"] as const;
+    labels.forEach((key, index) => { const day = (index + 1) as ReadingReminderDay, label = document.createElement("label"), input = document.createElement("input"); input.type = "checkbox"; input.checked = day >= 2 && day <= 6; input.value = String(day); label.append(input, document.createTextNode(this.i18n.t(key))); inputs.set(day, input); days.append(label); });
+    const status = document.createElement("p"); status.className = "reader-settings__note"; status.setAttribute("aria-live", "polite");
+    const value = (): Omit<ReadingReminderState, "enabled"> | null => {
+      const parts = time.value.split(":"), hour = Number(parts[0]), minute = Number(parts[1]), selected = [...inputs].filter(([, input]) => input.checked).map(([day]) => day);
+      return Number.isInteger(hour) && Number.isInteger(minute) && selected.length ? { hour, minute, days: selected } : null;
+    };
+    const save = async (): Promise<void> => {
+      if (!enabled.checked) { await ReadingReminder.cancel(); status.textContent = ""; return; }
+      const next = value(); if (!next) { enabled.checked = false; fields.hidden = true; status.textContent = this.i18n.t("reader.reminder.chooseDay"); return; }
+      const scheduled = await ReadingReminder.schedule(next);
+      if (!scheduled) { enabled.checked = false; fields.hidden = true; status.textContent = this.i18n.t("reader.reminder.permission"); return; }
+      status.textContent = this.i18n.t("reader.reminder.scheduled", { time: time.value });
+    };
+    enabled.addEventListener("change", () => { fields.hidden = !enabled.checked; void save(); });
+    time.addEventListener("change", () => { if (enabled.checked) void save(); });
+    inputs.forEach(input => input.addEventListener("change", () => { if (enabled.checked) void save(); }));
+    fields.append(timeField, days); body.append(toggle, fields, status);
+    void ReadingReminder.state().then(saved => { if (!saved) return; enabled.checked = saved.enabled; fields.hidden = !saved.enabled; time.value = `${String(saved.hour).padStart(2, "0")}:${String(saved.minute).padStart(2, "0")}`; inputs.forEach((input, day) => { input.checked = saved.days.includes(day); }); if (saved.enabled) status.textContent = this.i18n.t("reader.reminder.scheduled", { time: time.value }); });
     return body;
   }
   private number(label: string, min: number, max: number, value: number, onChange: (value: number) => void): HTMLElement {

@@ -57,6 +57,7 @@ import { DeviceConflictView } from "../views/DeviceConflictView";
 import { GenreView } from "../views/GenreView";
 import { HeaderView } from "../views/HeaderView";
 import { HomeView } from "../views/HomeView";
+import { AudiobooksView } from "../views/AudiobooksView";
 import { LibraryView } from "../views/LibraryView";
 import { LoginView } from "../views/LoginView";
 import { OnboardingView } from "../views/OnboardingView";
@@ -149,7 +150,8 @@ export class App {
     ));
     this.router.register("onboarding", () => new OnboardingView(this.state, this.userName(), () => void this.finishOnboarding()));
     this.router.register("home", () => new HomeView(this.state, this.userName(),
-      () => this.router.navigate("library"), () => this.router.navigate("import")));
+      () => this.router.navigate("library"), () => this.router.navigate("import"), () => this.router.navigate("audiobooks")));
+    this.router.register("audiobooks", () => new AudiobooksView(() => this.router.navigate("home")));
     this.router.register("library", () => new LibraryView(this.state,
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.openLibraryBook(bookId), (bookId) => void this.deleteBook(bookId, false)));
     this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }), () => this.router.navigate("catalog-admin")));

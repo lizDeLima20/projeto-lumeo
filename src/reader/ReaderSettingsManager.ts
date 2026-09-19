@@ -1,19 +1,21 @@
 import { StorageService } from "../services/StorageService";
-import { marginValues, spacingValues, textColorValues } from "./settings/ReaderPreferences";
+import { marginValues, spacingValues, textColorValues, type ReaderFontFamily } from "./settings/ReaderPreferences";
+import { Capacitor } from "@capacitor/core";
 import type { ScanEnhancementSettings } from "./image/ScanEnhancementPipeline";
 import { ReaderPreferencesService } from "./settings/ReaderPreferencesService";
 
 export type ReaderFitMode = "custom" | "width" | "page";
 export type ReaderTheme = "light" | "dark" | "paper";
 export type PageAnimation = "slide" | "page-turn" | "carousel";
-export interface ReflowSettings { fontFamily:"classic"|"modern"|"sans"|"accessible";fontSize:number;fontWeight:number;textColor:string;lineHeight:number;paragraphSpacing:number;margins:number;alignment:"left"|"justify";readingWidth:number; }
+export interface ReflowSettings { fontFamily:ReaderFontFamily;fontSize:number;fontWeight:number;textColor:string;lineHeight:number;paragraphSpacing:number;margins:number;alignment:"left"|"justify";readingWidth:number; }
 export interface ReaderSettings extends ReflowSettings { zoom: number; fitMode: ReaderFitMode; theme: ReaderTheme; brightness: number; animation: PageAnimation; }
 
 export class ReaderSettingsManager {
   private static readonly KEY = "reader-settings";
   private value: ReaderSettings = { zoom:100,fitMode:"width",theme:"light",brightness:100,animation:"page-turn",fontFamily:"classic",fontSize:18,fontWeight:400,textColor:"",lineHeight:1.65,paragraphSpacing:1,margins:28,alignment:"left",readingWidth:680 };
   public readonly preferencesService: ReaderPreferencesService;
-  public constructor(private readonly storage: StorageService) { this.preferencesService = new ReaderPreferencesService(storage); }
+  public constructor(private readonly storage: StorageService) { this.preferencesService = new ReaderPreferencesService(storage, ReaderSettingsManager.isAndroid()); }
+  private static isAndroid(): boolean { try { return typeof window !== "undefined" && Capacitor.getPlatform() === "android"; } catch { return false; } }
   public async initialize(globalTheme: "light" | "dark"): Promise<void> {
     const [saved] = await Promise.all([this.storage.load<ReaderSettings>(ReaderSettingsManager.KEY), this.preferencesService.restorePreferences()]);
     this.value = saved ? { ...this.value, ...saved } : { ...this.value, theme: globalTheme };

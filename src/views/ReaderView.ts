@@ -5,6 +5,8 @@ import { BaseView } from "./BaseView";
 import { ReaderToolbar, type ReaderToolbarActions } from "./ReaderToolbar";
 import { ReflowReaderEngine } from "../reader/reflow/ReflowReaderEngine";
 import { PageTurnController } from "../reader/reflow/PageTurnController";
+import { PageSlideController } from "../reader/reflow/PageSlideController";
+import { PageVerticalController } from "../reader/reflow/PageVerticalController";
 import { DesktopBookReaderView } from "./DesktopBookReaderView";
 import { ReaderLayoutPolicy } from "../reader/premium/ReaderLayoutPolicy";
 import { PageBoxMeasure } from "../reader/reflow/PageBoxMeasure";
@@ -42,7 +44,7 @@ import{I18nManager}from"../i18n/I18nManager";import{ReaderInteractionController}
 import{ReaderChromeController}from"../reader/premium/ReaderChromeController";import{FocusReadingMode}from"../reader/premium/FocusReadingMode";import{ReaderProgressModel}from"../reader/premium/ReaderProgressModel";import{ReaderProgressBar}from"./ReaderProgressBar";import{ReaderCoverPageView}from"./ReaderCoverPageView";
 import{ImagePageTurnAnimator,type ImageTurnDirection}from"../reader/image/ImagePageTurnAnimator";
 import{DesktopReaderStateMachine}from"../reader/desktop/DesktopReaderStateMachine";
-import{ReaderPomodoroView}from"./ReaderPomodoroView";import{ReadingDayTracker}from"../reader/pomodoro/ReadingDayTracker";import{PomodoroSettingsController}from"../reader/settings/PomodoroSettingsController";import{StorageService}from"../services/StorageService";
+import{ReaderPomodoroView}from"./ReaderPomodoroView";import{ReaderDisplay}from"../services/ReaderDisplay";import{ReadingDayTracker}from"../reader/pomodoro/ReadingDayTracker";import{PomodoroSettingsController}from"../reader/settings/PomodoroSettingsController";import{StorageService}from"../services/StorageService";import{FirstReadGreeting}from"../reader/premium/FirstReadGreeting";
 import { ReadingReviewRepository } from "../repositories/ReadingReviewRepository";
 import { ReadingReviewDialog } from "./ReadingReviewDialog";
 
@@ -57,7 +59,8 @@ export class ReaderView extends BaseView {
   private touchStartY = 0;
   private controlsTimer = 0;
   private resizeTimer = 0;
-  private reflow:ReflowReaderEngine|LimaReaderEngine|null=null;private reflowBook:Book|null=null;private turnController:PageTurnController|null=null;
+  private reflow:ReflowReaderEngine|LimaReaderEngine|null=null;private reflowBook:Book|null=null;
+  private turnController:PageTurnController|PageSlideController|PageVerticalController|null=null;
   private desktopView:DesktopBookReaderView|null=null;
   private readonly highlights:HighlightManager;private readonly annotations:AnnotationManager;private readonly bookmarks:BookmarkManager;
   private readonly anchors=new ReadingAnchorService();private readonly selections=new TextSelectionManager();private readonly selectionMenu=new SelectionContextMenu();private readonly studyPanel=new StudyPanel();private selectedAnchor:TextAnchor|null=null;
@@ -71,6 +74,7 @@ export class ReaderView extends BaseView {
   private readonly imageTurnAnimator=new ImagePageTurnAnimator();private imageTurnDirection:ImageTurnDirection|null=null;private imageTurnSnapshot:string|null=null;
   private readonly desktopState=new DesktopReaderStateMachine();
   private pomodoro:ReaderPomodoroView|null=null;private readonly readingDays=new ReadingDayTracker(new StorageService());
+  private readonly firstReadGreeting=new FirstReadGreeting(new StorageService());
   private readonly reviews: ReadingReviewRepository;
   private imageBook: Book | null = null;
   private completionSequence: HTMLElement | null = null;
@@ -79,12 +83,16 @@ export class ReaderView extends BaseView {
   public constructor(private readonly bookId: string, private readonly manager: ReaderManager,
     private readonly globalTheme: "light" | "dark", private readonly onBack: () => void,
     private readonly onBookUpdated: (book: Book) => void, database:IndexedDbService, private readonly readerName?:string,
-    private readonly readerUserId?:string) { super();const highlightRepository=new HighlightRepository(database),bookmarkRepository=new BookmarkRepository(database);this.annotationRepository=new AnnotationRepository(database);this.highlights=new HighlightManager(highlightRepository);this.annotations=new AnnotationManager(this.annotationRepository);this.bookmarks=new BookmarkManager(bookmarkRepository);this.notebookService=new StudyNotebookService(highlightRepository,this.annotationRepository,bookmarkRepository);this.lookup=new StudyLookupManager(new StudyLookupCacheRepository(database));this.chapterStudyController=new ChapterStudyController(new ChapterStudySheetService(new ChapterStudySheetRepository(database)),"current",bookId);this.reviews=new ReadingReviewRepository(database); }
+    private readonly readerUserId?:string) { super();const highlightRepository=new HighlightRepository(database),bookmarkRepository=new BookmarkRepository(database);this.annotationRepository=new AnnotationRepository(database);this.highlights=new HighlightManager(highlightRepository,readerUserId);this.annotations=new AnnotationManager(this.annotationRepository,readerUserId);this.bookmarks=new BookmarkManager(bookmarkRepository);this.notebookService=new StudyNotebookService(highlightRepository,this.annotationRepository,bookmarkRepository);this.lookup=new StudyLookupManager(new StudyLookupCacheRepository(database));this.chapterStudyController=new ChapterStudyController(new ChapterStudySheetService(new ChapterStudySheetRepository(database)),"current",bookId);this.reviews=new ReadingReviewRepository(database); }
 
   public render(): HTMLElement {
     const reader = this.createElement("section", "reader reader--controls-visible"); reader.dataset.readerTheme = this.globalTheme; reader.lang=this.i18n.locale;
     this.stage = this.createElement("div", "reader-stage"); this.stage.tabIndex = 0;
     this.canvas = this.createElement("canvas", "reader-page") as HTMLCanvasElement; this.canvas.setAttribute("aria-label", this.i18n.t("reader.pdfPage"));
+    // Hidden until an image-based (scanned) book actually needs it: shown here unconditionally,
+    // this opaque white rectangle was the flash reported between tapping a book and the reflow
+    // pages/cover mounting - the one visible thing during the async fetch/parse gap.
+    this.canvas.hidden = true;
     const loading = this.createElement("div", "reader-loading", this.i18n.t("reader.loading")); loading.setAttribute("role", "status");
     this.stage.append(this.canvas, loading, this.tapZones()); reader.append(this.stage);
     this.chrome=new ReaderChromeController(state=>{reader.classList.toggle("reader--controls-visible",state.visible);reader.classList.toggle("reader--focus-mode",state.focusMode);this.progressBar?.setVisible(state.progressVisible);});this.progressBar=new ReaderProgressBar();reader.append(this.progressBar.render());
@@ -94,7 +102,7 @@ export class ReaderView extends BaseView {
   public override unmount(): void {
     window.clearTimeout(this.controlsTimer); window.clearTimeout(this.resizeTimer);
     document.removeEventListener("keydown", this.handleKeydown); window.removeEventListener("resize", this.handleResize);
-    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();this.pomodoro?.destroy();this.pomodoro=null;document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();this.desktopView?.destroy();void this.reflow?.close();void this.manager.close(); super.unmount();
+    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();this.pomodoro?.destroy();this.pomodoro=null;void ReaderDisplay.restore();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();this.desktopView?.destroy();void this.reflow?.close();void this.manager.close(); super.unmount();
   }
 
   private async initialize(): Promise<void> {
@@ -102,7 +110,7 @@ export class ReaderView extends BaseView {
     try {
       await this.manager.settings.initialize(this.globalTheme); this.applyReaderSettings();
       const source=await this.manager.source(this.bookId);const savedProgress=source.progress?.progressPercent??source.book.progressPercent??0;const hasStartedReading=savedProgress>0;this.desktopState.restore(savedProgress);let reflow:ReflowReaderEngine|LimaReaderEngine;let type:"TEXT_BASED"|"MIXED"|"IMAGE_BASED"="TEXT_BASED";
-      if(typeof document!=="undefined"&&document.fonts)await document.fonts.ready;const cover={title:source.book.title,author:source.book.author,image:source.book.cover||undefined};
+      if(typeof document!=="undefined"&&document.fonts){await this.loadReadingFont();await document.fonts.ready;}const cover={title:source.book.title,author:source.book.author,image:source.book.cover||undefined};
       if(source.lima){this.limaDocument=source.lima;const engine=new LimaReaderEngine(),saved=source.progress?.currentLocation?.match(/^lima:([^:]+):(\d+)$/);engine.open(source.lima,this.paginationMetrics(),saved?.[1]?{blockId:saved[1],offset:Number(saved[2]??0)}:undefined,cover,!hasStartedReading);reflow=engine;}
       else{if(source.book.fileType==="epub")throw new EpubReaderUnavailableError("Este EPUB ainda está sendo preparado. Tente novamente em instantes.");const engine=new ReflowReaderEngine(),logical=source.progress?.currentLocation?.startsWith("logical:")?Number(source.progress.currentLocation.slice(8)):0;type=await engine.open(source.blob,this.paginationMetrics(),logical,cover,!hasStartedReading);reflow=engine;}
       if(type!=="IMAGE_BASED"){await this.manager.saveDocumentCapability(source.book,{documentMode:type==="MIXED"?"mixed":"native",textCapability:type==="MIXED"?"partial":"full",limaCapability:type==="MIXED"?"limited":"full"});this.reflow=reflow;this.reflowBook=source.book;await this.highlights.restore(source.book.id);this.mountReflow(source.book.title);this.remeasure();this.reflow.repaginate(this.paginationMetrics());
@@ -110,14 +118,26 @@ export class ReaderView extends BaseView {
          * a few tenths of a percent: shown as 0% on the shelf, yet it skipped the closed book.
          * Nothing past the first page has been read, so the book opens closed on its cover. */
         if(this.reflow.currentPageNumber<=2&&this.reflow.pageAt(1)?.cover){this.reflow.goTo(1);this.desktopState.restore(0);}
-        this.renderReflow();return;}await reflow.close();await this.manager.saveDocumentCapability(source.book,{documentMode:"scanned",textCapability:"none",limaCapability:"unavailable"});
-      this.element?.classList.add("reader--image-mode");this.stage.append(this.createElement("p","reader-image-mode-notice",this.i18n.t("reader.imageMode.notice")));
+        this.renderReflow();void this.offerFirstReadGreeting(hasStartedReading);return;}await reflow.close();await this.manager.saveDocumentCapability(source.book,{documentMode:"scanned",textCapability:"none",limaCapability:"unavailable"});
+      this.element?.classList.add("reader--image-mode");this.canvas.hidden=false;this.stage.append(this.createElement("p","reader-image-mode-notice",this.i18n.t("reader.imageMode.notice")));
       const book = await this.manager.openImageReader(this.bookId, this.canvas, () => this.stageSize(), (incorrect) => this.requestPassword(incorrect),
         (state) => this.onPageRendered(state));
       this.imageBook = book;
       this.element.querySelector(".reader-loading")?.remove(); this.mountControls(book.title);
       document.addEventListener("keydown", this.handleKeydown); window.addEventListener("resize", this.handleResize); this.scheduleControlsHide();
     } catch (error) { this.showError(this.errorMessage(error)); }
+  }
+  /** Desktop already keeps a permanent greeting beside the closed cover; this transient
+   *  toast is the single-page (mobile/Android) equivalent, shown once ever per book. */
+  private async offerFirstReadGreeting(hasStartedReading:boolean):Promise<void>{
+    if(this.wantsSpread()||!this.element)return;
+    if(!await this.firstReadGreeting.shouldGreet(this.bookId,hasStartedReading))return;
+    void this.firstReadGreeting.markGreeted(this.bookId);
+    const toast=this.createElement("div","reader-first-read");toast.setAttribute("role","status");
+    toast.append(this.createElement("p","reader-first-read__line",this.i18n.t("reader.firstRead.line1")),this.createElement("p","reader-first-read__line",this.i18n.t("reader.firstRead.line2")));
+    this.element.append(toast);
+    requestAnimationFrame(()=>toast.classList.add("reader-first-read--visible"));
+    window.setTimeout(()=>{toast.classList.remove("reader-first-read--visible");window.setTimeout(()=>toast.remove(),420);},2600);
   }
   private mountReflow(title:string):void{if(!this.stage||!this.element)return;this.stage.replaceChildren();this.stage.classList.add("reader-stage--reflow");this.stage.append(this.createElement("div","reflow-pages"),this.tapZones());this.element.querySelector(".reader-loading")?.remove();this.mountControls(title);document.addEventListener("keydown",this.handleKeydown);window.addEventListener("resize",this.handleResize);this.applyReflowStyles();this.scheduleControlsHide();}
   /** One page on a phone, an open spread on a wider screen. Asked here, in one place,
@@ -136,8 +156,14 @@ export class ReaderView extends BaseView {
       /* Positions 1-3 are the closed cover and the opened cover with page 1 on the right. */
       if(doublePage&&spread<=2&&this.reflow.pageAt(1)?.cover){const cover=this.reflow.pageAt(1)!,next=this.reflow.pageAt(2),name=this.readerName?.trim(),heading=name?this.i18n.t("ui.greeting.hello",{name}):this.i18n.t("ui.greeting.readerHello");this.desktopView=new DesktopBookReaderView(cover,next,()=>void this.previous(),()=>void this.next(),paragraph=>this.renderParagraph(paragraph),{versoAfter:this.reflow.pageAt(3),underAfter:this.reflow.pageAt(4),versoBefore:null,underBefore:null},{coverState:spread===0?"closed":"open",greeting:{heading,copy:this.i18n.t("ui.greeting.readerDeskCopy")},onCoverOpen:()=>this.openDesktopCover(),onCoverClose:()=>this.closeDesktopCover(),onTurnStart:direction=>this.desktopState.beginDrag(direction),onTurnSettling:direction=>this.desktopState.beginSettling(direction),onTurnFinished:()=>this.desktopState.settle()});host.append(this.desktopView.render());this.bindSelection(host);this.currentPage=current;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();this.updateProgress();return;}
     if(doublePage){const navigation=new OpenBookNavigationController(this.reflow.totalPages+1),start=spread;const at=(position:number)=>position>=2?this.reflow!.pageAt(position-1):null;this.desktopView=new DesktopBookReaderView(at(start),at(start+1),()=>void this.moveDesktop(navigation.previous(position)),()=>void this.moveDesktop(navigation.next(position)),paragraph=>this.renderParagraph(paragraph),{versoAfter:at(start+2),underAfter:at(start+3),versoBefore:at(start-1),underBefore:at(start-2)});host.append(this.desktopView.render());this.bindSelection(host);this.currentPage=Math.max(1,start-1);this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();return;}
-    this.reflow.window().forEach(page=>{const sheet=this.createElement("article",`reflow-sheet${page.cover?" reflow-sheet--cover":""}${page.index+1===current?" reflow-sheet--current":""}`);sheet.dataset.page=String(page.index+1);if(page.cover)sheet.append(this.renderCover(page.cover));else{page.paragraphs.forEach(paragraph=>sheet.append(this.renderParagraph(paragraph)));sheet.append(this.reflowPageNumber(page));if(page.index+1===current)sheet.append(this.reflowVerso(this.reflow!.pageAt(current+1)));}host.append(sheet);});this.bindSelection(host);
-    const active=host.querySelector<HTMLElement>(".reflow-sheet--current");if(active&&this.manager.settings.settings.animation==="page-turn"){this.turnController=new PageTurnController(active,()=>void this.next(),()=>void this.previous());this.turnController.bind();}
+    /* Every sheet window() returns is fully built up front - before/current/after - so the
+     * leaf the reader is about to see is already rendered underneath whichever animation
+     * reveals it, curl, slide or vertical scroll alike. */
+    this.reflow.window().forEach(page=>{const relation=page.index+1<current?"before":page.index+1===current?"current":"after";const sheet=this.createElement("article",`reflow-sheet${page.cover?" reflow-sheet--cover":""} reflow-sheet--${relation}`);sheet.dataset.page=String(page.index+1);if(page.cover)sheet.append(this.renderCover(page.cover));else{page.paragraphs.forEach(paragraph=>sheet.append(this.renderParagraph(paragraph)));sheet.append(this.reflowPageNumber(page));if(page.index+1===current)sheet.append(this.reflowVerso(this.reflow!.pageAt(current+1)));}host.append(sheet);});this.bindSelection(host);
+    const active=host.querySelector<HTMLElement>(".reflow-sheet--current");const animation=this.manager.settings.settings.animation;
+    if(active&&animation==="page-turn"){this.turnController=new PageTurnController(active,()=>void this.next(),()=>void this.previous());this.turnController.bind();}
+    else if(active&&animation==="slide"){this.turnController=new PageSlideController(host,()=>void this.next(),()=>void this.previous());this.turnController.bind();}
+    else if(active&&animation==="carousel"){this.turnController=new PageVerticalController(host,()=>void this.next(),()=>void this.previous());this.turnController.bind();}
     this.currentPage=this.reflow.currentPageNumber;this.totalPages=this.reflow.totalPages;this.toolbar?.update(this.currentPage,this.totalPages,this.manager.settings.settings.fontSize);this.updateCurrentChapter();this.updateProgress();}
   private openDesktopCover():void{if(!this.desktopState.beginOpening())return;this.desktopState.opened();this.renderReflow();}
   private closeDesktopCover():void{if(!this.desktopState.beginClosing())return;this.desktopState.closed();this.renderReflow();}
@@ -265,13 +291,16 @@ export class ReaderView extends BaseView {
   private paginationMetrics():PaginationMetrics{const settings=this.manager.settings.settings;const base={width:Math.min(this.stage?.clientWidth??window.innerWidth,settings.readingWidth+settings.margins*2),height:this.stage?.clientHeight??window.innerHeight,fontSize:settings.fontSize,lineHeight:settings.lineHeight,margin:settings.margins};const measured=this.element?PageBoxMeasure.measure(this.element,this.wantsSpread(),this.fitSafety):null;return measured?{...base,...measured}:base;}
   private remeasure():void{this.fitSafety=0;this.fitAttempts=0;}
   private async updateReflow(settings:Parameters<ReaderManager["settings"]["updateReflow"]>[0]):Promise<void>{await this.manager.settings.updateReflow(settings);if(settings.textColor&&this.element)this.element.style.setProperty("--reader-custom-ink",settings.textColor);if(!this.reflow)return;this.applyReflowStyles();this.remeasure();this.reflow.repaginate(this.paginationMetrics());this.renderReflow();await this.saveReflow();}
-  private applyReflowStyles():void{if(!this.element)return;const settings=this.manager.settings.settings;this.element.dataset.paper=this.manager.settings.preferencesService.preferences.paperTheme;this.element.style.setProperty("--reflow-font-size",`${settings.fontSize}px`);this.element.style.setProperty("--reflow-font-weight",String(settings.fontWeight));this.element.style.setProperty("--reflow-line-height",String(settings.lineHeight));this.element.style.setProperty("--reflow-paragraph-gap",`${settings.paragraphSpacing}em`);this.element.style.setProperty("--reflow-margin",`${settings.margins}px`);this.element.style.setProperty("--reflow-width",`${settings.readingWidth}px`);this.element.style.setProperty("--reflow-align",settings.alignment);this.element.dataset.font=settings.fontFamily;}
-  private async applyPreferences(repaginate:boolean):Promise<void>{this.manager.settings.syncPreferences();this.pomodoro?.sync();this.applyReaderSettings();this.applyReflowStyles();if(this.reflow&&repaginate){this.remeasure();this.reflow.repaginate(this.paginationMetrics());}if(this.reflow)this.renderReflow();else await this.manager.rerender();await this.saveReflow();}
+  private applyReflowStyles():void{if(!this.element)return;const settings=this.manager.settings.settings;this.element.dataset.paper=this.manager.settings.preferencesService.preferences.paperTheme;this.element.dataset.animation=settings.animation;this.element.style.setProperty("--reflow-font-size",`${settings.fontSize}px`);this.element.style.setProperty("--reflow-font-weight",String(settings.fontWeight));this.element.style.setProperty("--reflow-line-height",String(settings.lineHeight));this.element.style.setProperty("--reflow-paragraph-gap",`${settings.paragraphSpacing}em`);this.element.style.setProperty("--reflow-margin",`${settings.margins}px`);this.element.style.setProperty("--reflow-width",`${settings.readingWidth}px`);this.element.style.setProperty("--reflow-align",settings.alignment);this.element.dataset.font=settings.fontFamily;}
+  /** The bundled book font is fetched on first use; paginating before it arrives would cut
+   *  the pages for the fallback font. */
+  private async loadReadingFont():Promise<void>{if(typeof document==="undefined"||!document.fonts||this.manager.settings.preferencesService.preferences.fontFamily!=="book")return;try{await document.fonts.load('400 18px "Literata Variable"');}catch{/* fallback serif */}}
+  private async applyPreferences(repaginate:boolean):Promise<void>{this.manager.settings.syncPreferences();this.pomodoro?.sync();if(repaginate)await this.loadReadingFont();this.applyReaderSettings();this.applyReflowStyles();if(this.reflow&&repaginate){this.remeasure();this.reflow.repaginate(this.paginationMetrics());}if(this.reflow)this.renderReflow();else await this.manager.rerender();await this.saveReflow();}
   private renderParagraph(paragraph:ReaderParagraph):HTMLElement{const element=this.createElement(paragraph.kind==="heading"?"h2":"p",`reader-${paragraph.kind}`);const blockId=paragraph.sourceBlockId??paragraph.id,start=paragraph.sourceStart??0,end=start+paragraph.text.length;element.dataset.blockId=blockId;element.dataset.sourceStart=String(start);const marks=this.highlights.forBlock(blockId).filter(mark=>mark.endOffset>start&&mark.startOffset<end).sort((a,b)=>a.startOffset-b.startOffset);let cursor=start;marks.forEach(mark=>{const from=Math.max(start,mark.startOffset),to=Math.min(end,mark.endOffset);if(from>cursor)element.append(document.createTextNode(paragraph.text.slice(cursor-start,from-start)));const highlighted=document.createElement("mark");highlighted.className=`reader-highlight reader-highlight--${mark.color}`;highlighted.dataset.highlightId=mark.id;highlighted.textContent=paragraph.text.slice(from-start,to-start);element.append(highlighted);cursor=Math.max(cursor,to);});if(cursor<end)element.append(document.createTextNode(paragraph.text.slice(cursor-start)));return element;}
   private renderCover(cover:ReaderCoverPage):HTMLElement{return new ReaderCoverPageView().render(cover);}
   private reflowPageNumber(page:ReaderPage):HTMLElement{return this.createElement("span","reflow-sheet__number",page.visualLabel??String(page.index+1));}
   private reflowVerso(page:ReaderPage|null):HTMLElement{const face=this.createElement("div","page-turn-verso");face.setAttribute("aria-hidden","true");if(!page||page.cover)return face;const content=this.createElement("div","reflow-sheet__verso-content");page.paragraphs.forEach(paragraph=>content.append(this.renderParagraph(paragraph)));content.append(this.reflowPageNumber(page));face.append(content);return face;}
-  private bindSelection(root:HTMLElement):void{root.addEventListener("pointerdown",event=>{this.chrome?.selectionStarted();this.interactions.begin({x:event.clientX,y:event.clientY,time:event.timeStamp,target:"content"})});root.addEventListener("pointerup",event=>{window.setTimeout(()=>{const anchor=this.selections.selection(root),intent=this.interactions.end({x:event.clientX,y:event.clientY,time:event.timeStamp,target:"content",hasSelection:Boolean(anchor)});if(intent==="TAP"||intent==="SWIPE"||!anchor)return;this.selectedAnchor=anchor;const range=window.getSelection()?.getRangeAt(0);if(range)this.selectionMenu.open(range.getBoundingClientRect(),{highlight:color=>void this.createHighlight(color),annotate:()=>void this.createAnnotation(),definition:()=>void this.showDefinition(),translate:()=>this.chooseTranslation(),search:()=>this.webSearch(),origin:()=>void this.showOrigin(),context:()=>this.showContext(),copy:()=>void this.copySelection(),bookmark:()=>void this.bookmarkSelection(),paragraph:()=>this.selectParagraph(root),addToSheet:()=>void this.addSelectionToSheet()});},0)});}
+  private bindSelection(root:HTMLElement):void{root.addEventListener("pointerdown",event=>{this.chrome?.selectionStarted();this.interactions.begin({x:event.clientX,y:event.clientY,time:event.timeStamp,target:"content"})});root.addEventListener("pointerup",event=>{window.setTimeout(()=>{const anchor=this.selections.selection(root),intent=this.interactions.end({x:event.clientX,y:event.clientY,time:event.timeStamp,target:"content",hasSelection:Boolean(anchor)});if(intent==="TAP"||intent==="SWIPE"||!anchor)return;this.selectedAnchor=anchor;const range=window.getSelection()?.getRangeAt(0);if(range)this.selectionMenu.open(range.getBoundingClientRect(),{highlight:color=>void this.createHighlight(color),annotate:()=>void this.createAnnotation(),definition:()=>void this.showDefinition(),translate:()=>this.chooseTranslation(),search:()=>this.webSearch(),origin:()=>void this.showOrigin(),context:()=>this.showContext(),copy:()=>void this.copySelection(),bookmark:()=>void this.bookmarkSelection(),paragraph:()=>this.selectParagraph(root),addToSheet:()=>void this.addSelectionToSheet(),studyCard:()=>void this.openStudyCard()});},0)});}
   private async showDefinition():Promise<void>{const text=this.selectedAnchor?.selectedText;if(!text)return;this.lookupPanel.loading("Buscando significado…");try{this.lookupPanel.definition(await this.lookup.definition(text,this.sourceLanguage));}catch(error){this.lookupPanel.error(this.lookupMessage(error),()=>void this.showDefinition());}}
   private chooseTranslation():void{if(!this.selectedAnchor)return;this.lookupPanel.languagePicker(this.sourceLanguage==="en"?"pt-BR":"en",language=>void this.showTranslation(language));}
   private async showTranslation(target:StudyLanguage):Promise<void>{const text=this.selectedAnchor?.selectedText;if(!text)return;this.lookupPanel.loading("Traduzindo…");try{this.lookupPanel.translation(await this.lookup.translate(text,this.sourceLanguage,target));}catch(error){this.lookupPanel.error(this.lookupMessage(error),()=>void this.showTranslation(target));}}
@@ -279,13 +308,61 @@ export class ReaderView extends BaseView {
   private async showOrigin():Promise<void>{const text=this.selectedAnchor?.selectedText;if(!text)return;this.lookupPanel.loading("Buscando origem…");try{this.lookupPanel.origin(await this.lookup.wordOrigin(text,this.sourceLanguage));}catch(error){this.lookupPanel.error(this.lookupMessage(error),()=>void this.showOrigin());}}
   private webSearch():void{if(!this.selectedAnchor)return;try{this.lookup.webSearch(this.selectedAnchor.selectedText);}catch(error){this.lookupPanel.error(this.lookupMessage(error),()=>this.webSearch());}}
   private lookupMessage(error:unknown):string{return error instanceof Error?error.message:"Não foi possível concluir a consulta. Tente novamente.";}
+  /** "Mais" -> ficha de estudo: everything the reader has kept about one trecho, in one
+   *  place - the trecho itself, the book, where it is, significado/tradução if looked up
+   *  and kept, and the reader's own note, editable right there. Opening it on a selection
+   *  that was not grifado yet grifa it quietly first: the ficha needs a stable identity to
+   *  hang its fields on, the same one "Abrir marcações" and reopening the book both use. */
+  private async openStudyCard():Promise<void>{
+    const anchor=this.selectedAnchor,book=this.reflowBook;
+    if(!anchor||!book||!this.reflow)return;
+    const existing=this.highlights.forBlock(anchor.blockId).find(mark=>mark.startOffset===anchor.startOffset&&mark.endOffset===anchor.endOffset);
+    const highlight=existing??await this.createHighlight("yellow");
+    if(!highlight)return;
+    const page=this.reflow.currentPageNumber,note=await this.annotations.forHighlight(highlight.id);
+    this.renderStudyCard(book,highlight,{selectedText:anchor.selectedText,page,noteText:note?.text,definitionText:note?.definitionText,translationText:note?.translationText});
+  }
+  private renderStudyCard(book:Book,highlight:Highlight,data:{selectedText:string;page:number;noteText?:string;definitionText?:string;translationText?:string}):void{
+    if(!this.element)return;
+    const layer=this.createElement("div","reader-dialog-layer");const card=this.createElement("form","reader-dialog reader-study-card");
+    card.setAttribute("role","dialog");card.setAttribute("aria-modal","true");
+    card.append(this.createElement("h2","section-title",this.i18n.t("reader.card.title")));
+    const excerpt=this.createElement("blockquote","reader-study-card__excerpt",data.selectedText);card.append(excerpt);
+    card.append(this.studyCardField(this.i18n.t("reader.card.book"),book.title),this.studyCardField(this.i18n.t("reader.card.location"),this.i18n.t("reader.card.locationValue",{page:data.page})));
+    const definition=this.studyCardLookup(this.i18n.t("reader.card.definition"),data.definitionText,this.i18n.t("reader.card.lookupDefinition"),async()=>{const result=await this.lookup.definition(data.selectedText,this.sourceLanguage);await this.annotations.saveDefinition(book.id,highlight.id,result.definition);return result.definition;});
+    const translation=this.studyCardLookup(this.i18n.t("reader.card.translation"),data.translationText,this.i18n.t("reader.card.lookupTranslation"),async()=>{const target=this.sourceLanguage==="en"?"pt-BR":"en";const result=await this.lookup.translate(data.selectedText,this.sourceLanguage,target);await this.annotations.saveTranslation(book.id,highlight.id,result.translated);return result.translated;});
+    card.append(definition,translation);
+    const noteLabel=this.createElement("label","reader-study-card__note-label",this.i18n.t("reader.card.myNote"));
+    const note=this.createElement("textarea","input") as HTMLTextAreaElement;note.value=data.noteText??"";note.rows=3;note.placeholder=this.i18n.t("reader.card.myNotePlaceholder");noteLabel.append(note);card.append(noteLabel);
+    const actions=this.createElement("div","form-actions");
+    const save=this.createElement("button","button button--primary",this.i18n.t("reader.card.save")) as HTMLButtonElement;save.type="submit";
+    const close=this.createElement("button","button button--secondary",this.i18n.t("ui.common.close")) as HTMLButtonElement;close.type="button";
+    actions.append(save,close);card.append(actions);layer.append(card);this.element.append(layer);
+    const dismiss=():void=>{layer.remove();this.stage?.focus();};
+    close.addEventListener("click",dismiss);layer.addEventListener("click",event=>{if(event.target===layer)dismiss();});
+    card.addEventListener("submit",async event=>{event.preventDefault();const text=note.value.trim();const saved=await this.annotationForHighlight(highlight.id);if(text)await(saved?this.annotations.edit(saved,text):this.annotations.create(book.id,highlight.id,text));StudyEventBus.shared.publish({bookId:book.id,type:saved?"updated":"created"});dismiss();});
+    note.focus();
+  }
+  private async annotationForHighlight(highlightId:string){return this.annotations.forHighlight(highlightId);}
+  private studyCardField(label:string,value:string):HTMLElement{const row=this.createElement("p","reader-study-card__field");row.append(this.createElement("strong","",`${label}: `),document.createTextNode(value));return row;}
+  /** Shows the saved value if there is one; otherwise a small "buscar" action that fetches
+   *  it (via the same lookup services Significado/Traduzir already use) and saves it in
+   *  place - never invents a definition or translation that was never actually looked up. */
+  private studyCardLookup(label:string,saved:string|undefined,actionLabel:string,fetch:()=>Promise<string>):HTMLElement{
+    const row=this.createElement("div","reader-study-card__field");const strong=this.createElement("strong","",`${label}: `);row.append(strong);
+    const value=this.createElement("span","",saved??this.i18n.t("reader.card.notSaved"));row.append(value);
+    const action=this.createElement("button","link-button reader-study-card__lookup",actionLabel) as HTMLButtonElement;action.type="button";
+    action.hidden=Boolean(saved);
+    action.addEventListener("click",async()=>{action.disabled=true;action.textContent=this.i18n.t("reader.card.looking");try{value.textContent=await fetch();action.hidden=true;}catch(error){value.textContent=error instanceof Error?error.message:this.i18n.t("reader.card.lookupFailed");}finally{action.disabled=false;}});
+    row.append(action);return row;
+  }
   private async createHighlight(color:HighlightColor):Promise<Highlight|null>{if(!this.selectedAnchor||!this.reflowBook)return null;const value=await this.highlights.create(this.reflowBook.id,this.selectedAnchor,color);StudyEventBus.shared.publish({bookId:this.reflowBook.id,type:"created"});this.selectedAnchor=null;this.selections.clear();this.renderReflow();return value;}
   private async createAnnotation():Promise<void>{const anchor=this.selectedAnchor,book=this.reflowBook;if(!anchor||!book)return;const input=this.createElement("input","input") as HTMLInputElement;input.placeholder="Por que você marcou este trecho?";this.showDialog("Adicionar nota",input,"Salvar",async()=>{const text=input.value.trim();if(!text)return;const highlight=await this.highlights.create(book.id,anchor,"yellow");await this.annotations.create(book.id,highlight.id,text);StudyEventBus.shared.publish({bookId:book.id,type:"created"});this.selectedAnchor=null;this.selections.clear();this.renderReflow();});}
   private async copySelection():Promise<void>{if(!this.selectedAnchor)return;try{await navigator.clipboard.writeText(this.selectedAnchor.selectedText);}catch{const area=document.createElement("textarea");area.value=this.selectedAnchor.selectedText;document.body.append(area);area.select();document.execCommand("copy");area.remove();}this.selections.clear();}
   private async bookmarkSelection():Promise<void>{if(!this.selectedAnchor||!this.reflowBook||!this.reflow)return;const page=this.anchors.pageFor({paragraphId:this.selectedAnchor.blockId,textOffset:this.selectedAnchor.startOffset,logicalOffset:0},this.reflow.allPages);this.reflow.goTo(page);await this.bookmarks.create(this.reflowBook.id,{paragraphId:this.selectedAnchor.blockId,textOffset:this.selectedAnchor.startOffset,logicalOffset:this.reflow.readingAnchor.logicalOffset},this.selectedAnchor.selectedText.slice(0,60));StudyEventBus.shared.publish({bookId:this.reflowBook.id,type:"created"});this.selections.clear();}
   private selectParagraph(root:HTMLElement):void{const anchor=this.selections.paragraph(root);if(!anchor)return;this.selectedAnchor=anchor;const block=root.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(anchor.blockId)}"]`);if(block){const range=document.createRange();range.selectNodeContents(block);const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);}}
   private async createBookmark():Promise<void>{if(!this.reflow||!this.reflowBook)return;await this.bookmarks.create(this.reflowBook.id,this.reflow.readingAnchor,`Página ${this.reflow.currentPageNumber}`);StudyEventBus.shared.publish({bookId:this.reflowBook.id,type:"created"});}
-  private async openStudyPanel():Promise<void>{if(this.studyPanel.isOpen){this.studyPanel.close();return;}if(!this.reflowBook)return;const [highlights,annotations,bookmarks]=await Promise.all([this.highlights.restore(this.reflowBook.id),this.annotations.list(this.reflowBook.id),this.bookmarks.list(this.reflowBook.id)]);this.studyPanel.show(highlights,annotations,bookmarks,item=>void this.navigateStudyItem(item),(kind,id)=>void this.removeStudyItem(kind,id),note=>this.editAnnotation(note));}
+  private async openStudyPanel():Promise<void>{if(this.studyPanel.isOpen){this.studyPanel.close();return;}if(!this.reflowBook||!this.reflow)return;const [highlights,annotations,bookmarks]=await Promise.all([this.highlights.restore(this.reflowBook.id),this.annotations.list(this.reflowBook.id),this.bookmarks.list(this.reflowBook.id)]);this.studyPanel.show(highlights,annotations,bookmarks,item=>void this.navigateStudyItem(item),(kind,id)=>void this.removeStudyItem(kind,id),note=>this.editAnnotation(note),item=>"selectedText"in item?this.anchors.pageFor(this.anchors.forHighlight(item,this.reflow!.allPages),this.reflow!.allPages):this.anchors.pageFor(item.anchor,this.reflow!.allPages));}
   private editAnnotation(annotation:import("../models/Annotation").AnnotationData):void{const input=this.createElement("input","input") as HTMLInputElement;input.value=annotation.text;input.placeholder="Por que você marcou este trecho?";this.showDialog("Editar nota",input,"Salvar",async()=>{if(input.value.trim())await this.annotations.edit(annotation,input.value);await this.openStudyPanel();});}
   private async navigateStudyItem(item:Highlight|BookmarkData):Promise<void>{if(!this.reflow)return;const anchor="selectedText"in item?this.anchors.forHighlight(item,this.reflow.allPages):item.anchor;this.reflow.goTo(this.anchors.pageFor(anchor,this.reflow.allPages));this.studyPanel.close();this.renderReflow();window.setTimeout(()=>this.element?.querySelector<HTMLElement>(".reader-highlight")?.classList.add("reader-highlight--focus"),0);await this.saveReflow();}
   private async removeStudyItem(kind:"highlight"|"annotation"|"bookmark",id:string):Promise<void>{if(kind==="highlight"){const note=await this.annotations.forHighlight(id);if(note)await this.annotations.delete(note.id);await this.highlights.delete(id);}else if(kind==="annotation")await this.annotations.delete(id);else await this.bookmarks.delete(id);if(this.reflowBook)StudyEventBus.shared.publish({bookId:this.reflowBook.id,type:"deleted"});this.renderReflow();await this.openStudyPanel();}
@@ -317,7 +394,9 @@ export class ReaderView extends BaseView {
   private applyReaderSettings(): void {
     if (!this.element || !this.stage) return; this.element.dataset.readerTheme = this.manager.settings.settings.theme;
     const preferences=this.manager.settings.preferencesService.preferences;this.element.dataset.readingMode=preferences.readingMode;this.element.dataset.paper=preferences.paperTheme;
-    const paperLightness=Math.round(45+this.manager.settings.settings.brightness*.55);
+    // Android reads as an e-reader: the window's own brightness replaces dimming the paper.
+    const android=ReaderDisplay.available;if(android){this.element.dataset.native="android";void ReaderDisplay.apply(preferences.screenBrightness);}
+    const paperLightness=android?100:Math.round(45+this.manager.settings.settings.brightness*.55);
     this.element.style.setProperty("--reader-lightness",`${paperLightness}%`);
   }
 
@@ -357,9 +436,11 @@ export class ReaderView extends BaseView {
   }
 
   private animatePage(direction: "next" | "previous"): void {
-    if (!this.canvas) return; const animation = this.manager.settings.settings.animation; if (animation === "carousel") return;
-    this.canvas.classList.remove("reader-page--slide-next", "reader-page--slide-previous", "reader-page--turn-next", "reader-page--turn-previous");
-    void this.canvas.offsetWidth; this.canvas.classList.add(`reader-page--${animation === "slide" ? "slide" : "turn"}-${direction}`);
+    if (!this.canvas) return; const animation = this.manager.settings.settings.animation;
+    this.canvas.classList.remove("reader-page--slide-next", "reader-page--slide-previous", "reader-page--turn-next", "reader-page--turn-previous", "reader-page--vertical-next", "reader-page--vertical-previous");
+    void this.canvas.offsetWidth;
+    const kind = animation === "page-turn" ? "turn" : animation === "carousel" ? "vertical" : "slide";
+    this.canvas.classList.add(`reader-page--${kind}-${direction}`);
   }
   private prepareImageTurn(direction: ImageTurnDirection): void {
     if (!this.canvas || !this.manager.navigation) return;

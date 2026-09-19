@@ -8,6 +8,7 @@ import "./styles/library.css";
 import "./styles/book-physical.css";
 import "./styles/auth.css";
 import "./styles/home.css";
+import "@fontsource-variable/literata";
 import "./styles/reader.css";
 import "./styles/reading-review.css";
 import "./styles/catalog.css";

@@ -19,10 +19,13 @@ export class ReaderToolbar extends BaseView {
   public render(): HTMLElement {
     const wrapper = this.createElement("div", "reader-controls");
     const backButton = this.button("‹", this.i18n.t("reader.back"), this.actions.back, "reader-back-fab");
+    // One discreet icon, not a row of them: everything else about a book's marks lives one
+    // tap away inside "Abrir marcações" (Caderno), not scattered across the reader chrome.
+    const marksButton = this.button("📑", this.i18n.t("reader.study"), this.actions.toggleNotebook, "reader-marks-fab");
     this.settingsButton = this.button("⚙", this.i18n.t("reader.settings"), this.actions.toggleSettings, "reader-settings-fab");
     this.settingsButton.setAttribute("aria-expanded", "false"); this.settingsButton.setAttribute("aria-controls", "reader-settings");
     this.settingsButton.title=this.title;
-    wrapper.append(backButton, this.settingsButton); return wrapper;
+    wrapper.append(backButton, marksButton, this.settingsButton); return wrapper;
   }
   public update(currentPage: number, totalPages: number, zoom: number): void {
     if (this.pageIndicator) this.pageIndicator.textContent = `${currentPage} / ${totalPages}`;

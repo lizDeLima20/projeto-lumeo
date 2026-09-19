@@ -3,7 +3,7 @@ import { BaseView } from "./BaseView";
 
 export class HomeView extends BaseView {
   public constructor(private readonly state: AppState, private readonly userName: string,
-    private readonly onOpenLibrary: () => void, private readonly onAddBook: () => void) { super(); }
+    private readonly onOpenLibrary: () => void, private readonly onAddBook: () => void, private readonly onOpenAudiobooks?: () => void) { super(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "home-view"); const copy = this.createElement("div", "home-copy");
     const saved=this.t("ui.home.booksSaved",{count:this.state.books.length}).split("|")[this.state.books.length===1?0:1]??"";
@@ -15,7 +15,13 @@ export class HomeView extends BaseView {
     book.append(front, this.createElement("span", "closed-book__pages"), this.createElement("span", "closed-book__back"));
     book.addEventListener("click", () => { book.classList.add("closed-book--opening"); window.setTimeout(this.onOpenLibrary, 420); });
     stage.append(book, this.createElement("span", "book-stage__hint", this.t("ui.home.openHint")));
+    const actions = this.createElement("div", "home-actions");
     const add = this.createElement("button", "button button--secondary", this.t("ui.home.addBook")); add.type = "button"; add.addEventListener("click", this.onAddBook);
-    section.append(copy, stage, add); return section;
+    actions.append(add);
+    if (this.onOpenAudiobooks) {
+      const audiobooks = this.createElement("button", "link-button home-actions__audiobooks", `🎧 ${this.t("ui.home.audiobooks")}`);
+      audiobooks.type = "button"; audiobooks.addEventListener("click", this.onOpenAudiobooks); actions.append(audiobooks);
+    }
+    section.append(copy, stage, actions); return section;
   }
 }

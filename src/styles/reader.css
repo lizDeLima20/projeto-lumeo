@@ -2,20 +2,28 @@ body.reader-mode { overflow: hidden; }
 body.reader-mode #app-header { display: none; }
 body.reader-mode #app-footer { display: none; }
 body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; overflow: hidden; }
-.reader { --reader-bg: #fff; --reader-bar: rgba(19,17,25,.9); --reader-lightness:100%; --reader-paper-lit:#fff; position: fixed; inset: 0; z-index: 60; overflow: hidden; color: #242424; background: var(--reader-bg); }
+/* --reader-paper-lit tracks whichever paper the reader picked (--reader-paper, set by the
+   data-paper rules below) everywhere, not only on Android: on Web/Desktop the paper theme
+   used to recolour the ink but never the page itself, so "Sépia" was sepia text on a plain
+   white page. Until data-paper is set (the very first paint, before applyReaderSettings()
+   runs) it falls back to a soft off-white rather than stark white, so the gap between
+   tapping a book and the page/cover mounting reads as paper waiting, not a white flash. */
+.reader { --reader-bg: #fff; --reader-bar: rgba(19,17,25,.9); --reader-lightness:100%; --reader-paper-lit:var(--reader-paper,#f6f1e7); position: fixed; inset: 0; z-index: 60; overflow: hidden; color: #242424; background: var(--reader-bg); }
 .reader[data-reader-theme="light"] { --reader-bg: #fff; --reader-bar: rgba(250,249,252,.94); color: #211e29; }
 .reader[data-reader-theme="dark"] { --reader-bg: #fff; --reader-bar: rgba(20,18,25,.94); color: #242424; }
 .reader[data-reader-theme="paper"] { --reader-bg: #fff; --reader-bar: rgba(242,232,208,.95); color: #2c261b; }
-.reader-stage { position: absolute; inset: 0; display: grid; overflow: auto; place-items: center; padding: 4.5rem .75rem .75rem; background: var(--reader-bg); overscroll-behavior: contain; }
+.reader-stage { position: absolute; inset: 0; display: grid; overflow: auto; place-items: center; padding: 4.5rem .75rem .75rem; background: var(--reader-paper-lit,var(--reader-bg)); overscroll-behavior: contain; }
 .reader-page { display: block; max-width: none; background: #fff; box-shadow: 0 10px 36px rgba(0,0,0,.3); transform-origin: center; }
 .reader-loading, .reader-error { display: grid; place-items: center; gap: var(--spacing-md); color: inherit; text-align: center; }
 .reader-image-mode-notice{position:absolute;right:1rem;bottom:4.3rem;z-index:6;margin:0;border-radius:999px;background:color-mix(in srgb,var(--color-surface) 86%,transparent);padding:.45rem .72rem;color:var(--color-text-muted);font-size:.78rem;box-shadow:var(--shadow-sm);pointer-events:none}
 .reader-progress{position:fixed;right:max(.75rem,env(safe-area-inset-right));bottom:max(.4rem,env(safe-area-inset-bottom));left:max(.75rem,env(safe-area-inset-left));z-index:64;height:.22rem;border-radius:999px;background:color-mix(in srgb,currentColor 14%,transparent);opacity:.72;transition:opacity .2s,transform .2s;pointer-events:none}.reader-progress__fill{display:block;height:100%;border-radius:inherit;background:var(--color-primary)}.reader-progress__label{position:absolute;right:0;bottom:.45rem;color:inherit;font-size:.68rem;opacity:.72}.reader-progress--hidden,.reader--focus-mode .reader-progress{opacity:0;transform:translateY(.5rem)}.reader-resume-hint{position:fixed;z-index:74;top:max(4.4rem,env(safe-area-inset-top));left:50%;margin:0;transform:translateX(-50%);border-radius:999px;background:color-mix(in srgb,var(--color-surface) 90%,transparent);box-shadow:var(--shadow-sm);padding:.5rem .8rem;color:var(--color-text);font-size:.78rem;animation:reader-hint 2.2s ease forwards}@keyframes reader-hint{0%,85%{opacity:1}100%{opacity:0;transform:translate(-50%,-.5rem)}}.reader--focus-mode .reader-toolbar,.reader--focus-mode .reader-footer{opacity:0;pointer-events:none}
 .reader-error { min-height: 100dvh; padding: 2rem; }
 .reader-controls { pointer-events: none; }
-.reader-settings-fab,.reader-back-fab{position:fixed;top:max(.7rem,env(safe-area-inset-top));z-index:71;display:grid;width:2.35rem;height:2.35rem;place-items:center;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:50%;color:var(--reader-ink,currentColor);background:color-mix(in srgb,var(--reader-paper-lit,#fff) 82%,transparent);box-shadow:0 .35rem 1rem rgba(0,0,0,.14);font-size:1rem;pointer-events:auto;backdrop-filter:blur(8px)}
+.reader-settings-fab,.reader-back-fab,.reader-marks-fab{position:fixed;top:max(.7rem,env(safe-area-inset-top));z-index:71;display:grid;width:2.35rem;height:2.35rem;place-items:center;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:50%;color:var(--reader-ink,currentColor);background:color-mix(in srgb,var(--reader-paper-lit,#fff) 82%,transparent);box-shadow:0 .35rem 1rem rgba(0,0,0,.14);font-size:1rem;pointer-events:auto;backdrop-filter:blur(8px)}
 .reader-settings-fab{right:max(.7rem,env(safe-area-inset-right))}
 .reader-back-fab{left:max(.7rem,env(safe-area-inset-left));font-size:1.75rem;line-height:1}
+/* One discreet icon beside the gear, not a whole row: "Abrir marcações" one tap away. */
+.reader-marks-fab{right:max(3.35rem,calc(env(safe-area-inset-right) + 2.65rem));font-size:.95rem}
 .reader-toolbar, .reader-footer { position: fixed; z-index: 65; display: flex; align-items: center; gap: .55rem; color: inherit; background: var(--reader-bar); box-shadow: 0 5px 22px rgba(0,0,0,.12); backdrop-filter: blur(14px); opacity: 0; transition: opacity 220ms ease, transform 220ms ease; pointer-events: auto; }
 .reader-toolbar { inset: 0 0 auto; min-height: 3.75rem; transform: translateY(-100%); padding: .5rem .65rem; }
 .reader-footer { inset: auto 0 0; justify-content: center; min-height: 4.25rem; transform: translateY(100%); padding: .5rem; }
@@ -37,6 +45,7 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .reader-dialog-layer { position: fixed; inset: 0; z-index: 75; display: grid; place-items: center; background: rgba(8,7,12,.62); padding: var(--spacing-md); }
 .reader-dialog { display: grid; width: min(100%, 22rem); gap: var(--spacing-md); border-radius: var(--radius-md); color: var(--color-text); background: var(--color-surface); padding: var(--spacing-lg); box-shadow: var(--shadow-sm); }
 .reader-page--slide-next { animation: reader-slide-next 220ms ease; }.reader-page--slide-previous { animation: reader-slide-previous 220ms ease; }
+.reader-page--vertical-next { animation: reader-slide-vertical-next 220ms ease; }.reader-page--vertical-previous { animation: reader-slide-vertical-previous 220ms ease; }
 .reader-page--turn-next { animation: reader-turn-next 260ms ease; }.reader-page--turn-previous { animation: reader-turn-previous 260ms ease; }
 .reader-image-turn-leaf{position:fixed;z-index:64;overflow:visible;pointer-events:none;transform-style:preserve-3d;perspective:1600px;will-change:transform;box-shadow:0 .7rem 1.4rem rgba(24,17,10,.26)}.reader-image-turn-leaf__front,.reader-image-turn-leaf__back{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:fill;backface-visibility:hidden;background:var(--reader-paper-lit,#fff);box-shadow:inset 0 0 0 1px rgba(89,69,45,.12)}.reader-image-turn-leaf__back{transform:rotateY(180deg) scaleX(-1);filter:brightness(.8) saturate(.88)}.reader-image-turn-leaf--next{transform-origin:left center;animation:reader-image-leaf-next 620ms cubic-bezier(.22,.61,.36,1) both}.reader-image-turn-leaf--previous{transform-origin:right center;animation:reader-image-leaf-previous 620ms cubic-bezier(.22,.61,.36,1) both}@keyframes reader-image-leaf-next{0%{transform:rotateY(0deg);filter:drop-shadow(.1rem .15rem .1rem rgba(0,0,0,.12))}48%{filter:drop-shadow(.55rem .2rem .42rem rgba(0,0,0,.33))}100%{transform:rotateY(-180deg);filter:drop-shadow(.1rem .15rem .1rem rgba(0,0,0,.12))}}@keyframes reader-image-leaf-previous{0%{transform:rotateY(0deg);filter:drop-shadow(-.1rem .15rem .1rem rgba(0,0,0,.12))}48%{filter:drop-shadow(-.55rem .2rem .42rem rgba(0,0,0,.33))}100%{transform:rotateY(180deg);filter:drop-shadow(-.1rem .15rem .1rem rgba(0,0,0,.12))}}
 .reader-stage--reflow { overflow: hidden; padding: 0; background: var(--reader-paper-lit);perspective:4000px;perspective-origin:center center; }
@@ -44,6 +53,11 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .reflow-pages { position:absolute;inset:0;display:grid;place-items:center;background:var(--reader-paper-lit);color:var(--reader-ink);overflow:hidden; }
 .reflow-sheet { position:absolute;inset:0;display:none;overflow:hidden;max-width:none;margin:0;padding:calc(3.2rem + env(safe-area-inset-top)) calc(var(--reflow-margin,28px) + env(safe-area-inset-right)) calc(max(1.35rem,var(--reflow-margin,28px)*.6) + env(safe-area-inset-bottom)) calc(var(--reflow-margin,28px) + env(safe-area-inset-left));overflow-wrap:break-word;background:var(--reader-paper-lit);color:var(--reader-ink);font-family:var(--reflow-font,Georgia,serif);font-size:var(--reflow-font-size,18px);font-weight:var(--reflow-font-weight,400);line-height:var(--reflow-line-height,1.65);text-align:var(--reflow-align,left);transform-origin:left center;touch-action:pinch-zoom;will-change:transform; }
 .reflow-sheet::before{position:absolute;inset:0;z-index:-1;background:var(--reader-paper-lit);content:"";pointer-events:none}
+/* Ambient light falling from above a physical sheet, not a screen glowing from below: a
+   whisper of shadow pooling at the very top and bottom edges, nowhere near strong enough to
+   touch contrast in the reading column between them. No radial glow, no gradient centred on
+   the page - a light source over a flat page would never look like that. */
+.reflow-sheet:not(.reflow-sheet--cover)::after{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(20,14,8,.05) 0,transparent 7%,transparent 93%,rgba(20,14,8,.06) 100%);content:"";pointer-events:none}
 .reflow-sheet>*{position:relative;z-index:1}
 .reflow-sheet--cover{display:none;place-items:center;max-width:none;margin:0;padding:0;background:transparent}
 .reflow-sheet--cover.reflow-sheet--current{display:grid}
@@ -68,7 +82,12 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .reflow-sheet:has(+ .page-turn--previous.reflow-sheet--current){ display:block;z-index:1; }
 .reader-heading { margin:1.2em 0 .75em;font-family:inherit;font-size:1.35em;line-height:1.25;text-align:left; }.reader-paragraph { margin-bottom:var(--reflow-paragraph-gap,1em); }
 .reader[data-font="classic"] { --reflow-font:Georgia,"Times New Roman",serif; }.reader[data-font="modern"] { --reflow-font:"Palatino Linotype",Palatino,serif; }.reader[data-font="sans"] { --reflow-font:Inter,Arial,sans-serif; }.reader[data-font="accessible"] { --reflow-font:Verdana,Arial,sans-serif; }
-.reader[data-paper="pure-white"]{--reader-paper:#fff;--reader-ink:#242424;}.reader[data-paper="ivory"]{--reader-paper:#fbf4df;--reader-ink:#25231e;}.reader[data-paper="soft-white"]{--reader-paper:#f8f7f2;--reader-ink:#232323;}.reader[data-paper="off-white"]{--reader-paper:#f3f0e7;--reader-ink:#292720;}.reader[data-paper="cream"]{--reader-paper:#efe3c4;--reader-ink:#342d21;}.reader[data-paper="natural-offset"],.reader[data-paper="natural"]{--reader-paper:#e7dcc1;--reader-ink:#302b22;}.reader[data-paper="soft-recycled"]{--reader-paper:#d8d0ba;--reader-ink:#292921;}.reader[data-paper="bible-paper"]{--reader-paper:#f0ead7;--reader-ink:#28251f;}.reader[data-paper="sepia"]{--reader-paper:#d8bd8c;--reader-ink:#3c2918;}.reader[data-paper="night"],.reader[data-paper="dark"]{--reader-paper:#15171a;--reader-ink:#ded5c4;}
+/* Papel, Claro, Sépia, Escuro: the same four values on every platform now, not just
+   Android - a soft off-white "paper" (never bright/glossy), a "Claro" that still stops
+   short of pure white, a gentle sepia, and a dark that stops short of pure black. The
+   older named tones (ivory/cream/soft-white/etc.) stay defined for anyone with one
+   already saved, but are no longer offered in either settings panel. */
+.reader[data-paper="paper"]{--reader-paper:#f6f1e7;--reader-ink:#2b2823;}.reader[data-paper="pure-white"]{--reader-paper:#fbfbf9;--reader-ink:#1e1e1c;}.reader[data-paper="ivory"]{--reader-paper:#fbf4df;--reader-ink:#25231e;}.reader[data-paper="soft-white"]{--reader-paper:#f8f7f2;--reader-ink:#232323;}.reader[data-paper="off-white"]{--reader-paper:#f3f0e7;--reader-ink:#292720;}.reader[data-paper="cream"]{--reader-paper:#efe3c4;--reader-ink:#342d21;}.reader[data-paper="natural-offset"],.reader[data-paper="natural"]{--reader-paper:#e7dcc1;--reader-ink:#302b22;}.reader[data-paper="soft-recycled"]{--reader-paper:#d8d0ba;--reader-ink:#292921;}.reader[data-paper="bible-paper"]{--reader-paper:#f0ead7;--reader-ink:#28251f;}.reader[data-paper="sepia"]{--reader-paper:#f1e3c8;--reader-ink:#3b2e20;}.reader[data-paper="night"]{--reader-paper:#15171a;--reader-ink:#ded5c4;}.reader[data-paper="dark"]{--reader-paper:#1c1b19;--reader-ink:#d3cbbd;}
 .reader[data-reading-mode="book-real"]{--reader-bg:var(--reader-paper-lit);--reader-ink:#26241f;--reader-custom-ink:#26241f}.reader[data-reading-mode="book-real"] .reader-page,.reader[data-reading-mode="book-real"] .open-book-layout:not(.open-book-layout--cover){box-shadow:0 .35rem 1rem rgba(0,0,0,.12)}.reader[data-reading-mode="book-real"] .reader-settings-fab,.reader[data-reading-mode="book-real"] .reader-back-fab{box-shadow:none;backdrop-filter:none;background:color-mix(in srgb,var(--reader-paper-lit) 92%,transparent)}
 .reader--scanned-enhanced .reader-page { filter:brightness(96%) contrast(112%) grayscale(18%); }
 .reader .reflow-pages,.reader .reflow-sheet { color:var(--reader-custom-ink,var(--reader-ink)); }
@@ -155,6 +174,8 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 }
 @keyframes reader-slide-next { from { opacity: .65; transform: translateX(2rem); } to { opacity: 1; transform: translateX(0); } }
 @keyframes reader-slide-previous { from { opacity: .65; transform: translateX(-2rem); } to { opacity: 1; transform: translateX(0); } }
+@keyframes reader-slide-vertical-next { from { opacity: .65; transform: translateY(2rem); } to { opacity: 1; transform: translateY(0); } }
+@keyframes reader-slide-vertical-previous { from { opacity: .65; transform: translateY(-2rem); } to { opacity: 1; transform: translateY(0); } }
 @keyframes reader-turn-next { from { opacity: .65; transform: perspective(900px) rotateY(-7deg); } to { opacity: 1; transform: perspective(900px) rotateY(0); } }
 @keyframes reader-turn-previous { from { opacity: .65; transform: perspective(900px) rotateY(7deg); } to { opacity: 1; transform: perspective(900px) rotateY(0); } }
 @media (max-width: 40rem) { .reader { width: 100vw; height: 100dvh; min-height: 100svh; }.reader-stage { inset: 0; padding: calc(3.35rem + env(safe-area-inset-top)) .2rem max(.2rem, env(safe-area-inset-bottom)); }.reader-toolbar { min-height: 3.2rem; padding: max(.25rem, env(safe-area-inset-top)) .3rem .25rem; }.reader-footer { min-height: 3.55rem; justify-content: space-between; padding: .25rem max(.2rem, env(safe-area-inset-right)) max(.25rem, env(safe-area-inset-bottom)) max(.2rem, env(safe-area-inset-left)); }.reader-toolbar__title { max-width: 28vw; font-size: .78rem; }.reader-footer .reader-control-button, .reader-control-button, .reader-toolbar__back, .reader-toolbar__settings { min-width: 2.25rem; min-height: 2.25rem; padding: .3rem; }.reader-page-indicator { min-width: 3.5rem; }.reader-zoom > span { min-width: 2.8rem; }.reader-tap-zones { inset: calc(3.2rem + env(safe-area-inset-top)) 0 max(.2rem, env(safe-area-inset-bottom)); }.reader-progress__label{display:none} }
@@ -174,7 +195,11 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
     radial-gradient(ellipse at 50% 45%,rgba(255,210,139,.13),transparent 48%),
     repeating-linear-gradient(174deg,rgba(255,214,157,.032) 0 1px,transparent 1px 5px),
     linear-gradient(135deg,#24150e 0%,#56321b 42%,#21130d 100%)!important;perspective:2600px;perspective-origin:50% 43%}
-  .desktop-book-reader{--desktop-page-height:min(calc(100dvh - 10.5rem),44vw);--desktop-page-width:calc(var(--desktop-page-height) * .68);position:absolute!important;inset:3.4rem 1.15rem 1rem!important;display:block!important;overflow:visible;perspective:2600px;isolation:isolate}
+  /* Widened moderately: the book used to sit narrow with the desk's sides mostly empty.
+     Raising the vw share (and shrinking the vertical inset) lets each page use more of a
+     wide monitor while `min()` against the height keeps a tall/narrow window from ever
+     stretching pages past a comfortable reading measure. */
+  .desktop-book-reader{--desktop-page-height:min(calc(100dvh - 8.5rem),50vw);--desktop-page-width:calc(var(--desktop-page-height) * .7);position:absolute!important;inset:3rem .85rem .75rem!important;display:block!important;overflow:visible;perspective:2600px;isolation:isolate}
   .desktop-reader-desk{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;overflow:visible}
   .desktop-reader-book-slot{position:relative;z-index:2;display:grid;grid-column:1 / -1;place-items:center;min-width:0;height:100%;overflow:visible}
   .desktop-book-reader--closed .desktop-reader-book-slot{grid-column:2;justify-self:stretch}
@@ -191,8 +216,11 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
   .open-book-layout--open-cover{grid-template-columns:var(--desktop-page-width) var(--desktop-page-width)!important;width:calc(var(--desktop-page-width) * 2)!important;box-shadow:0 2rem 3.6rem rgba(7,4,2,.56),0 .18rem .45rem rgba(0,0,0,.4)!important}
   .open-book-layout--open-cover::before,.open-book-layout--open-cover::after{display:block!important}
   .open-book-page{position:relative!important;box-sizing:border-box;overflow:hidden!important;width:100%!important;height:100%!important;min-height:0!important;padding:clamp(1.7rem,2.8vw,3.25rem) clamp(1.55rem,2.9vw,3.5rem) clamp(2.55rem,3.2vw,3.4rem)!important;border:0!important;color:var(--reader-custom-ink,var(--reader-ink))!important;background-color:var(--reader-paper-lit)!important;font-family:var(--reflow-font)!important;font-size:var(--reflow-font-size)!important;font-weight:var(--reflow-font-weight)!important;line-height:var(--reflow-line-height)!important;text-align:var(--reflow-align)!important}
-  .open-book-page--left,.open-book-page--under-left{grid-column:1!important;grid-row:1!important;border-radius:.28rem 0 0 .4rem!important;background-image:linear-gradient(90deg,rgba(255,255,255,.09),transparent 82%,rgba(31,16,7,.17))!important}
-  .open-book-page--right,.open-book-page--under-right{grid-column:2!important;grid-row:1!important;border-radius:0 .4rem .28rem 0!important;background-image:linear-gradient(90deg,rgba(31,16,7,.17),transparent 17%,rgba(255,255,255,.07))!important}
+  /* The second (vertical) layer in each is ambient light falling from above the desk, not
+     the page itself glowing: a faint shadow pooling at the top and bottom edges of the
+     leaf, same idea as the mobile page, sized to leave the reading column untouched. */
+  .open-book-page--left,.open-book-page--under-left{grid-column:1!important;grid-row:1!important;border-radius:.28rem 0 0 .4rem!important;background-image:linear-gradient(90deg,rgba(255,255,255,.09),transparent 82%,rgba(31,16,7,.17)),linear-gradient(180deg,rgba(20,14,8,.05) 0,transparent 8%,transparent 92%,rgba(20,14,8,.06) 100%)!important}
+  .open-book-page--right,.open-book-page--under-right{grid-column:2!important;grid-row:1!important;border-radius:0 .4rem .28rem 0!important;background-image:linear-gradient(90deg,rgba(31,16,7,.17),transparent 17%,rgba(255,255,255,.07)),linear-gradient(180deg,rgba(20,14,8,.05) 0,transparent 8%,transparent 92%,rgba(20,14,8,.06) 100%)!important}
   .open-book-page--cover{position:absolute!important;inset:0!important;z-index:3!important;display:block!important;padding:0!important;border-radius:.2rem .42rem .42rem .2rem!important;background:transparent!important;transform-style:preserve-3d}
   .open-book-page--cover .reader-cover-page,.open-book-page--cover .reader-cover-page img{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:cover!important}
   .open-book-page--cover-back{display:block!important;padding:0!important;background:#1e1711!important}
@@ -270,8 +298,16 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 }
 .reader-highlight{border-radius:.16em;background:rgba(232,201,91,.48);color:inherit;padding:.02em 0}.reader-highlight--orange{background:rgba(224,150,78,.45)}.reader-highlight--green{background:rgba(112,177,125,.42)}.reader-highlight--blue{background:rgba(100,160,211,.42)}.reader-highlight--pink{background:rgba(218,130,166,.4)}.reader[data-paper="dark"] .reader-highlight{background:rgba(240,205,85,.38)}.reader-highlight--focus{animation:highlight-focus 1.4s ease 2}.selection-context-menu{position:fixed;z-index:90;display:flex;max-width:calc(100vw - 1rem);align-items:center;gap:.3rem;overflow:auto;border:1px solid color-mix(in srgb,currentColor 14%,transparent);border-radius:.75rem;color:var(--color-text);background:var(--color-surface);box-shadow:0 .8rem 2.5rem rgba(0,0,0,.3);padding:.4rem}.selection-context-menu button{min-height:2.1rem;border-radius:.5rem;color:inherit;background:transparent;padding:.35rem .5rem;font-size:.72rem}.highlight-palette{display:flex;gap:.2rem}.highlight-swatch{min-width:1.8rem!important;width:1.8rem;background:#e8c95b!important}.highlight-swatch--orange{background:#df9651!important}.highlight-swatch--green{background:#72b27f!important}.highlight-swatch--blue{background:#66a1d3!important}.highlight-swatch--pink{background:#da82a6!important}.study-panel{position:fixed;z-index:69;inset:4.15rem .65rem 4.6rem auto;width:min(22rem,calc(100vw - 1.3rem));overflow:auto;border-radius:1rem;color:var(--color-text);background:var(--color-surface);box-shadow:0 1rem 3rem rgba(0,0,0,.28);padding:1rem;opacity:0;transform:translateX(calc(100% + 1rem));visibility:hidden;transition:.22s}.study-panel--open{opacity:1;transform:translateX(0);visibility:visible}.study-panel h2,.study-panel h3{margin:.3rem 0 .7rem}.study-panel section{display:grid;gap:.5rem;margin-bottom:1rem}.study-item{display:grid;grid-template-columns:1fr auto;gap:.3rem;border-left:.3rem solid #e8c95b;border-radius:.5rem;background:color-mix(in srgb,currentColor 5%,transparent);padding:.5rem}.study-item[data-color="orange"]{border-color:#df9651}.study-item[data-color="green"]{border-color:#72b27f}.study-item[data-color="blue"]{border-color:#66a1d3}.study-item[data-color="pink"]{border-color:#da82a6}.study-item button{color:inherit;background:transparent;text-align:left}.study-item p{grid-column:1/-1;margin:0;font-size:.78rem}@keyframes highlight-focus{50%{filter:brightness(1.35);outline:2px solid currentColor}}@media(max-width:40rem){.selection-context-menu{inset:auto .5rem 4rem!important}.study-panel{inset:auto .45rem .45rem;width:calc(100vw - .9rem);max-height:70dvh;transform:translateY(calc(100% + 1rem))}.study-panel--open{transform:translateY(0)}}
 /* Pomodoro Lumeo: the timer sits between the two reader buttons, inside the safe area. */
-.reader-pomodoro-chip{position:fixed;top:max(.7rem,env(safe-area-inset-top));left:50%;z-index:71;display:grid;min-height:2.35rem;place-items:center;transform:translateX(-50%);border:1px solid color-mix(in srgb,var(--reader-ink) 14%,transparent);border-radius:1.2rem;padding:0 .8rem;background:color-mix(in srgb,var(--reader-paper-lit) 82%,transparent);color:var(--reader-ink);font:700 .82rem/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;backdrop-filter:blur(6px);cursor:pointer;opacity:.55;transition:opacity .2s}
-.reader--controls-visible .reader-pomodoro-chip{opacity:1}
+/* Discreet by default: a small dot, not a permanent clock. Tap expands it in place; a
+   second tap collapses it again. Width animates so the numbers do not just pop in. */
+.reader-pomodoro-chip{position:fixed;top:max(.7rem,env(safe-area-inset-top));left:50%;z-index:71;display:flex;align-items:center;gap:.4rem;overflow:hidden;min-height:1.9rem;max-width:2.6rem;transform:translateX(-50%);border:1px solid color-mix(in srgb,var(--reader-ink) 14%,transparent);border-radius:1.2rem;padding:0 .55rem;background:color-mix(in srgb,var(--reader-paper-lit) 82%,transparent);color:var(--reader-ink);font:700 .82rem/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;backdrop-filter:blur(6px);cursor:pointer;opacity:.5;transition:opacity .2s,max-width .22s ease,padding .22s ease}
+.reader-pomodoro-chip__expand{display:flex;align-items:center;gap:.4rem;min-height:1.9rem;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.reader-pomodoro-chip__icon{font-size:.88rem;line-height:1}
+.reader-pomodoro-chip__time{overflow:hidden;white-space:nowrap}
+.reader-pomodoro-chip__pause{min-width:1.35rem;min-height:1.35rem;padding:0;border:0;border-radius:50%;color:inherit;background:color-mix(in srgb,var(--reader-ink) 12%,transparent);font-size:.7rem;line-height:1}
+.reader--controls-visible .reader-pomodoro-chip{opacity:.85}
+.reader-pomodoro-chip:hover,.reader-pomodoro-chip:focus-within{opacity:1}
+.reader-pomodoro-chip--expanded{max-width:16rem;padding:0 .7rem}
 .reader-pomodoro-chip--paused{border-color:color-mix(in srgb,var(--color-primary) 60%,transparent);opacity:1}
 .reader-pomodoro-dialog{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));background:rgba(8,7,12,.55)}
 .reader-pomodoro-dialog__panel{display:grid;gap:.7rem;width:min(26rem,100%);max-height:100%;overflow:auto;border-radius:.9rem;padding:1.15rem;background:var(--color-surface,var(--reader-paper-lit));color:var(--color-text,var(--reader-ink));box-shadow:0 1.2rem 3rem rgba(0,0,0,.4);text-align:center}
@@ -283,5 +319,48 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 @media (min-width:30rem){.reader-pomodoro-dialog__actions{grid-auto-flow:column;justify-content:center}.reader-pomodoro-dialog__actions .button{width:auto}}
 .reader-pomodoro-settings__toggle{display:flex;align-items:center;gap:.5rem}
 .reader-pomodoro-settings__fields{display:grid;gap:.6rem}
+.reader-pomodoro-settings__group{display:grid;gap:.6rem;margin-top:.6rem}
 .reader-pomodoro-settings__number .input{width:100%}
 .reader-pomodoro-settings__today{margin:0;font-size:.82rem;opacity:.8}
+.reader-reminder-settings__days{display:flex;flex-wrap:wrap;gap:.35rem;border:0;margin:0;padding:0}.reader-reminder-settings__days legend{margin-bottom:.25rem;font-size:.82rem}.reader-reminder-settings__days label{display:flex;align-items:center;gap:.2rem;border:1px solid color-mix(in srgb,currentColor 15%,transparent);border-radius:.45rem;padding:.3rem .4rem;font-size:.78rem}
+/* Literata: a serif drawn for long reading on screens (SIL OFL), bundled so it works offline. */
+.reader[data-font="book"]{--reflow-font:"Literata Variable",Literata,"Noto Serif",Georgia,serif}
+/* Android e-reader. The theme is the paper the page is printed on: never a bright pure white,
+   ink dark but not black; the dark theme avoids pure black and pure white. Brightness is the
+   window's own (ReaderDisplay), so the paper is never dimmed with CSS here. Covers and images
+   keep their own colours. */
+/* --reader-paper-lit already tracks --reader-paper for every platform (base rule above);
+   Android additionally carries that same paper into the loading/chrome background and the
+   ink colour, since it has no separate "app theme" distinct from the reading theme. */
+.reader[data-native="android"]{--reader-bg:var(--reader-paper-lit);--reader-custom-ink:var(--reader-ink)}
+/* paper/pure-white/sepia/dark are defined once, above, for every platform. */
+.reader[data-paper="dark"] .reflow-sheet__number{color:#8f887c}
+/* A comfortable column: the chosen margin on phones, and at most ~34em of text on wider screens
+   (tablets, phones in landscape), centred. Pagination measures this same box. */
+.reader[data-native="android"] .reflow-sheet{padding-left:calc(max(var(--reflow-margin,28px),(100% - 34em)/2) + env(safe-area-inset-left));padding-right:calc(max(var(--reflow-margin,28px),(100% - 34em)/2) + env(safe-area-inset-right));font-kerning:normal;font-variant-ligatures:common-ligatures;font-optical-sizing:auto;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
+.reader-font-steps{display:flex;align-items:center;gap:.5rem}
+.reader-font-steps button{min-width:2.6rem;min-height:2.4rem;border:1px solid var(--color-border);border-radius:.5rem;background:var(--color-surface);color:var(--color-text);font:700 .95rem/1 Georgia,serif}
+.reader-font-steps output{min-width:3.2rem;text-align:center;font-variant-numeric:tabular-nums}
+.reader-theme-options label{gap:.35rem}
+.reader-theme-swatch{display:inline-block;width:1rem;height:1rem;border:1px solid rgba(0,0,0,.25);border-radius:50%;vertical-align:middle}
+/* First-read greeting: a brief, elegant toast over the mobile/Android reader on a book's
+   very first open at 0% progress - never a blocking popup, never repeated. */
+.reader-first-read{position:fixed;z-index:73;top:36%;left:50%;transform:translate(-50%,-50%) scale(.97);width:min(22rem,84vw);text-align:center;opacity:0;pointer-events:none;transition:opacity .4s ease,transform .4s ease}
+.reader-first-read__line{margin:.15rem 0;color:var(--reader-ink,inherit);font:500 1.05rem/1.5 Georgia,serif;text-shadow:0 .1rem .5rem rgba(0,0,0,.18)}
+.reader-first-read--visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+/* Deslizar horizontal: a flat carousel, no curl. All three sheets window() renders sit side
+   by side; PageSlideController drags them together and settles with a transition, never a
+   custom property (Safari does not animate one through calc() reliably). */
+.reader[data-animation="slide"] .reflow-sheet{display:block!important;touch-action:pan-y pinch-zoom;user-select:none}
+.reader[data-animation="slide"] .reflow-sheet--before{transform:translateX(-100%)}
+.reader[data-animation="slide"] .reflow-sheet--current{transform:translateX(0)}
+.reader[data-animation="slide"] .reflow-sheet--after{transform:translateX(100%)}
+.reader[data-animation="slide"] .reflow-sheet.page-slide-settling{transition:transform .24s cubic-bezier(.22,.61,.36,1)}
+/* Deslizar vertical: native scroll-snap owns the physics and guarantees each page comes to
+   rest filling the viewport - not a free document scroll, one sheet at a time. */
+/* display:block, not the base display:grid: a percentage height on a position:relative
+   .reflow-sheet only fills the column reliably against a block containing box - inside a
+   grid with auto rows each sheet instead sized to its own content, so the three sheets
+   crowded into a fraction of the height and there was nothing to scroll. */
+.reader[data-animation="carousel"] .reflow-pages{display:block;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;overscroll-behavior-y:contain}
+.reader[data-animation="carousel"] .reflow-sheet{position:relative!important;inset:auto!important;display:block!important;height:100%;scroll-snap-align:start;scroll-snap-stop:always;touch-action:pan-y pinch-zoom}

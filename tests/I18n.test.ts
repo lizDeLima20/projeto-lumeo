@@ -59,7 +59,7 @@ describe("I18nManager", () => {
   });
   it("translates the shared application chrome, reader and cloud-import copy", async () => {
     const { manager } = create(); await manager.setLocale("en-US");
-    assert.equal(manager.t("ui.auth.login"), "Sign in"); assert.equal(manager.t("reader.animation.carousel"), "Carousel");
+    assert.equal(manager.t("ui.auth.login"), "Sign in"); assert.equal(manager.t("reader.animation.carousel"), "Vertical swipe");
     assert.equal(manager.t("import.download.cancel"), "Cancel download");
     await manager.setLocale("es");
     assert.equal(manager.t("ui.library.title"), "Mi biblioteca"); assert.equal(manager.t("reader.scan.scannedText"), "Texto escaneado");
