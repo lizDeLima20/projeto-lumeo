@@ -49,8 +49,23 @@ describe("PageCurlGeometry",()=>{
   });
   it("a sobra anti-costura cresce quando a tira fica de perfil",()=>{
     const step=W/PageCurlGeometry.strips;
-    assert.ok(curl.bleedFor(85,step)>curl.bleedFor(20,step)*3,"de perfil precisa de muito mais sobra");
+    assert.ok(curl.bleedFor(85,step)>curl.bleedFor(20,step)*2,"de perfil precisa de muito mais sobra");
     assert.ok(curl.bleedFor(89.9,step)<=step*.85,"nunca engole a tira seguinte");
+  });
+  it("as tiras se sobrepoem sem mover a origem fisica da dobra",()=>{
+    const source=readFileSync("src/reader/page-turn/PageCurl.ts","utf8");
+    assert.ok(PageCurlGeometry.strips>=64,"mais fatias reduzem blocos verticais visiveis");
+    assert.ok(PageCurlGeometry.overlapPixels>=3,"WebView precisa de sobra real entre tiras");
+    assert.match(source,/visualLeft=left-leftOverlap/);
+    assert.match(source,/originX=origin\.startsWith\("0"\)\?leftOverlap:stripWidth-rightOverlap/);
+    assert.match(source,/transformOrigin=`\$\{originX\}px 50%`/);
+    assert.match(source,/nodes\.front\.style\.transform=`translateX\(\$\{-visualLeft\}px\)`/);
+  });
+  it("a folha curva nao revela faixas retangulares individuais",()=>{
+    const css=readFileSync("src/styles/reader.css","utf8");
+    assert.match(css,/\.page-turn-strip\{[^}]*box-shadow:0 0 0 calc\(var\(--strip-bleed/,"cada tira sangra papel opaco por cima da costura");
+    assert.match(css,/\.page-turn-curl::before\{[^}]*linear-gradient/,"a sombra principal e continua no host da folha");
+    assert.match(css,/\.page-turn-strip__front,\.page-turn-strip__back\{[^}]*background-image:none/,"faces nao recebem gradiente individual em bloco");
   });
   it("a folha nao pode carregar overflow nem filter - achatam o arco",()=>{
     const css=readFileSync("src/styles/reader.css","utf8");

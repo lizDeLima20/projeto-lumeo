@@ -64,16 +64,29 @@ export class PageCurl {
   public apply(progress:number,landingAngle:number,direction:1|-1):CurlStrip[]{
     const count=this.strips.length;
     const plan=this.geometry.build(progress,this.width,landingAngle,1,count);
+    const step=this.width/count,overlap=PageCurlGeometry.overlapPixels;
+    if(this.host){
+      this.host.style.setProperty("--curl-progress",progress.toFixed(3));
+      this.host.style.setProperty("--curl-direction",String(direction));
+      this.host.style.setProperty("--curl-crease-x",`${direction===1?Math.max(0,Math.min(this.width,this.width*(1-progress))):Math.max(0,Math.min(this.width,this.width*progress))}px`);
+    }
     for(let slot=0;slot<count;slot+=1){
       const nodes=this.strips[slot]!,strip=plan[direction===1?slot:count-1-slot]!;
       const{left,origin,shiftX,angle,shadeLeft,shadeRight}=PageCurl.place(strip,slot,count,this.width,direction);
       const root=nodes.root.style;
-      const stripWidth=this.width/count+strip.bleed;
-      root.left=`${left}px`;root.width=`${stripWidth}px`;root.transformOrigin=origin;
+      const leftOverlap=slot===0&&direction===1?0:overlap;
+      const rightOverlap=slot===count-1&&direction===-1?0:overlap;
+      const visualLeft=left-leftOverlap;
+      const stripWidth=step+strip.bleed+leftOverlap+rightOverlap;
+      const originX=origin.startsWith("0")?leftOverlap:stripWidth-rightOverlap;
+      root.left=`${visualLeft}px`;root.width=`${stripWidth}px`;root.transformOrigin=`${originX}px 50%`;
       root.transform=`translate3d(${shiftX}px,${strip.y}px,${strip.z}px) rotateY(${angle}deg)`;
+      root.zIndex=String(direction===1?slot+1:count-slot);
       nodes.root.style.setProperty("--strip-shade-a",shadeLeft.toFixed(3));
       nodes.root.style.setProperty("--strip-shade-b",shadeRight.toFixed(3));
       nodes.root.style.setProperty("--strip-ink",strip.ink.toFixed(3));
+      nodes.root.style.setProperty("--strip-overlap",`${overlap}px`);
+      nodes.root.style.setProperty("--strip-bleed",`${Math.max(strip.bleed,overlap)}px`);
       /* Each strip is flattened by its own clipping, so backface culling of the faces
        * inside it is not dependable: past 90deg the front's type bled through the verso.
        * The face turned away is hidden explicitly; both stay laid out and decoded. */
@@ -82,8 +95,8 @@ export class PageCurl {
        * display:none to swap cloned text at 90deg was what made the sheet look like a
        * transparent card on some desktop compositors. Its band is already turned about
        * the strip's centre, so the content is offset to show the mirrored slice x -> W-x-left. */
-      nodes.front.style.transform=`translateX(${-left}px)`;
-      nodes.back.style.transform=`translateX(${stripWidth-this.width+left}px)`;
+      nodes.front.style.transform=`translateX(${-visualLeft}px)`;
+      nodes.back.style.transform=`translateX(${stripWidth-this.width+visualLeft}px)`;
     }
     return plan;
   }

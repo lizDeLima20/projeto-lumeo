@@ -19,19 +19,22 @@ const clamp01=(value:number):number=>Math.min(1,Math.max(0,value));
  *  90deg it stood up as a narrow column of text between the two pages. A travelling fold
  *  keeps the flat part flat on its page and gives the roll a real radius. */
 export class PageCurlGeometry {
-  public static readonly strips = 24;
+  public static readonly strips = 64;
   /** Half the width of the roll, as a share of the leaf. Smaller is a tighter curl. */
   public static readonly foldHalfWidth = .22;
   /** How far the tip drops as it falls over, in pixels at the free edge. */
   public static readonly sagPixels = 10;
   /** Screen-space bleed each strip needs to close the antialiased crack against its
    *  neighbour, scaled by 1/cos and capped so a strip can never swallow the next. */
-  public static readonly screenBleedPixels = 1.6;
-  public static readonly overlapPixels = 1;
+  public static readonly screenBleedPixels = 2.8;
+  /** Physical overlap between neighbouring visual strip boxes. The mathematical strip
+   *  still starts exactly at its original coordinate; PageCurl compensates the transform
+   *  origin so this overlap only closes WebView/Chrome subpixel cracks. */
+  public static readonly overlapPixels = 3.5;
   public static readonly minShade = 0;
   /** Ambient paper, not a spotlight - but deep enough in the roll that the curve reads
    *  as a surface rather than as a strip of text. */
-  public static readonly maxShade = .42;
+  public static readonly maxShade = .14;
   /** Below this |cos| a strip is seen at a grazing angle and its type is gone; above the
    *  upper bound it is fully legible. */
   public static readonly inkFadeFrom = .7;

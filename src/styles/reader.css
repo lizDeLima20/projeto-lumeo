@@ -106,14 +106,15 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .page-turn-curled,.open-book-page.page-turn-curled,.reflow-sheet.page-turn-curled{background-color:transparent;background-image:none;box-shadow:none}
 .page-turn-curled>*:not(.page-turn-curl){visibility:hidden}
 .page-turn-curled::after,.page-turn-curled::before{display:none}
-.open-book-page>.page-turn-curl,.reflow-sheet>.page-turn-curl{position:absolute;inset:0;z-index:2;transform-style:preserve-3d;pointer-events:none;visibility:visible}
-.page-turn-strip{position:absolute;top:0;bottom:0;overflow:hidden;transform-origin:0 50%;background:var(--reader-paper-lit);will-change:transform;transform-style:preserve-3d}
+.open-book-page>.page-turn-curl,.reflow-sheet>.page-turn-curl{position:absolute;inset:0;z-index:2;transform-style:preserve-3d;pointer-events:none;visibility:visible;--curl-progress:0;--curl-direction:1;--curl-crease-x:50%}
+.page-turn-curl::before{position:absolute;inset:0;z-index:999;content:"";pointer-events:none;background:linear-gradient(90deg,rgba(33,21,10,.18),rgba(33,21,10,0) 18%,rgba(255,255,255,.08) 48%,rgba(33,21,10,.12) 72%,rgba(33,21,10,0));opacity:calc(.05 + var(--curl-progress,0)*.13);transform:translateZ(2px);will-change:opacity}
+.page-turn-strip{position:absolute;top:0;bottom:0;overflow:hidden;transform-origin:0 50%;background:var(--reader-paper-lit);will-change:transform;transform-style:preserve-3d;opacity:1;-webkit-transform-style:preserve-3d;box-shadow:0 0 0 calc(var(--strip-bleed,3px) + .75px) var(--reader-paper-lit);outline:1px solid transparent}
 /* Shading is baked into the strip's own opaque paper rather than laid over it. As a
    translucent overlay it was drawn twice wherever two strips overlap, and every seam
    came out as a dark hairline - the banding that read as a roll lying on the page. */
-.page-turn-strip__front,.page-turn-strip__back{position:absolute;inset:0;overflow:hidden;backface-visibility:visible;transform-style:preserve-3d;background-color:var(--reader-paper-lit);background-image:linear-gradient(90deg,rgba(22,15,7,var(--strip-shade-a,0)),rgba(22,15,7,var(--strip-shade-b,0)))}
+.page-turn-strip__front,.page-turn-strip__back{position:absolute;inset:0;overflow:hidden;opacity:1;backface-visibility:visible;-webkit-backface-visibility:visible;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;background-color:var(--reader-paper-lit);background-image:none}
 .page-turn-strip--back>.page-turn-strip__front,.page-turn-strip:not(.page-turn-strip--back)>.page-turn-strip__back{visibility:hidden}
-.page-turn-strip__inner{position:absolute;top:0;bottom:0;left:0;opacity:var(--strip-ink,1)}
+.page-turn-strip__inner{position:absolute;top:0;bottom:0;left:0;opacity:var(--strip-ink,1);background:transparent}
 /* The crease darkening is the geometry shading itself - each strip takes the lamp in
    proportion to how squarely it faces the reader - not a band painted across the page. */
 .page-turn-active::before{display:none}
