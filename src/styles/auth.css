@@ -1,6 +1,9 @@
 .auth-page { display: grid; min-height: calc(100vh - 4.25rem); place-items: center; }
 .auth-card { display: grid; gap: var(--spacing-md); width: min(100%, 28rem); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-sm); padding: clamp(1.25rem, 5vw, 2.25rem); }
 .auth-card .page-title { font-size: 2.25rem; margin-bottom: var(--spacing-sm); }
+.auth-offline { display: grid; gap: .55rem; border-top: 1px solid var(--color-border); padding-top: var(--spacing-md); }
+.auth-offline__title { margin: 0; color: var(--color-text-muted); font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.auth-offline__identity { justify-content: flex-start; text-align: left; }
 .field { display: grid; gap: 0.35rem; }
 .field__label { font-size: 0.85rem; font-weight: 750; }
 .form-error { min-height: 1.5rem; color: #a22b35; font-size: 0.875rem; }

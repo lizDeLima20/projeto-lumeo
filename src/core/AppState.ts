@@ -2,9 +2,9 @@ import { Book } from "../models/Book";
 import { Genre } from "../models/Genre";
 import { Library } from "../models/Library";
 
-export interface User { id: string; email: string; }
+export interface User { id: string; email: string; displayName?: string; avatarUrl?: string; }
 /** Explicit boot phases prevent a persisted session being mistaken for a logout. */
-export type AuthStatus = "AUTH_INITIALIZING" | "SESSION_RESTORED" | "USER_DATA_LOADING" | "READY" | "UNKNOWN" | "AUTHENTICATED" | "UNAUTHENTICATED" | "REFRESHING" | "OFFLINE_AUTHENTICATED" | "EXPIRED" | "loading" | "authenticated" | "unauthenticated";
+export type AuthStatus = "AUTH_INITIALIZING" | "SESSION_RESTORED" | "USER_DATA_LOADING" | "READY" | "ONLINE_READY" | "OFFLINE_SESSION_AVAILABLE" | "OFFLINE_READY" | "SYNC_PENDING" | "UNKNOWN" | "AUTHENTICATED" | "UNAUTHENTICATED" | "REFRESHING" | "OFFLINE_AUTHENTICATED" | "EXPIRED" | "loading" | "authenticated" | "unauthenticated";
 export type DeviceStatus = "unknown" | "authorized" | "conflict" | "revoked";
 export type LicenseStatus = "unknown" | "active" | "inactive" | "trial" | "grace" | "expired" | "revoked" | "offline_grace";
 export interface ConflictingDevice { deviceName: string; lastSeenAt: string; }

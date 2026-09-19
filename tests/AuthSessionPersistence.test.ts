@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { AppState } from "../src/core/AppState";
-import { ApiClient } from "../src/services/ApiClient";
+import { ApiClient, ApiError } from "../src/services/ApiClient";
 import { AuthManager, type AuthSession } from "../src/services/AuthManager";
 import type { StorageAdapter } from "../src/services/StorageService";
 
@@ -55,5 +55,25 @@ describe("sessão persistida", () => {
     assert.deepEqual(await api.get("/protected"), { ok: true });
     assert.equal(refreshes, 1);
     assert.equal(attempts, 2);
+  });
+
+  it("permite Entrar offline somente para uma identidade previamente validada", async () => {
+    const storage = new MemoryStorage(), state = new AppState();
+    const auth = new AuthManager({ setAccessToken: () => undefined, setSessionRefreshHandler: () => undefined } as never, storage as never, state);
+    assert.equal(await auth.loginOffline("user-1"), false);
+    await storage.save("offline-identities", [{ id: "user-1", email: "reader@example.com", displayName: "Leitor" }]);
+    assert.equal(await auth.loginOffline("user-1"), true);
+    assert.equal(state.currentUser?.email, "reader@example.com");
+    assert.equal(state.authStatus, "OFFLINE_SESSION_AVAILABLE");
+  });
+
+  it("preserva a identidade quando o refresh expira sem internet", async () => {
+    const storage = new MemoryStorage(), state = new AppState();
+    await storage.save("auth-session", session(1));
+    const auth = new AuthManager({ setAccessToken: () => undefined, setSessionRefreshHandler: () => undefined, post: async () => { throw new ApiError(0, "NETWORK_ERROR", "offline"); } } as never, storage as never, state);
+    await auth.initialize();
+    assert.equal(state.currentUser?.id, "user-1");
+    assert.equal(state.authStatus, "OFFLINE_AUTHENTICATED");
+    assert.ok(await storage.load<AuthSession>("auth-session"));
   });
 });

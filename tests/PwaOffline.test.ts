@@ -55,6 +55,8 @@ describe("PWA offline e armazenamento robusto", () => {
     const sw = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
     assert.match(sw, /url\.hostname === "www\.googleapis\.com"/);
     assert.match(sw, /Authenticated Drive API requests are browser-only/);
+    assert.match(sw, /request\.headers\.has\("Authorization"\)/);
+    assert.doesNotMatch(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
   });
 
   it("aVersaoDoServiceWorkerEUmaSo", async () => {

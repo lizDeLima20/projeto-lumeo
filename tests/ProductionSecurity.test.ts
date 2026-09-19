@@ -89,7 +89,8 @@ describe("produção e segurança do frontend", () => {
   it("serviceWorkerDoesNotCacheBookFilesOrSensitiveApi", async () => {
     const sw = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
     assert.match(sw, /BOOK_FILE_PATTERN/);
-    assert.match(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
+    assert.match(sw, /request\.headers\.has\("Authorization"\)/);
+    assert.doesNotMatch(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
   });
 
   it("permite o popup e os estilos oficiais do Google Identity", async () => {

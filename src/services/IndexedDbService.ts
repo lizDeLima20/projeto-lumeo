@@ -19,13 +19,14 @@ export const STORE_NAMES = {
   recoveryJournal: "recoveryJournal",
   localDiagnostics: "localDiagnostics",
   readingReviews: "readingReviews",
+  syncOutbox: "syncOutbox",
 } as const;
 
 export type StoreName = typeof STORE_NAMES[keyof typeof STORE_NAMES];
 export type TransactionMode = "readonly" | "readwrite";
 
 export class IndexedDbService {
-  public static readonly SCHEMA_VERSION = 10;
+  public static readonly SCHEMA_VERSION = 11;
   private connection: Promise<IDBDatabase> | null = null;
   public constructor(private readonly databaseName = "lumeo-library", private readonly version = IndexedDbService.SCHEMA_VERSION) {}
 
@@ -61,6 +62,10 @@ export class IndexedDbService {
           const store=database.createObjectStore(STORE_NAMES.readingReviews,{keyPath:"id"});
           store.createIndex("userBook",["userId","bookId"],{unique:true});
           store.createIndex("bookId","bookId",{unique:false});
+        }
+        if (!database.objectStoreNames.contains(STORE_NAMES.syncOutbox)) {
+          const store = database.createObjectStore(STORE_NAMES.syncOutbox, { keyPath: "id" });
+          store.createIndex("userCreated", ["userId", "createdAt"], { unique: false });
         }
       };
       request.onsuccess = () => resolve(request.result);

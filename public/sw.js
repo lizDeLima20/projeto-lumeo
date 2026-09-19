@@ -35,6 +35,8 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   // Authenticated Drive API requests are browser-only and must never enter Cache Storage.
   if (url.hostname === "www.googleapis.com") return;
+  // Private account/session responses must never be persisted by the service worker.
+  if (request.headers.has("Authorization")) return;
   // OAuth callbacks must never receive the offline app shell or be cached.
   if (url.origin === self.location.origin && url.pathname === "/onedrive-auth.html") return;
   if (BOOK_FILE_PATTERN.test(url.pathname)) return;
@@ -49,7 +51,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/api/") || url.pathname.includes("/dictionary") || url.pathname.includes("/lookup")) {
+  if (url.pathname.includes("/dictionary") || url.pathname.includes("/lookup")) {
     event.respondWith(networkFirst(request, LOOKUP_CACHE));
     return;
   }

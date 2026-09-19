@@ -42,6 +42,7 @@ import { AccountPersistenceService, type RemoteLibraryBook } from "../services/A
 import { reportNativeDownloadDiagnostic } from "../services/NativeBookDownload";
 import { ConnectivityManager } from "../pwa/ConnectivityManager";
 import { PwaInstallManager } from "../pwa/PwaInstallManager";
+import { SyncOutbox, SyncOutboxRepository } from "../services/SyncOutbox";
 import { LimaDocumentRepository } from "../repositories/LimaDocumentRepository";
 import { LimaConversionManager } from "../lima/LimaConversionManager";
 import { LibraryChecksumRepository } from "../repositories/LibraryChecksumRepository";
@@ -92,7 +93,7 @@ export class App {
   private imports = this.createImportManager();
   private libraryService = this.createLibraryService();
   private readerSettings = new ReaderSettingsManager(this.storage);
-  private readerManager = new ReaderManager(this.books, new LocalBookFileStore(this.files),
+  private readerManager = new ReaderManager(this.books, this.localFileStore(),
     new ReadingProgressService(this.progress, this.books), this.readerSettings,this.limaDocuments);
   private readonly api = new ApiClient(new EnvironmentConfig().read().bffBaseUrl);
   private readonly accountPersistence = new AccountPersistenceService(this.api);
@@ -124,20 +125,26 @@ export class App {
     await this.restoreTheme();
     this.connectivity.bind();
     this.pwaInstall.bind();
-    this.connectivity.subscribe((status)=>{if(status==="OFFLINE")this.showToast(I18nManager.shared.t("offline.status"));if(status==="RECONNECTING"){this.showToast(I18nManager.shared.t("offline.reconnecting"));if(this.isAuthenticated())void this.syncLocalLibrary();}});
+    this.connectivity.subscribe((status)=>{if(status==="OFFLINE")this.showToast(I18nManager.shared.t("offline.status"));if(status==="RECONNECTING"){this.showToast(I18nManager.shared.t("offline.reconnecting"));this.connectivity.markReconnected();if(this.isAuthenticated())void this.syncLocalLibrary();}});
     await this.devices.initialize();
     await this.auth.initialize();
     if (this.isAuthenticated()) {
-      this.state.authStatus = "USER_DATA_LOADING"; this.state.notify();
-      try { await this.resolveDevice(); }
-      catch (error) {
-        // Offline readers still restore their per-user IndexedDB/OPFS library.
-        if ((error instanceof ApiError && error.code === "NETWORK_ERROR") || !this.connectivity.online) {
-          if (this.state.currentUser) { this.configureLocalLibrary(this.state.currentUser.id); await this.hydrateLibrary(); }
-        } else this.showToast(error instanceof ApiError ? error.message : "Não foi possível restaurar sua sessão.");
-      }
+        if (!this.connectivity.online || this.state.authStatus === "OFFLINE_SESSION_AVAILABLE" || this.state.authStatus === "OFFLINE_AUTHENTICATED") {
+          if (this.state.currentUser) { this.configureLocalLibrary(this.state.currentUser.id); await this.hydrateLibrary(false); }
+          this.state.authStatus = "OFFLINE_READY"; this.state.notify();
+        } else {
+          this.state.authStatus = "USER_DATA_LOADING"; this.state.notify();
+          try { await this.resolveDevice(); }
+          catch (error) {
+            // Offline readers still restore their per-user IndexedDB/OPFS library.
+            if ((error instanceof ApiError && error.code === "NETWORK_ERROR") || !this.connectivity.online) {
+              if (this.state.currentUser) { this.configureLocalLibrary(this.state.currentUser.id); await this.hydrateLibrary(false); }
+              this.state.authStatus = "OFFLINE_READY"; this.state.notify();
+            } else this.showToast(error instanceof ApiError ? error.message : "Não foi possível restaurar sua sessão.");
+          }
+        }
     }
-    if (this.isAuthenticated()) { this.state.authStatus = "READY"; console.info(JSON.stringify({ event: "AUTH_READY" })); this.state.notify(); }
+      if (this.isAuthenticated() && this.state.authStatus !== "OFFLINE_READY") { this.state.authStatus = "ONLINE_READY"; console.info(JSON.stringify({ event: "AUTH_READY" })); this.state.notify(); }
     this.router.start(this.isAuthenticated() ? this.nextProtectedRoute() : "login");
   }
 
@@ -198,6 +205,7 @@ export class App {
   }
 
   private async resolveDevice(): Promise<void> {
+      if (this.state.authStatus === "OFFLINE_SESSION_AVAILABLE" || this.state.authStatus === "OFFLINE_AUTHENTICATED" || !this.connectivity.online) return;
     try {
       const device = await this.devices.ensureAuthorized();
       if (device.status === "authorized") {
@@ -220,12 +228,12 @@ export class App {
     }
   }
 
-  private async hydrateLibrary(): Promise<void> {
-    const files=new LocalBookFileStore(this.files),folder=new DesktopLibraryFolderService(this.database),manager=new PersistentLibraryManager(this.books,files,this.limaDocuments,undefined,folder),restored=await new LibraryBootstrapService(this.genres,manager).restore();
+  private async hydrateLibrary(allowRemote = true): Promise<void> {
+    const files=this.localFileStore(),folder=new DesktopLibraryFolderService(this.database),manager=new PersistentLibraryManager(this.books,files,this.limaDocuments,undefined,folder),restored=await new LibraryBootstrapService(this.genres,manager).restore();
     const localPreferences = await this.preferences.load();
     // A remote metadata failure must never hide a valid local library or end a
     // session. It will reconcile on the next authenticated online boot.
-    const remote = await this.accountPersistence.load().catch(() => null);
+    const remote = allowRemote ? await this.accountPersistence.load().catch(() => null) : null;
     const preferences = remote?.preferences ?? localPreferences;
     const genres = [...restored.genres];
     for (const item of preferences?.genres ?? []) {
@@ -257,7 +265,7 @@ export class App {
     console.info(JSON.stringify({ event: "LIBRARY_RESTORED", books: books.length }));
     // Offline writes are retained in local metadata. A successful authenticated
     // startup/reconnect retries them without ever uploading the original file.
-    void this.syncLocalLibrary();
+    if (allowRemote) void this.syncLocalLibrary();
   }
 
   private configureLocalLibrary(userId: string): void {
@@ -270,7 +278,7 @@ export class App {
     this.imports = this.createImportManager();
     this.libraryService = this.createLibraryService();
     this.readerSettings = new ReaderSettingsManager(this.storage);
-    this.readerManager = new ReaderManager(this.books, new LocalBookFileStore(this.files),
+    this.readerManager = new ReaderManager(this.books, this.localFileStore(),
       new ReadingProgressService(this.progress, this.books), this.readerSettings,this.limaDocuments);
   }
 
@@ -278,17 +286,17 @@ export class App {
     const preferences = this.preferences.fromState(true, this.state.settings.theme, this.state.genres);
     await Promise.all([Promise.all(this.state.genres.map((genre) => this.genres.save(genre))),
       this.preferences.save(preferences), this.storage.save("theme", this.state.settings.theme)]);
-    void this.accountPersistence.savePreferences(preferences).catch(() => undefined);
+    void this.persistPreferences(preferences).catch(() => undefined);
     this.applyTheme(this.state.settings.theme); this.router.navigate("home");
   }
 
   private createImportManager(): ImportManager {
     const local = new LocalFileImporter(); const drive = new GoogleDriveImporter(this.driveConfig, local);
-    return new ImportManager(local, this.books, new LocalBookFileStore(this.files), drive, new UrlImporter(local, undefined, drive),this.limaDocuments,new DesktopLibraryFolderService(this.database),new LibraryChecksumRepository(this.database));
+    return new ImportManager(local, this.books, this.localFileStore(), drive, new UrlImporter(local, undefined, drive),this.limaDocuments,new DesktopLibraryFolderService(this.database),new LibraryChecksumRepository(this.database));
   }
 
   private createLibraryService(): LibraryService {
-    return new LibraryService(this.books, new LocalBookFileStore(this.files), this.progress, [
+    return new LibraryService(this.books, this.localFileStore(), this.progress, [
       this.limaDocuments,
       new LibraryChecksumRepository(this.database),
       new HighlightRepository(this.database),
@@ -298,6 +306,8 @@ export class App {
       new ReadingReviewRepository(this.database),
     ]);
   }
+
+  private localFileStore(): LocalBookFileStore { return new LocalBookFileStore(this.files, this.state.currentUser?.id); }
 
   private async addBook(book: Book): Promise<void> {
     this.state.library.addBook(book); this.state.notify();
@@ -358,7 +368,7 @@ export class App {
     await this.preferences.save(accountPreferences);
     await Promise.all([
       this.persistRemoteBook(libraryBook),
-      this.accountPersistence.savePreferences(accountPreferences),
+      this.persistPreferences(accountPreferences),
     ]).catch(() => undefined);
     this.logCatalogImport("LIBRARY_REGISTERED", { bookId: catalogBook.bookId, localBookId: saved.id });
     this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
@@ -384,10 +394,10 @@ export class App {
   private async deleteBook(id: string, navigate = true): Promise<void> {
     const book = this.findBook(id);
     await this.libraryService.deleteBook(id);
-    void this.accountPersistence.deleteBook(book?.catalogBookId ?? id).catch(() => undefined);
+    void this.persistRemoteDelete(book?.catalogBookId ?? id).catch(() => undefined);
     this.state.library.removeBook(id); this.state.notify(); if(navigate)this.router.navigate("library"); this.showToast("Livro e arquivo removidos.");
   }
-  private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await new LocalBookFileStore(this.files).save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
+  private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await this.localFileStore().save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
 
   private findBook(id: string | null): Book | null { return id ? this.state.library.findBookById(id) ?? null : null; }
 
@@ -428,14 +438,14 @@ export class App {
     this.state.settings.theme = theme; this.applyTheme(theme); await this.storage.save("theme", theme);
     if (this.state.currentUser) {
       const preferences = this.preferences.fromState(this.state.onboardingCompleted, theme, this.state.genres);
-      await this.preferences.save(preferences); void this.accountPersistence.savePreferences(preferences).catch(() => undefined);
+      await this.preferences.save(preferences); void this.persistPreferences(preferences).catch(() => undefined);
     }
     this.state.notify();
   }
 
   private applyTheme(theme: "light" | "dark"): void { document.documentElement.dataset.theme = theme; }
   private userName(): string {
-    const raw = this.state.currentUser?.email.split("@")[0]?.replace(/[._-]+/g, " ").trim() || "Leitor";
+    const raw = this.state.currentUser?.displayName?.trim() || this.state.currentUser?.email.split("@")[0]?.replace(/[._-]+/g, " ").trim() || "Leitor";
     return raw.charAt(0).toLocaleUpperCase() + raw.slice(1);
   }
 
@@ -450,26 +460,30 @@ export class App {
     I18nManager.shared.localizeTree(this.footerRoot);
   }
 
-  private isAuthenticated(): boolean { return ["authenticated", "AUTHENTICATED", "OFFLINE_AUTHENTICATED", "SESSION_RESTORED", "USER_DATA_LOADING", "READY"].includes(this.state.authStatus); }
+  private isAuthenticated(): boolean { return ["authenticated", "AUTHENTICATED", "OFFLINE_AUTHENTICATED", "OFFLINE_SESSION_AVAILABLE", "OFFLINE_READY", "SESSION_RESTORED", "USER_DATA_LOADING", "READY", "ONLINE_READY"].includes(this.state.authStatus); }
   private hasUsableLicense(): boolean { return this.state.licenseStatus === "active" || this.state.licenseStatus === "offline_grace" || this.state.licenseStatus === "grace"; }
 
   private async logout(): Promise<void> {
     // Sign-out invalidates only the remote session. OPFS, IndexedDB and the
     // per-user library database are intentionally retained for offline use.
-    await this.auth.logout(); this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
+    await this.auth.logout(); this.state.library.replaceBooks([]); this.state.library.replaceGenres([]); this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
   }
   private persistRemoteBook(book: Book): Promise<void> {
     const userId = this.state.currentUser?.id; if (!userId) return Promise.resolve();
     return new ReadingReviewRepository(this.database).get(userId, book.id)
-      .then(review => this.accountPersistence.saveBook(book, this.state.genres.find((genre) => genre.id === book.genreId), review))
-      .then(() => this.connectivity.markReconnected());
+      .then(review => this.syncOutbox().enqueueBook(book, this.state.genres.find((genre) => genre.id === book.genreId), review))
+      .then(() => this.connectivity.online ? this.syncOutbox().flush() : undefined)
+      .then(() => { if (this.connectivity.online) this.connectivity.markReconnected(); });
   }
+  private persistRemoteDelete(bookId: string): Promise<void> { return this.syncOutbox().enqueueDelete(bookId).then(() => this.connectivity.online ? this.syncOutbox().flush() : undefined); }
+  private persistPreferences(preferences: Parameters<SyncOutbox["enqueuePreferences"]>[0]): Promise<void> { return this.syncOutbox().enqueuePreferences(preferences).then(() => this.connectivity.online ? this.syncOutbox().flush() : undefined); }
+  private syncOutbox(): SyncOutbox { return new SyncOutbox(new SyncOutboxRepository(this.database), this.accountPersistence, this.state.currentUser?.id ?? "anonymous"); }
   private async syncLocalLibrary(): Promise<void> {
     if (!this.state.currentUser || !this.connectivity.online) return;
     await Promise.all(this.state.books.map(async book => {
       const review = await new ReadingReviewRepository(this.database).get(this.state.currentUser!.id, book.id);
-      await this.accountPersistence.saveBook(book, this.state.genres.find(genre => genre.id === book.genreId), review);
-    })).then(() => this.connectivity.markReconnected()).catch(() => undefined);
+      await this.syncOutbox().enqueueBook(book, this.state.genres.find(genre => genre.id === book.genreId), review);
+    })).then(() => this.syncOutbox().flush()).then(() => this.connectivity.markReconnected()).catch(() => undefined);
   }
   private remoteBook(item: RemoteLibraryBook): Book | null {
     const data = item.metadata; const text = (key: string): string | null => typeof data[key] === "string" && (data[key] as string).trim() ? (data[key] as string).trim() : null;
