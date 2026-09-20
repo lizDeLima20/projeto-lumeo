@@ -52,20 +52,17 @@ describe("PageCurlGeometry",()=>{
     assert.ok(curl.bleedFor(85,step)>curl.bleedFor(20,step)*2,"de perfil precisa de muito mais sobra");
     assert.ok(curl.bleedFor(89.9,step)<=step*.85,"nunca engole a tira seguinte");
   });
-  it("as tiras se sobrepoem sem mover a origem fisica da dobra",()=>{
+  it("o renderer do folhear nao usa mais tiras visiveis",()=>{
     const source=readFileSync("src/reader/page-turn/PageCurl.ts","utf8");
-    assert.ok(PageCurlGeometry.strips>=64,"mais fatias reduzem blocos verticais visiveis");
-    assert.ok(PageCurlGeometry.overlapPixels>=3,"WebView precisa de sobra real entre tiras");
-    assert.match(source,/visualLeft=left-leftOverlap/);
-    assert.match(source,/originX=origin\.startsWith\("0"\)\?leftOverlap:stripWidth-rightOverlap/);
-    assert.match(source,/transformOrigin=`\$\{originX\}px 50%`/);
-    assert.match(source,/nodes\.front\.style\.transform=`translateX\(\$\{-visualLeft\}px\)`/);
+    assert.match(source,/page-turn-surface/);
+    assert.equal(source.includes("page-turn-strip"),false,"segmentos visiveis voltariam a mostrar costuras");
+    assert.match(source,/surface\.append\(front,back\)/,"frente e verso ficam na mesma folha fisica");
   });
   it("a folha curva nao revela faixas retangulares individuais",()=>{
     const css=readFileSync("src/styles/reader.css","utf8");
-    assert.match(css,/\.page-turn-strip\{[^}]*box-shadow:0 0 0 calc\(var\(--strip-bleed/,"cada tira sangra papel opaco por cima da costura");
-    assert.match(css,/\.page-turn-curl::before\{[^}]*linear-gradient/,"a sombra principal e continua no host da folha");
-    assert.match(css,/\.page-turn-strip__front,\.page-turn-strip__back\{[^}]*background-image:none/,"faces nao recebem gradiente individual em bloco");
+    assert.equal(css.includes(".page-turn-strip"),false,"CSS segmentado nao pode participar do folhear");
+    assert.match(css,/\.page-turn-surface::before\{[^}]*linear-gradient/,"a sombra principal e continua na folha");
+    assert.match(css,/\.page-turn-surface__front,\.page-turn-surface__back\{[^}]*background:var\(--reader-paper-lit\)/,"faces continuam opacas");
   });
   it("a folha nao pode carregar overflow nem filter - achatam o arco",()=>{
     const css=readFileSync("src/styles/reader.css","utf8");
@@ -76,13 +73,9 @@ describe("PageCurlGeometry",()=>{
   });
   it("a folha tem frente e verso físicos, nunca faces alternadas por display",()=>{
     const css=readFileSync("src/styles/reader.css","utf8"),source=readFileSync("src/reader/page-turn/PageCurl.ts","utf8");
-    /* Each strip clips, which flattens it: backface culling of the faces inside is
-       relative to the strip, so it hid the real verso and let the front bleed through.
-       The face turned away is chosen by the geometry instead. */
-    assert.match(css,/\.page-turn-strip--back>\.page-turn-strip__front,\.page-turn-strip:not\(\.page-turn-strip--back\)>\.page-turn-strip__back\{visibility:hidden\}/);
-    assert.match(source,/classList\.toggle\("page-turn-strip--back",strip\.showsBack\)/);
-    assert.equal(css.includes(".page-turn-strip[data-face="),false);
-    assert.match(source,/if\(face==="back"\)band\.style\.transform="rotateY\(180deg\)"/);
+    assert.match(css,/\.page-turn-surface__back\{transform:rotateY\(180deg\)\}/);
+    assert.match(css,/backface-visibility:hidden/);
+    assert.equal(source.includes("visibility:hidden"),false,"a face nao deve sumir por troca manual durante a virada");
     assert.equal(source.includes("dataset.face"),false);
   });
 });
@@ -175,17 +168,10 @@ describe("toque no celular e virar para tras",()=>{
     }finally{scope.Element=previous;}
   });
   it("virando para tras a dobradica e a borda direita, nunca a externa",()=>{
-    const curl=new PageCurlGeometry(),W=412,count=PageCurlGeometry.strips;
-    for(const progress of [.1,.4,.7,.95]){
-      const plan=curl.build(progress,W,PageGeometry.landingAngle,1,count);
-      const back=PageCurl.place(plan[0]!,count-1,count,W,-1);
-      assert.equal(back.origin,"100% 50%");
-      assert.ok(Math.abs(back.shiftX)<1e-9,`a dobradica andou ${back.shiftX}px em ${progress}`);
-      assert.ok(Math.abs(back.left+W/count+plan[0]!.bleed-W)<1e-9,"a caixa da dobradica termina na borda direita");
-      assert.ok(back.angle>=0,"e gira para o lado de dentro, nao para dentro da tela");
-      const forward=PageCurl.place(plan[0]!,0,count,W,1);
-      assert.equal(forward.origin,"0 50%");assert.equal(forward.left,0);assert.equal(forward.shiftX,0);
-    }
+    const source=readFileSync("src/reader/page-turn/PageCurl.ts","utf8");
+    assert.match(source,/direction===1\?"0 50%":"100% 50%"/);
+    assert.match(source,/surface\.transformOrigin=origin/);
+    assert.match(source,/rotateY\(\$\{angle\.toFixed\(3\)\}deg\)/);
   });
 });
 
@@ -196,8 +182,8 @@ describe("a crista da dobra le como papel, nao como texto espremido",()=>{
     assert.ok(curl.inkAt(-88)<.05,"de perfil nao sobra texto para parecer duplicado");
     for(let angle=0;angle<=178;angle+=2){const ink=curl.inkAt(-angle);assert.ok(ink>=0&&ink<=1);}
     const css=readFileSync("src/styles/reader.css","utf8");
-    assert.match(css,/\.page-turn-strip__inner\{[^}]*opacity:var\(--strip-ink/,"so a tinta desbota");
-    assert.match(css,/\.page-turn-strip__front,\.page-turn-strip__back\{[^}]*background-color:var\(--reader-paper-lit\)/,"o papel da tira e opaco");
+    assert.match(css,/\.page-turn-surface__front,\.page-turn-surface__back\{[^}]*opacity:1/,"faces fisicas nunca ficam transparentes");
+    assert.match(css,/\.page-turn-surface__front,\.page-turn-surface__back\{[^}]*background:var\(--reader-paper-lit\)/,"o papel da folha e opaco");
   });
   it("em qualquer ponto do gesto, texto legivel so onde a folha esta de frente",()=>{
     for(let step=0;step<=20;step+=1){

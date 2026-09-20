@@ -62,5 +62,8 @@ describe("download nativo Android do catálogo", () => {
     assert.match(bridge, /PLUGIN_AVAILABLE/);
     assert.match(bridge, /PRIVATE_FILE_ACCESS_STARTED/);
     assert.match(bridge, /NATIVE_FILE_UNREADABLE/);
+    assert.match(bridge, /ALTERNATIVE_URL_RETRY/);
+    assert.match(bridge, /mustStopAfterNativeFailure/);
+    assert.doesNotMatch(bridge, /"HTTP_403", "HTTP_404", "UNEXPECTED_HTML_RESPONSE"/);
   });
 });

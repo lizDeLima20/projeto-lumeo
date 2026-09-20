@@ -58,7 +58,8 @@ export class CapacitorNativeBookDownloadBridge implements AndroidCatalogDownload
           lastError = error;
           const code = NativeBookDownloadError.from(error).code;
           this.log("DOWNLOAD_FAILED", { bookId: link.bookId, stage: "NATIVE_PLUGIN", errorCode: code, exceptionClass: error instanceof Error ? error.constructor.name : "Unknown" });
-          if (["DOWNLOAD_CANCELLED", "HTTP_401", "HTTP_403", "HTTP_404", "UNEXPECTED_HTML_RESPONSE", "FILE_SIZE_INVALID", "INVALID_PDF", "NO_SPACE", "FILE_MOVE_FAILED", "NATIVE_FILE_UNREADABLE", "NATIVE_FILE_INCOMPLETE"].includes(code)) throw error;
+          if (this.mustStopAfterNativeFailure(code)) throw error;
+          this.log("ALTERNATIVE_URL_RETRY", { bookId: link.bookId, errorCode: code });
         }
       }
       throw lastError;
@@ -82,6 +83,20 @@ export class CapacitorNativeBookDownloadBridge implements AndroidCatalogDownload
     this.log("PRIVATE_FILE_ACCESS_OK", { bookId: result.bookId, bytes: blob.size });
     this.log("FILE_VALIDATED", { bookId: result.bookId, bytes: blob.size, mimeType: result.mimeType });
     return new File([blob], link.expectedFilename, { type: result.mimeType });
+  }
+  private mustStopAfterNativeFailure(code: string): boolean {
+    // Errors caused by the current public Drive URL (HTML interstitials, 403s,
+    // 404s, timeouts or invalid downloaded bytes) should try the next BFF
+    // fallback URL. Local/device failures cannot be fixed by another URL.
+    return [
+      "DOWNLOAD_CANCELLED",
+      "DOWNLOAD_REQUEST_INVALID",
+      "DOWNLOAD_STORAGE_UNAVAILABLE",
+      "NO_SPACE",
+      "FILE_MOVE_FAILED",
+      "NATIVE_FILE_UNREADABLE",
+      "NATIVE_FILE_INCOMPLETE",
+    ].includes(code) || code.startsWith("NATIVE_");
   }
   private log(stage: string, details: Record<string, unknown>): void { reportNativeDownloadDiagnostic(stage, details); }
 }
