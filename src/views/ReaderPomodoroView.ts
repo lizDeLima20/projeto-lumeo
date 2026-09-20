@@ -71,7 +71,7 @@ export class ReaderPomodoroView {
     const result = await this.tracker.pagesViewed(bookId, pages, this.preferences().dailyPagesGoal);
     this.dayCache = result.day;
     this.render();
-    if (result.goalReached) this.showGoal(result.day);
+    if (result.goalReached) { this.sound.playReadingFinished(); this.showGoal(result.day); }
   }
 
   public destroy(): void {
@@ -100,9 +100,7 @@ export class ReaderPomodoroView {
     if (document.visibilityState !== "visible" || seconds > 5) { this.render(); return; }
     const before = this.cycle.phase, step = this.cycle.tick(seconds);
     if (step.readingSeconds > 0) this.dayCache = await this.tracker.addReadingSeconds(step.readingSeconds);
-    if (step.changed && before === "focus" && this.cycle.phase === "break") { this.dayCache = await this.tracker.pause(); this.sound.playReadingFinished(); this.showBreak(); }
-    else if (step.changed && this.cycle.phase === "break-over") { this.sound.playBreakFinished(); this.showBreakOver(); }
-    else if (this.cycle.phase === "break") this.updateBreakCountdown();
+    if (step.changed && before === "focus" && this.cycle.phase === "break") { this.stop(); this.dayCache = await this.tracker.pause(); this.sound.playReadingFinished(); this.showGoal(this.dayCache); }
     this.render();
   }
 
@@ -150,30 +148,25 @@ export class ReaderPomodoroView {
       [[this.t("reader.pomodoro.resumeAction"), () => void this.resume(), true]]);
   }
 
-  private showBreak(): void {
-    const value = this.preferences();
-    this.openDialog(this.t("reader.pomodoro.break.title"),
-      [this.t("reader.pomodoro.break.body", { minutes: value.pomodoroFocusMinutes, time: ReaderPomodoroView.clock(this.cycle.remaining) }), this.todayLine()],
-      [[this.t("reader.pomodoro.break.skip"), () => void this.resume(), false]], "reader-pomodoro-dialog--break");
-  }
-
-  private updateBreakCountdown(): void {
-    const body = this.dialog?.querySelector<HTMLElement>(".reader-pomodoro-dialog__body");
-    if (body && this.dialog?.classList.contains("reader-pomodoro-dialog--break"))
-      body.textContent = this.t("reader.pomodoro.break.body", { minutes: this.preferences().pomodoroFocusMinutes, time: ReaderPomodoroView.clock(this.cycle.remaining) });
-  }
-
-  private showBreakOver(): void {
-    this.openDialog(this.t("reader.pomodoro.breakOver.title"), [this.t("reader.pomodoro.breakOver.body"), this.todayLine()],
-      [[this.t("reader.pomodoro.resumeAction"), () => void this.resume(), true]]);
-  }
-
   private showGoal(day: Readonly<ReadingDay>): void {
     const time = day.firstReadAt ?? ReaderPomodoroView.now();
-    this.openDialog(this.t("reader.pomodoro.goal.title"),
-      [this.t("reader.pomodoro.goal.body", { pages: day.pagesRead, minutes: Math.floor(day.readingSeconds / 60) }), this.t("reader.pomodoro.goal.question")],
-      [[this.t("reader.pomodoro.goal.continue"), () => { void this.tracker.decideGoal("continue"); this.closeDialog(); }, true],
+    const body = this.isTimeGoal
+      ? this.t("reader.pomodoro.goal.bodyTime", { minutes: Math.floor(day.readingSeconds / 60) })
+      : this.t("reader.pomodoro.goal.body", { pages: day.pagesRead, minutes: Math.floor(day.readingSeconds / 60) });
+    this.openDialog(this.t("reader.pomodoro.goal.done"),
+      [body, this.t("reader.pomodoro.goal.question")],
+      [[this.t("reader.pomodoro.goal.continue"), () => void this.continueReading(), true],
        [this.t("reader.pomodoro.goal.tomorrow", { time }), () => void this.returnTomorrowChoice(time), false]], "reader-pomodoro-dialog--goal");
+  }
+
+  private async continueReading(): Promise<void> {
+    await this.tracker.decideGoal("continue");
+    if (this.isTimeGoal) {
+      this.cycle.resume();
+      this.lastTick = Date.now();
+      this.start();
+    }
+    this.closeDialog(); this.render();
   }
 
   private async returnTomorrowChoice(time: string): Promise<void> {

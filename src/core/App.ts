@@ -182,7 +182,7 @@ export class App {
       (book) => void this.updateBook(book), () => this.router.navigate("book", { id: params.get("id") ?? "" })));
     this.router.register("reader", (params) => new ReaderView(params.get("id") ?? "", this.readerManager,
       this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database,
-      this.userName(), this.state.currentUser?.id));
+      this.userName(), this.state.currentUser?.id, this.state.books));
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
         open: source => this.router.navigate("import", { source }) } : undefined, this.pwaInstall));

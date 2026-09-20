@@ -18,7 +18,7 @@ export interface PomodoroSoundPaths { readingFinished: string; breakFinished: st
 /** Where the two cue files are expected once supplied - drop them in unchanged and this
  *  starts playing them, no code change required. */
 export const POMODORO_SOUND_PATHS: PomodoroSoundPaths = {
-  readingFinished: "/sounds/pomodoro-reading-finished.mp3",
+  readingFinished: "/sounds/fim-da-leitura.mp3",
   breakFinished: "/sounds/pomodoro-break-finished.mp3",
 };
 

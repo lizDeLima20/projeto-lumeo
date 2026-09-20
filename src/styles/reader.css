@@ -62,13 +62,15 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .reflow-sheet--cover{display:none;place-items:center;max-width:none;margin:0;padding:0;background:transparent}
 .reflow-sheet--cover.reflow-sheet--current{display:grid}
 .reader-cover-page{position:relative;--cover-color-top:#161319;--cover-color-middle:#24202a;--cover-color-bottom:#101014;display:grid;width:100%;height:100%;place-items:center;overflow:hidden;background:linear-gradient(180deg,var(--cover-color-top),var(--cover-color-middle) 50%,var(--cover-color-bottom));padding:0;text-align:center}
-.reader-cover-page img{display:block;width:100%;height:100%;max-width:none;max-height:none;border:0;border-radius:0;object-fit:cover}
+.reader-cover-page img{display:block;max-width:none;max-height:none;border:0;border-radius:0}
+.reader-cover-page__backdrop{position:absolute;inset:-4%;z-index:0;width:108%;height:108%;object-fit:cover;filter:blur(18px) saturate(1.08) brightness(.78);transform:scale(1.04);opacity:.9}
+.reader-cover-page__image{position:relative;z-index:1;width:100%;height:100%;object-fit:cover}
 /* Single-page reader (phones, tablets): the whole cover fits inside the safe area. `cover` on a
    tall phone cut about a third of a 2:3 cover off the sides, title included; the space left is
    filled by the palette sampled from the cover itself. The curl strips are inside the sheet, so
    the turning cover keeps the same framing. */
-.reflow-sheet--cover .reader-cover-page{box-sizing:border-box;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
-.reflow-sheet--cover .reader-cover-page img{width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;object-position:center}
+.reflow-sheet--cover .reader-cover-page{box-sizing:border-box;padding:0}
+.reflow-sheet--cover .reader-cover-page__image{width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;object-position:center}
 .reader-cover-page__fallback{display:grid;width:min(86vw,28rem);aspect-ratio:2/3;place-items:center;border-radius:.5rem;background:linear-gradient(140deg,#1d1a21,#6f5130);color:#f8e4bd;font-size:3rem;font-weight:800}
 .desktop-book-reader:has(.open-book-layout--cover){inset:0;grid-template-columns:0 minmax(0,1fr) 0;gap:0}
 .desktop-book-reader:has(.open-book-layout--cover) .open-book-arrow{display:none}
@@ -115,6 +117,11 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .page-turn-surface__front,.page-turn-surface__back{position:absolute;inset:0;overflow:hidden;opacity:1;background:var(--reader-paper-lit);backface-visibility:hidden;-webkit-backface-visibility:hidden;transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
 .page-turn-surface__back{transform:rotateY(180deg)}
 .page-turn-surface__inner{position:absolute;inset:0;overflow:hidden;color:inherit;font:inherit;text-align:inherit;background:transparent}
+.page-turn-curl-lip{position:absolute;top:0;bottom:0;z-index:7;overflow:hidden;opacity:1;background:var(--reader-paper-lit);box-shadow:0 0 0 9px var(--reader-paper-lit),inset -10px 0 24px rgba(37,21,8,calc(.1 + var(--curl-lift,0)*.2)),0 10px 26px rgba(20,13,6,calc(.08 + var(--curl-lift,0)*.22));transform-style:preserve-3d;-webkit-transform-style:preserve-3d;backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}
+.page-turn-surface--previous .page-turn-curl-lip{box-shadow:0 0 0 9px var(--reader-paper-lit),inset 10px 0 24px rgba(37,21,8,calc(.1 + var(--curl-lift,0)*.2)),0 10px 26px rgba(20,13,6,calc(.08 + var(--curl-lift,0)*.22))}
+.page-turn-curl-lip__front,.page-turn-curl-lip__back{position:absolute;inset:0;overflow:hidden;opacity:1;background:var(--reader-paper-lit);backface-visibility:hidden;-webkit-backface-visibility:hidden;transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
+.page-turn-curl-lip__back{transform:rotateY(180deg)}
+.page-turn-surface--cover .page-turn-curl-lip{display:none}
 /* The moving sheet is one continuous opaque surface. Shadows are painted on that surface,
    never on per-strip rectangles, so Android WebView cannot reveal seams between slices. */
 .page-turn-active::before{display:none}
@@ -324,6 +331,7 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .reader-pomodoro-settings__number .input{width:100%}
 .reader-pomodoro-settings__today{margin:0;font-size:.82rem;opacity:.8}
 .reader-reminder-settings__days{display:flex;flex-wrap:wrap;gap:.35rem;border:0;margin:0;padding:0}.reader-reminder-settings__days legend{margin-bottom:.25rem;font-size:.82rem}.reader-reminder-settings__days label{display:flex;align-items:center;gap:.2rem;border:1px solid color-mix(in srgb,currentColor 15%,transparent);border-radius:.45rem;padding:.3rem .4rem;font-size:.78rem}
+.reader-reminder-settings__books,.reader-reminder-settings__list{display:grid;gap:.5rem}.reader-reminder-settings__books label,.reader-reminder-settings__item{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:.5rem;border:1px solid color-mix(in srgb,currentColor 14%,transparent);border-radius:.55rem;padding:.45rem;text-align:left}.reader-reminder-settings__books img{width:2rem;height:2.8rem;object-fit:cover;border-radius:.2rem;background:color-mix(in srgb,currentColor 8%,transparent)}.reader-reminder-settings__books span,.reader-reminder-settings__item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reader-reminder-settings__item button{min-height:2rem;border-radius:.45rem;padding:.25rem .45rem}
 /* Literata: a serif drawn for long reading on screens (SIL OFL), bundled so it works offline. */
 .reader[data-font="book"]{--reflow-font:"Literata Variable",Literata,"Noto Serif",Georgia,serif}
 /* Android e-reader. The theme is the paper the page is printed on: never a bright pure white,
