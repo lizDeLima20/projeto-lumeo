@@ -30,6 +30,9 @@ import { UserPersistenceRepository } from "./repositories/UserPersistenceReposit
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 
+export const isPublicCatalogRequest = (method: string | undefined, path: string): boolean =>
+  method === "GET" && /^\/api\/catalog\/books(?:\/[^/]+(?:\/download)?)?$/.test(path);
+
 export class ServerApp {
   public static create(config: ServerConfig = Config.fromEnvironment()): RequestHandler {
     let controller: ApiController | null = null;
@@ -106,7 +109,8 @@ export class ServerApp {
       }
       rateLimiter.assertAllowed(ServerApp.clientKey(request), path);
       const publicPaths = ["/api/auth/signup", "/api/auth/login", "/api/auth/google", "/api/auth/refresh"];
-      if (!publicPaths.includes(path) && !request.headers.authorization?.startsWith("Bearer ")) {
+      const publicCatalog = isPublicCatalogRequest(request.method, path);
+      if (!publicPaths.includes(path) && !publicCatalog && !request.headers.authorization?.startsWith("Bearer ")) {
         response.statusCode = 401;
         response.setHeader("Content-Type", "application/json; charset=utf-8");
         response.end(JSON.stringify({ ok: false, code: "AUTH_REQUIRED", message: "Autenticação necessária.", requestId }));

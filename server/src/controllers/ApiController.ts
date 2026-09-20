@@ -30,6 +30,20 @@ export class ApiController {
       if (request.method === "POST" && path === "/api/auth/login") return await this.login(request, response);
       if (request.method === "POST" && path === "/api/auth/google") return await this.google(request, response);
       if (request.method === "POST" && path === "/api/auth/refresh") return await this.refresh(request, response);
+      // The public catalogue is intentionally separate from account access. It returns
+      // only curated metadata and direct public Drive links; profiles, devices and
+      // all account-scoped writes remain below the authentication gate.
+      if (path === "/api/catalog/books" && request.method === "GET") {
+        return this.json(response, 200, await this.requiredCatalog().list(this.catalogQuery(request)));
+      }
+      const publicCatalogBook = path.match(/^\/api\/catalog\/books\/([^/]+)$/);
+      if (publicCatalogBook && request.method === "GET") {
+        return this.json(response, 200, await this.requiredCatalog().get(decodeURIComponent(publicCatalogBook[1]!), this.catalogQuery(request).locale));
+      }
+      const publicCatalogDownload = path.match(/^\/api\/catalog\/books\/([^/]+)\/download$/);
+      if (publicCatalogDownload && request.method === "GET") {
+        return this.json(response, 200, await this.requiredCatalog().download(decodeURIComponent(publicCatalogDownload[1]!), this.catalogQuery(request).locale));
+      }
       await this.authMiddleware.requireAuth(request);
       const user = request.user;
       if (!user) throw new ApiError(401, "AUTH_REQUIRED", "Autenticação necessária.");
@@ -62,23 +76,9 @@ export class ApiController {
       if (request.method === "GET" && path === "/api/device") {
         return this.json(response, 200, await this.devices.getState(user.id, this.installationId(request)));
       }
-      if (path === "/api/catalog/books" && request.method === "GET") {
-        await this.assertCatalogLicense(user.id);
-        return this.json(response, 200, await this.requiredCatalog().list(this.catalogQuery(request)));
-      }
       if (path === "/api/catalog/admin/status" && request.method === "GET") {
         await this.assertCatalogLicense(user.id);
         return this.json(response, 200, await this.requiredCatalog().adminStatus(user.id));
-      }
-      const catalogBook = path.match(/^\/api\/catalog\/books\/([^/]+)$/);
-      if (catalogBook && request.method === "GET") {
-        await this.assertCatalogLicense(user.id);
-        return this.json(response, 200, await this.requiredCatalog().get(decodeURIComponent(catalogBook[1]!), this.catalogQuery(request).locale));
-      }
-      const catalogDownload = path.match(/^\/api\/catalog\/books\/([^/]+)\/download$/);
-      if (catalogDownload && request.method === "GET") {
-        await this.assertCatalogLicense(user.id);
-        return this.json(response, 200, await this.requiredCatalog().download(decodeURIComponent(catalogDownload[1]!), this.catalogQuery(request).locale));
       }
       // Catalogue genre folders: admin only, checked inside the service.
       if (path === "/api/catalog/sources" && request.method === "GET") {

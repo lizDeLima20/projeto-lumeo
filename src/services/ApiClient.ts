@@ -1,6 +1,7 @@
 export interface ApiErrorBody { error?: { code: string; message: string }; code?: string; message?: string; requestId?: string; }
 
 import { I18nManager } from "../i18n/I18nManager";
+import { Capacitor } from "@capacitor/core";
 
 export class ApiError extends Error {
   public constructor(public readonly status: number, public readonly code: string, message: string) { super(message); }
@@ -66,8 +67,19 @@ export class ApiClient {
     const headers = this.authHeaders(authenticated);
     const supplied = new Headers(init.headers); supplied.forEach((value, key) => headers.set(key, value));
     if (init.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-    try { return await fetch(`${this.baseUrl}${path}`, { ...init, headers }); }
+    const endpoint = path.split("?", 1)[0]!.replace(/^(\/catalog\/books)\/[^/]+/, "$1/:id");
+    const logAndroid = (status: number): void => {
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
+        console.info(JSON.stringify({ event: "ANDROID_API_RESPONSE", endpoint, status, authorizationPresent: headers.has("Authorization") }));
+      }
+    };
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
+      logAndroid(response.status);
+      return response;
+    }
     catch (error) {
+      logAndroid(0);
       if (error instanceof DOMException && error.name === "AbortError") throw error;
       throw new ApiError(0, "NETWORK_ERROR", I18nManager.shared.messageForErrorCode("NETWORK_ERROR")!);
     }
