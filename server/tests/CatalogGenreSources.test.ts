@@ -45,6 +45,7 @@ const drive = (folders: Record<string, unknown>): CatalogJsonReader => ({
   read: async (folderId) => { const value = folders[folderId]; if (value instanceof Error) throw value; if (value === undefined) throw new Error("CATALOG_PUBLIC_SOURCE_UNAVAILABLE"); return value; },
 });
 const ARTES = "1Yc2qLF5v5j163qtkqK0pnwKxL-uERNF0", ADMINISTRACAO = "10bXreEgmEAQGwjKW7-lnnIX92YZ9VcNj";
+const TURISMO = "1QYs_64VSDXg6RVMx7zjGA-Sp0c1Pvbrk";
 
 function setup(folders: Record<string, unknown>, admin = true) {
   const store = new MemorySourceStore(), reader = drive(folders);
@@ -78,7 +79,7 @@ describe("link da pasta do Google Drive", () => {
 });
 
 describe("fontes do catálogo cadastradas", () => {
-  it("não existe mais lista de gêneros no código: a migração traz os dois gêneros atuais", () => {
+  it("não existe lista oficial no código: as fontes são cadastradas por migração", () => {
     const code = readdirSync("server/src/catalog").map((file) => readFileSync(`server/src/catalog/${file}`, "utf8")).join("\n");
     assert.equal(code.includes(ARTES), false); assert.equal(code.includes("Artes e música"), false);
     const migration = readFileSync("supabase/migrations/202609170001_catalog_sources.sql", "utf8");
@@ -86,6 +87,9 @@ describe("fontes do catálogo cadastradas", () => {
     assert.match(migration, new RegExp(`'Artes e música', 'https://drive\\.google\\.com/drive/folders/${ARTES}', '${ARTES}'`));
     assert.match(migration, new RegExp(`'Administração e economia', 'https://drive\\.google\\.com/drive/folders/${ADMINISTRACAO}', '${ADMINISTRACAO}'`));
     assert.match(migration, /enable row level security/);
+    const turismoMigration = readFileSync("supabase/migrations/202609200001_catalog_source_turismo.sql", "utf8");
+    assert.match(turismoMigration, new RegExp(`'Turismo e guia de viagem',[\\s\\S]*${TURISMO}`));
+    assert.match(turismoMigration, /on conflict \(folder_id\) do update/i);
   });
 
   it("cadastrar só nome e link cria o gênero e o chip, sem deploy", async () => {
@@ -112,6 +116,17 @@ describe("fontes do catálogo cadastradas", () => {
     const page = await catalog.list({ offset: 0, limit: 50, locale: "pt-BR" });
     assert.equal(page.items.length, 1);
     assert.deepEqual(page.genres, [{ id: "artes-e-musica", name: "Artes e música" }]);
+  });
+
+  it("uma nova fonte estruturada vira chip sem depender de lista fixa na interface", async () => {
+    const { admin, catalog } = setup({ [TURISMO]: [entry(22, "epub", { synopsis: "Roteiro oficial.", genre: "ignorado pela fonte" })] });
+    await admin.create("admin-user", { genre: "Turismo e guia de viagem", driveFolderUrl: `https://drive.google.com/drive/folders/${TURISMO}` });
+    const page = await catalog.list({ offset: 0, limit: 50, locale: "pt-BR" });
+    assert.deepEqual(page.genres, [{ id: "turismo-e-guia-de-viagem", name: "Turismo e guia de viagem" }]);
+    assert.deepEqual(page.items.map((book) => [book.genreId, book.genreName, book.description, book.coverUrl, book.downloadUrl]), [[
+      "turismo-e-guia-de-viagem", "Turismo e guia de viagem", "Roteiro oficial.",
+      "https://lh3.googleusercontent.com/d/cover-file-22-abcdef", "https://drive.google.com/uc?export=download&id=drive-file-22-abcdef",
+    ]]);
   });
 
   it("testar pasta distingue pasta sem catalog.json e catalog.json inválido, sem salvar", async () => {

@@ -9,7 +9,6 @@ export class CatalogExplorerView extends BaseView {
   private loading = false;
   private readonly loaded = new Set<string>();
   private readonly classified: HTMLElement = document.createElement("div");
-  private readonly unclassified: HTMLElement = document.createElement("div");
   private status: HTMLElement | null = null;
   /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
   private addCatalogGenre: (id: string, label: string) => void = () => undefined;
@@ -22,14 +21,16 @@ export class CatalogExplorerView extends BaseView {
     const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = ""; const availableGenres = new Set<string>();
     const selectGenre = (id: string): void => { selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
     const addGenre = (id: string, label: string): void => { if (availableGenres.has(id)) return; availableGenres.add(id); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
-    addGenre("", "Todos"); addGenre("sem-genero", this.t("ui.catalog.unclassified")); this.state.genres.forEach((value) => addGenre(value.id, value.name));
+    // Explore is the public catalogue: its filters are supplied only by the
+    // active remote sources. Personal library categories belong in Biblioteca
+    // and must never masquerade as catalogue genres here.
+    addGenre("", this.t("ui.catalog.allGenres"));
     this.addCatalogGenre = addGenre;
     controls.append(search, genres);
     const list = this.createElement("div", "catalog__sections");
-    this.classified.className = "catalog__grid"; this.unclassified.className = "catalog__grid";
+    this.classified.className = "catalog__grid";
     const classifiedSection = this.createElement("section", "catalog__section"); classifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.allGenres")), this.classified);
-    const unclassifiedSection = this.createElement("section", "catalog__section catalog__section--unclassified"); unclassifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.unclassified")), this.unclassified);
-    list.append(classifiedSection, unclassifiedSection);
+    list.append(classifiedSection);
     const status = this.createElement("p", "catalog__status"); status.setAttribute("role", "status"); this.status = status;
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
     let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
@@ -45,7 +46,7 @@ export class CatalogExplorerView extends BaseView {
       link.addEventListener("click", () => this.onManageSources?.()); heading.append(link);
     } catch { /* No admin link when the status cannot be read. */ }
   }
-  private reset(): void { this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); this.unclassified.replaceChildren(); }
+  private reset(): void { this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); }
   private async load(query: string, genreId: string, more: HTMLButtonElement): Promise<void> {
     if (this.loading || this.cursor === "end") return; this.loading = true; more.disabled = true; this.status!.textContent = this.t("ui.common.loading");
     try {
@@ -53,10 +54,9 @@ export class CatalogExplorerView extends BaseView {
       page.genres?.forEach((genre) => this.addCatalogGenre(genre.id, genre.name));
       page.items.filter((book) => !this.loaded.has(book.bookId)).forEach((book) => {
         this.loaded.add(book.bookId);
-        (this.isUnclassified(book) ? this.unclassified : this.classified).append(this.card(book));
+        this.classified.append(this.card(book));
       });
       this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end"; this.status!.textContent = this.loaded.size ? "" : this.t("ui.catalog.empty");
-      this.unclassified.closest<HTMLElement>(".catalog__section")!.hidden = this.unclassified.childElementCount === 0;
       this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
     } catch (error) { this.status!.textContent = error instanceof Error ? error.message : this.t("ui.catalog.offline"); }
     finally { this.loading = false; more.disabled = false; }
@@ -65,7 +65,8 @@ export class CatalogExplorerView extends BaseView {
     const card = this.createElement("article", "catalog-card"); card.tabIndex = 0; card.addEventListener("click", () => this.onOpen(book.bookId)); card.addEventListener("keydown", (event) => { if (event.key === "Enter") this.onOpen(book.bookId); }); const cover = this.createElement("div", "catalog-card__cover");
     this.appendCover(cover, book);
     const title = this.createElement("h2", "catalog-card__title", book.title); const author = this.createElement("p", "catalog-card__author", book.author);
-    const info = this.createElement("div", "catalog-card__info"); info.append(title, author, this.createElement("small", "catalog-card__genre", book.genreName || this.t("ui.catalog.unclassified")));
+    const info = this.createElement("div", "catalog-card__info"); info.append(title, author);
+    if (!this.isUnclassified(book)) info.append(this.createElement("small", "catalog-card__genre", book.genreName));
     if (book.volume) info.append(this.createElement("small", "catalog-card__volume", this.t("ui.catalog.volume", { volume: book.volume })));
     const action = this.createElement("button", "button button--secondary", this.isLocal(book) ? this.t("ui.catalog.inLibrary") : this.t("catalog.findBook")); action.type = "button";
     action.addEventListener("click", (event) => { event.stopPropagation(); this.onOpen(book.bookId); });
