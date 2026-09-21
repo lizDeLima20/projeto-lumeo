@@ -102,7 +102,7 @@ export class ReaderView extends BaseView {
   public override unmount(): void {
     window.clearTimeout(this.controlsTimer); window.clearTimeout(this.resizeTimer);
     document.removeEventListener("keydown", this.handleKeydown); window.removeEventListener("resize", this.handleResize);
-    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();this.pomodoro?.destroy();this.pomodoro=null;void AndroidReadingOptics.stop();void ReaderDisplay.allowSleep();void ReaderDisplay.restore();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();this.desktopView?.destroy();void this.reflow?.close();void this.manager.close(); super.unmount();
+    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();this.pomodoro?.destroy();this.pomodoro=null;void AndroidReadingOptics.stop();void ReaderDisplay.restore();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();this.desktopView?.destroy();void this.reflow?.close();void this.manager.close(); super.unmount();
   }
 
   private async initialize(): Promise<void> {
@@ -395,7 +395,7 @@ export class ReaderView extends BaseView {
     if (!this.element || !this.stage) return; this.element.dataset.readerTheme = this.manager.settings.settings.theme;
     const preferences=this.manager.settings.preferencesService.preferences;this.element.dataset.readingMode=preferences.readingMode;this.element.dataset.paper=preferences.paperTheme;
     // Android reads as an e-reader: the window's own brightness replaces dimming the paper.
-    const android=ReaderDisplay.available;if(android){this.element.dataset.native="android";void ReaderDisplay.keepAwake();void ReaderDisplay.apply(preferences.screenBrightness);void AndroidReadingOptics.start(profile=>this.applyAndroidOptics(profile));}
+    const android=ReaderDisplay.available;if(android){this.element.dataset.native="android";void ReaderDisplay.apply(preferences.screenBrightness);void AndroidReadingOptics.start(profile=>this.applyAndroidOptics(profile));}
     const paperLightness=android?100:Math.round(45+this.manager.settings.settings.brightness*.55);
     this.element.style.setProperty("--reader-lightness",`${paperLightness}%`);
   }

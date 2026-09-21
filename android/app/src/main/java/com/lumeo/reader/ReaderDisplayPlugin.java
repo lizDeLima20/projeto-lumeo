@@ -27,8 +27,6 @@ public class ReaderDisplayPlugin extends Plugin {
 
     /** The level the Reader asked for, or null when the system level applies. */
     private Float readerBrightness = null;
-    /** Window-only wake policy. It never alters the device's global screen timeout. */
-    private boolean keepScreenOn = false;
 
     @PluginMethod
     public void setReaderBrightness(PluginCall call) {
@@ -51,20 +49,7 @@ public class ReaderDisplayPlugin extends Plugin {
     public void getState(PluginCall call) {
         JSObject result = new JSObject();
         result.put("readerBrightness", readerBrightness);
-        result.put("keepScreenOn", keepScreenOn);
         call.resolve(result);
-    }
-
-    @PluginMethod
-    public void keepScreenOn(PluginCall call) {
-        keepScreenOn = true;
-        setKeepScreenOn(call, true);
-    }
-
-    @PluginMethod
-    public void clearKeepScreenOn(PluginCall call) {
-        keepScreenOn = false;
-        setKeepScreenOn(call, false);
     }
 
     /** A recreated Activity (rotation, theme change) gets a new window: re-apply the level. */
@@ -72,15 +57,12 @@ public class ReaderDisplayPlugin extends Plugin {
     protected void handleOnResume() {
         super.handleOnResume();
         if (readerBrightness != null) apply(null);
-        if (keepScreenOn) setKeepScreenOn(null, true);
     }
 
     /** Leaving nothing behind: the window override goes with the window. */
     @Override
     protected void handleOnDestroy() {
         readerBrightness = null;
-        keepScreenOn = false;
-        setKeepScreenOn(null, false);
         super.handleOnDestroy();
     }
 
@@ -106,20 +88,6 @@ public class ReaderDisplayPlugin extends Plugin {
                 result.put("readerBrightness", level);
                 call.resolve(result);
             }
-        });
-    }
-
-    private void setKeepScreenOn(PluginCall call, boolean enabled) {
-        Activity activity = getActivity();
-        if (activity == null) {
-            if (call != null) call.reject("NO_ACTIVITY");
-            return;
-        }
-        activity.runOnUiThread(() -> {
-            if (enabled) activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            else activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            Log.i(TAG, enabled ? "reader.keep_screen_on enabled" : "reader.keep_screen_on cleared");
-            if (call != null) call.resolve();
         });
     }
 }

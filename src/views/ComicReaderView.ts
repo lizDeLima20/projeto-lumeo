@@ -7,7 +7,6 @@ import { ComicPageProcessor } from "../reader/comic/ComicPageProcessor";
 import { PdfTextLayerFragmentSource } from "../reader/comic/PdfTextLayerFragmentSource";
 import { TesseractComicOcrSource } from "../reader/comic/TesseractComicOcrSource";
 import { ReaderFileMissingError, type ReaderManager } from "../reader/ReaderManager";
-import { ReaderDisplay } from "../services/ReaderDisplay";
 import { BaseView } from "./BaseView";
 
 /** The comic reader. It shares the library, the file store and the reading progress with the
@@ -52,7 +51,6 @@ export class ComicReaderView extends BaseView {
     this.stage.addEventListener("pointerdown", this.handlePointerDown);
     this.stage.addEventListener("pointerup", this.handlePointerUp);
     document.body.classList.add("reader-mode");
-    void ReaderDisplay.keepAwake();
     document.addEventListener("keydown", this.handleKeydown);
     window.addEventListener("resize", this.handleResize);
     queueMicrotask(() => void this.initialize());
@@ -64,7 +62,6 @@ export class ComicReaderView extends BaseView {
     document.removeEventListener("keydown", this.handleKeydown);
     window.removeEventListener("resize", this.handleResize);
     document.body.classList.remove("reader-mode");
-    void ReaderDisplay.allowSleep();
     this.processing?.abort(); this.processing = null;
     void this.processor.dispose(); void this.engine.close();
     super.unmount();
