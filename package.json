@@ -35,6 +35,7 @@
     "@lingo-reader/mobi-parser": "^0.4.6",
     "@supabase/supabase-js": "^2.57.0",
     "fflate": "^0.8.3",
+    "html2canvas": "^1.4.1",
     "pdfjs-dist": "^6.3.289",
     "tesseract.js": "^7.0.0"
   },
