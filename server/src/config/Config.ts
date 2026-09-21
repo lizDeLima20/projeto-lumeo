@@ -1,6 +1,8 @@
 import { ApiError } from "../errors/ApiError.js";
 import { catalogSourcesFromEnvironment } from "../catalog/CatalogSourceRegistry.js";
+import { driveCollectionsFromEnvironment } from "../collections/DriveCollectionRegistry.js";
 import type { CatalogSourceConfig } from "../catalog/types.js";
+import type { DriveCollection } from "../collections/types.js";
 
 export interface ServerConfig {
   supabaseUrl: string;
@@ -20,6 +22,8 @@ export interface ServerConfig {
   catalogSources: readonly CatalogSourceConfig[];
   googleCatalogServiceAccountJson: string;
   catalogSyncMaxFileBytes: number;
+  /** Published Drive folders browsed live, folder by folder. */
+  driveCollections: readonly DriveCollection[];
 }
 
 export class Config {
@@ -60,6 +64,7 @@ export class Config {
       // JSON or base64 JSON are accepted only in backend environment variables.
       googleCatalogServiceAccountJson: environment.GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON ?? "",
       catalogSyncMaxFileBytes: Number(environment.CATALOG_SYNC_MAX_FILE_BYTES ?? 104_857_600),
+      driveCollections: driveCollectionsFromEnvironment(environment.DRIVE_COLLECTIONS_JSON),
     };
   }
 

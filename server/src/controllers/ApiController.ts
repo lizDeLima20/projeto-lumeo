@@ -8,6 +8,7 @@ import type { ApiResponse, AuthenticatedRequest } from "../types/http.js";
 import { RequestValidator } from "../validation/RequestValidator.js";
 import { CatalogApplicationService } from "../catalog/CatalogApplicationService.js";
 import type { CatalogSourceAdminService } from "../catalog/CatalogSourceAdminService.js";
+import type { DriveCollectionService } from "../collections/DriveCollectionService.js";
 import type { PersistedGenre, PersistedLibraryBook, PersistedPreferences, UserPersistenceStore } from "../repositories/UserPersistenceRepository.js";
 
 export class ApiController {
@@ -21,6 +22,7 @@ export class ApiController {
     private readonly catalog?: CatalogApplicationService,
     private readonly persistence?: UserPersistenceStore,
     private readonly catalogSources?: CatalogSourceAdminService,
+    private readonly collections?: DriveCollectionService,
   ) {}
 
   public async handle(request: AuthenticatedRequest, response: ApiResponse, path: string): Promise<void> {
@@ -43,6 +45,20 @@ export class ApiController {
       const publicCatalogDownload = path.match(/^\/api\/catalog\/books\/([^/]+)\/download$/);
       if (publicCatalogDownload && request.method === "GET") {
         return this.json(response, 200, await this.requiredCatalog().download(decodeURIComponent(publicCatalogDownload[1]!), this.catalogQuery(request).locale));
+      }
+      if (request.method === "GET" && path === "/api/collections") {
+        if (!this.collections) throw new ApiError(503, "COLLECTIONS_UNAVAILABLE", "As coleções não estão disponíveis.");
+        return this.json(response, 200, { items: this.collections.list() });
+      }
+      // .../folders lists the root; .../folders/<driveFolderId> lists that folder. One
+      // request per screen, and the id in the path is the Drive id, never a name.
+      const folders = /^\/api\/collections\/([a-z0-9-]+)\/folders(?:\/([A-Za-z0-9_-]+))?$/i.exec(path);
+      if (request.method === "GET" && folders) {
+        if (!this.collections) throw new ApiError(503, "COLLECTIONS_UNAVAILABLE", "As coleções não estão disponíveis.");
+        // The path the reader followed, so the server can verify the folder belongs here.
+        const trail = new URL(request.url ?? "/", "http://localhost").searchParams.get("path");
+        return this.json(response, 200, await this.collections.open(folders[1]!, folders[2],
+          trail ? trail.split(",").map(step => step.trim()).filter(Boolean) : undefined));
       }
       await this.authMiddleware.requireAuth(request);
       const user = request.user;

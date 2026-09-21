@@ -1,0 +1,54 @@
+/* Published Drive collections: the strip on Explorar and the folder browser. */
+.catalog__collections { display: flex; flex-wrap: wrap; gap: .6rem; }
+.catalog__collections:empty { display: none; }
+.catalog__collection {
+  display: inline-flex; align-items: center; gap: .55rem;
+  padding: .7rem 1rem; border-radius: 999px; border: 1px solid var(--surface-border, rgba(0, 0, 0, .12));
+  background: var(--surface, #fff); color: inherit; font: inherit; cursor: pointer;
+}
+.catalog__collection:hover { border-color: currentColor; }
+.catalog__collection-name { font-weight: 600; }
+.catalog__collection-go { opacity: .55; }
+
+.collection-browser { display: grid; gap: 1rem; align-content: start; }
+.collection-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; font-size: .9rem; }
+.collection-breadcrumb__step {
+  border: 0; background: none; padding: .15rem .1rem; font: inherit; color: inherit;
+  cursor: pointer; text-decoration: underline; text-underline-offset: .2em; opacity: .75;
+}
+.collection-breadcrumb__step:hover { opacity: 1; }
+.collection-breadcrumb__separator { opacity: .4; }
+.collection-breadcrumb__current { font-weight: 600; }
+.collection-status:empty { display: none; }
+
+.collection-entries { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.collection-entry__open, .collection-entry__file {
+  /* Never `width: 100%` with padding and a border: a grid item already fills its track,
+     and the pair would overflow the row wherever box-sizing is not border-box. */
+  box-sizing: border-box; display: flex; align-items: center; gap: .7rem;
+  padding: .8rem .9rem; border-radius: .8rem; border: 1px solid var(--surface-border, rgba(0, 0, 0, .1));
+  background: var(--surface, #fff); color: inherit; font: inherit; text-align: left;
+}
+.collection-entry__open { cursor: pointer; }
+.collection-entry__open:hover { border-color: currentColor; }
+.collection-entry__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.collection-entry__chevron { opacity: .45; }
+.collection-entry__size { font-size: .8rem; opacity: .6; white-space: nowrap; }
+.collection-entry--file .collection-entry__file { opacity: .82; }
+
+.collection-entry__cover {
+  width: 40px; height: 56px; object-fit: cover; border-radius: .25rem; flex: none;
+  background: rgba(0, 0, 0, .06);
+}
+.collection-entry__badge {
+  font-size: .72rem; letter-spacing: .02em; white-space: nowrap;
+  padding: .2rem .5rem; border-radius: 999px; border: 1px solid currentColor; opacity: .7;
+}
+/* Present and named, just not openable yet. */
+.collection-entry--unsupported .collection-entry__name { opacity: .75; }
+
+.collection-entry__add {
+  appearance: none; border: 1px solid currentColor; background: none; color: inherit; font: inherit;
+  font-size: .8rem; padding: .3rem .7rem; border-radius: 999px; cursor: pointer; white-space: nowrap;
+}
+.collection-entry__add:hover { background: rgba(0, 0, 0, .06); }

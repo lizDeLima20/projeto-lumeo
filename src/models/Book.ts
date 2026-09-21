@@ -34,6 +34,11 @@ export interface BookData {
   /** Which reader opens this item. Absent means a regular book: existing PDFs are never
    *  reinterpreted as comics behind the reader's back. */
   contentType?: BookContentType;
+  /** Drive folder ids from the collection root down to the folder this book came from,
+   *  joined by "/". With catalogBookId ("<sourceId>:<driveFileId>") it is everything
+   *  needed to reopen the book, and to walk back to where it was found, without listing
+   *  the Drive tree again. */
+  collectionPath?: string;
   /** Remote catalogue identity, retained only after the original file is local. */
   catalogBookId?: string;
   source?: BookSource;
@@ -62,6 +67,7 @@ export class Book {
   public documentMode:BookDocumentMode;public textCapability:BookTextCapability;public limaCapability:BookLimaCapability;
   public offlineAvailability:BookOfflineAvailability;
   public readonly contentType:BookContentType;
+  public readonly collectionPath?:string;
   public readonly catalogBookId?:string;
   public readonly source:BookSource;
 
@@ -88,6 +94,7 @@ export class Book {
     this.documentMode=data.documentMode??"unknown";this.textCapability=data.textCapability??"partial";this.limaCapability=data.limaCapability??"limited";
     this.offlineAvailability=data.offlineAvailability??(this.availability==="AVAILABLE"?"AVAILABLE":"ERROR");
     this.contentType=data.contentType??"book";
+    this.collectionPath=data.collectionPath;
     this.catalogBookId=data.catalogBookId;this.source=data.source??"device";
   }
 }

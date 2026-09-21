@@ -1,6 +1,7 @@
 import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
+import type { DriveCollectionService } from "../services/DriveCollectionService";
 import { BaseView } from "./BaseView";
 
 export class CatalogExplorerView extends BaseView {
@@ -12,7 +13,8 @@ export class CatalogExplorerView extends BaseView {
   private status: HTMLElement | null = null;
   /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
   private addCatalogGenre: (id: string, label: string) => void = () => undefined;
-  public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void) { super(); this.catalog = api; }
+  public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void,
+    private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void }) { super(); this.catalog = api; }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog page-shell");
     const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
@@ -35,8 +37,27 @@ export class CatalogExplorerView extends BaseView {
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
     let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
     search.addEventListener("input", reload); more.addEventListener("click", () => void this.load(search.value, selectedGenre, more));
-    section.append(heading, controls, list, status, more); void this.load("", "", more); void this.offerSourceManagement(heading); return section;
+    const collections = this.createElement("div", "catalog__collections");
+    section.append(heading, collections, controls, list, status, more);
+    void this.load("", "", more); void this.offerSourceManagement(heading); void this.offerCollections(collections); return section;
   }
+  /** Published Drive collections sit beside the catalogue without joining it: they are
+   *  browsed live, folder by folder, and never enter the catalogue's genre filters. The
+   *  strip stays empty - and invisible - when no collection is configured or reachable. */
+  private async offerCollections(host: HTMLElement): Promise<void> {
+    if (!this.published) return;
+    const collections = await this.published.collections.list();
+    if (!collections.length) return;
+    collections.forEach((collection) => {
+      const card = this.createElement("button", "catalog__collection"); card.type = "button";
+      card.setAttribute("aria-label", `${this.t("ui.collections.open")}: ${collection.name}`);
+      card.append(this.createElement("span", "catalog__collection-name", collection.name),
+        this.createElement("span", "catalog__collection-go", "›"));
+      card.addEventListener("click", () => this.published!.open(collection.id));
+      host.append(card);
+    });
+  }
+
   /** Administrators reach "Fontes do catálogo" from here; everyone else never sees the link. */
   private async offerSourceManagement(heading: HTMLElement): Promise<void> {
     if (!this.onManageSources) return;

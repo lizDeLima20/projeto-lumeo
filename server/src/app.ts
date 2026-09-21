@@ -26,12 +26,20 @@ import { HybridCatalogSourceProvider } from "./catalog/HybridCatalogSourceProvid
 import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalogProvider.js";
 import { StructuredDriveCatalogProvider } from "./catalog/StructuredDriveCatalogProvider.js";
 import { PublicDriveFolderReader } from "./catalog/PublicDriveFolderReader.js";
+import { DriveCollectionService } from "./collections/DriveCollectionService.js";
+import { DriveFolderBrowser } from "./collections/DriveFolderBrowser.js";
+import { DriveRequestLimiter } from "./collections/DriveRequestLimiter.js";
 import { UserPersistenceRepository } from "./repositories/UserPersistenceRepository.js";
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 
 export const isPublicCatalogRequest = (method: string | undefined, path: string): boolean =>
   method === "GET" && /^\/api\/catalog\/books(?:\/[^/]+(?:\/download)?)?$/.test(path);
+
+/** Published collections are public reading material, exactly like the catalogue: browsing
+ * a folder must never ask the reader to sign in to Lumeo, let alone to Google. */
+export const isPublicCollectionRequest = (method: string | undefined, path: string): boolean =>
+  method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/folders(?:\/[A-Za-z0-9_-]+)?)?$/i.test(path);
 
 export class ServerApp {
   public static create(config: ServerConfig = Config.fromEnvironment()): RequestHandler {
@@ -69,6 +77,8 @@ export class ServerApp {
         new CatalogApplicationService(catalogStore, () => createDrive(), new HybridCatalogSourceProvider((locale) => catalogSources.providers(locale))),
         new UserPersistenceRepository(supabase.admin),
         new CatalogSourceAdminService(sourceStore, configuredSources, catalogSources, (userId) => catalogStore.isAdmin(userId)),
+        // The Drive tree is the navigation: this only ever lists the folder that was asked for.
+        new DriveCollectionService(config.driveCollections, new DriveFolderBrowser((url) => createDrive().request(url), new DriveRequestLimiter())),
       );
       return controller;
     };
@@ -109,7 +119,7 @@ export class ServerApp {
       }
       rateLimiter.assertAllowed(ServerApp.clientKey(request), path);
       const publicPaths = ["/api/auth/signup", "/api/auth/login", "/api/auth/google", "/api/auth/refresh"];
-      const publicCatalog = isPublicCatalogRequest(request.method, path);
+      const publicCatalog = isPublicCatalogRequest(request.method, path) || isPublicCollectionRequest(request.method, path);
       if (!publicPaths.includes(path) && !publicCatalog && !request.headers.authorization?.startsWith("Bearer ")) {
         response.statusCode = 401;
         response.setHeader("Content-Type", "application/json; charset=utf-8");

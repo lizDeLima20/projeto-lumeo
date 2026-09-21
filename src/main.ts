@@ -12,6 +12,7 @@ import "@fontsource-variable/literata";
 import "./styles/reader.css";
 import "./styles/reading-review.css";
 import "./styles/comic.css";
+import "./styles/collections.css";
 import "./styles/catalog.css";
 import "./styles/privacy.css";
 import "./styles/native-launch-splash.css";

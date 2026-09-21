@@ -14,7 +14,7 @@ export class ReadingProgressService {
     const updated = new Book({ id: book.id, title: book.title, author: book.author, genreId: book.genreId, cover: book.cover,
       fileType: book.fileType, fileName: book.fileName, fileSize: book.fileSize, mimeType: book.mimeType, readingStatus,
       createdAt: book.createdAt, updatedAt: new Date(), currentLocation: logicalLocation??String(currentPage), progressPercent, collectionId: book.collectionId,
-      conversionStatus:book.conversionStatus,availability:book.availability,volume:book.volume,summary:book.summary,description:book.description,publicationYear:book.publicationYear,series:book.series,documentMode:book.documentMode,textCapability:book.textCapability,limaCapability:book.limaCapability,offlineAvailability:book.offlineAvailability,contentType:book.contentType,catalogBookId:book.catalogBookId,source:book.source });
+      conversionStatus:book.conversionStatus,availability:book.availability,volume:book.volume,summary:book.summary,description:book.description,publicationYear:book.publicationYear,series:book.series,documentMode:book.documentMode,textCapability:book.textCapability,limaCapability:book.limaCapability,offlineAvailability:book.offlineAvailability,contentType:book.contentType,collectionPath:book.collectionPath,catalogBookId:book.catalogBookId,source:book.source });
     await Promise.all([this.progress.save({ bookId: book.id, currentPage, totalPages, currentLocation: logicalLocation??String(currentPage), progressPercent, updatedAt: new Date().toISOString() }), this.books.save(updated)]);
     return updated;
   }

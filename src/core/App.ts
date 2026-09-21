@@ -76,6 +76,10 @@ import { AppState } from "./AppState";
 import { Router, type RouteName } from "./Router";
 import { ComicReaderView } from "../views/ComicReaderView";
 import { ComicContentTypeResolver } from "../reader/comic/ComicContentType";
+import { CollectionBrowserView } from "../views/CollectionBrowserView";
+import { DriveCollectionService } from "../services/DriveCollectionService";
+import { CollectionImportService } from "../services/CollectionImportService";
+import type { DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 
 export class App {
   private readonly state = new AppState();
@@ -100,6 +104,7 @@ export class App {
   private readonly api = new ApiClient(new EnvironmentConfig().read().bffBaseUrl);
   private readonly accountPersistence = new AccountPersistenceService(this.api);
   private readonly catalog = new CatalogService(this.api);
+  private readonly driveCollections = new DriveCollectionService(this.api);
   private readonly catalogDownloads = new HybridCatalogDownloadService();
   private readonly auth = new AuthManager(this.api, this.storage, this.state);
   private readonly devices = new DeviceManager(this.api, this.storage, this.state);
@@ -163,7 +168,10 @@ export class App {
     this.router.register("audiobooks", () => new AudiobooksView(() => this.router.navigate("home")));
     this.router.register("library", () => new LibraryView(this.state,
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.openLibraryBook(bookId), (bookId) => void this.deleteBook(bookId, false)));
-    this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }), () => this.router.navigate("catalog-admin")));
+    this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }), () => this.router.navigate("catalog-admin"),
+      { collections: this.driveCollections, open: (id) => this.router.navigate("collection", { id }) }));
+    /* A published Drive folder browsed live. The folder id travels in the URL, so a
+     * breadcrumb step and the browser's own Back button land on the same screen. */
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
       () => this.router.navigate("explore"), (bookId) => this.openLibraryBook(bookId),
       (book, link) => this.prepareCatalogDownload(book, link),
@@ -193,6 +201,13 @@ export class App {
         this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database,
         this.userName(), this.state.currentUser?.id, this.state.books);
     });
+    this.router.register("collection", (params) => new CollectionBrowserView(this.driveCollections,
+      params.get("id") ?? "", params.get("folder") ?? undefined,
+      (collectionId, folderId) => this.router.navigate("collection", { id: collectionId, folder: folderId,
+        path: [...(params.get("path")?.split(",").filter(Boolean) ?? [params.get("folder")].filter((value): value is string => Boolean(value))), folderId].join(",") }),
+      () => this.router.navigate("explore"),
+      params.get("path")?.split(",").filter(Boolean),
+      (entry, listing) => void this.addCollectionBook(params.get("id") ?? "", entry, listing)));
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
         open: source => this.router.navigate("import", { source }) } : undefined, this.pwaInstall));
@@ -409,6 +424,25 @@ export class App {
   }
   private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await this.localFileStore().save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
 
+  /** A comic chosen in a published collection becomes an ordinary library book: the same
+   *  download service, the same ImportManager, the same shelf. It only arrives carrying
+   *  contentType "comic", so it opens in the ComicReader. */
+  private async addCollectionBook(collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing): Promise<void> {
+    const service = new CollectionImportService(this.catalogDownloads, this.imports, this.covers);
+    const genre = this.state.genres[0];
+    if (!genre) { this.showToast("Crie um gênero antes de adicionar uma HQ."); return; }
+    try {
+      const result = await service.add({ collectionId, entry, listing, genreId: genre.id });
+      if (result.kind === "browser-download") { this.showToast(`Baixe "${result.expectedFilename}" e importe pelo botão Adicionar livro.`); return; }
+      this.state.library.addBook(result.book); this.state.notify();
+      void this.persistRemoteBook(result.book).catch(() => undefined);
+      this.showToast("HQ adicionada à biblioteca.");
+      this.router.navigate("book", { id: result.book.id });
+    } catch (error) {
+      this.showToast(error instanceof Error ? error.message : "Não foi possível adicionar esta HQ.");
+    }
+  }
+
   private findBook(id: string | null): Book | null { return id ? this.state.library.findBookById(id) ?? null : null; }
 
   private openLibraryBook(id: string): void {
@@ -515,7 +549,7 @@ export class App {
     if (!local) return remote;
     return new Book({ ...remote, id: local.id, cover: local.cover || remote.cover, availability: local.availability, offlineAvailability: local.offlineAvailability,
       conversionStatus: local.conversionStatus, documentMode: local.documentMode, textCapability: local.textCapability, limaCapability: local.limaCapability,
-      contentType: local.contentType });
+      contentType: local.contentType, collectionPath: local.collectionPath });
   }
   private remoteReview(item: RemoteLibraryBook, userId: string, localBookId: string) {
     const value = item.metadata.review; if (!value || typeof value !== "object" || Array.isArray(value)) return null;

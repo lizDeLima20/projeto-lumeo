@@ -2,7 +2,7 @@ import type { ImportedFile } from "../importers/BookImporter";
 import { LocalFileImporter } from "../importers/LocalFileImporter";
 import type { GoogleDriveImporter } from "../importers/GoogleDriveImporter";
 import type { UrlImporter } from "../importers/UrlImporter";
-import { Book, type ReadingStatus, type BookDocumentMode, type BookTextCapability, type BookLimaCapability } from "../models/Book";
+import { Book, type ReadingStatus, type BookDocumentMode, type BookTextCapability, type BookLimaCapability, type BookContentType } from "../models/Book";
 import { BookRepository } from "../repositories/BookRepository";
 import { LimaDocumentRepository } from "../repositories/LimaDocumentRepository";
 import { LimaConversionManager } from "../lima/LimaConversionManager";
@@ -16,7 +16,7 @@ import { BookDownloadError, StartTelemetry } from "../diagnostics/StartTelemetry
 
 interface BookFileStorage { save(bookId:string,file:Blob):Promise<unknown>; delete(bookId:string):Promise<unknown>; get?(bookId:string):Promise<Blob|null>; saveLima?(bookId:string,file:Blob):Promise<unknown>; }
 
-export interface ImportMetadata { title: string; author: string; genreId: string; collectionId?: string; readingStatus: ReadingStatus; cover: string; volume?: string; series?: string; description?: string; publicationYear?: number; documentMode?: BookDocumentMode; textCapability?: BookTextCapability; limaCapability?: BookLimaCapability; }
+export interface ImportMetadata { title: string; author: string; genreId: string; contentType?: BookContentType; collectionPath?: string; collectionId?: string; readingStatus: ReadingStatus; cover: string; volume?: string; series?: string; description?: string; publicationYear?: number; documentMode?: BookDocumentMode; textCapability?: BookTextCapability; limaCapability?: BookLimaCapability; }
 export interface SaveImportOptions { allowPossibleVersion?: boolean; replaceBookId?: string; bookId?: string; signal?: AbortSignal; journal?: OperationRecoveryJournal; operationId?: string; catalogBookId?: string; }
 export class DuplicateBookImportError extends Error { public constructor(public readonly decision: Extract<DuplicateDecision,{kind:"duplicate"}>) { super("Este livro já está na sua biblioteca."); } }
 export class BookVersionConflictError extends Error { public constructor(public readonly decision: Extract<DuplicateDecision,{kind:"possible-version"}>) { super("Já existe outra versão deste livro na biblioteca."); } }
