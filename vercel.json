@@ -24,6 +24,13 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/collections/:collectionId/folders/:folderId",
+      "has": [
+        { "type": "query", "key": "path", "value": "(?<collectionPath>.*)" }
+      ],
+      "destination": "/api/index?__lumeo_route=collections/:collectionId/folders/:folderId&path=:collectionPath"
+    },
     { "source": "/api/:path*", "destination": "/api/index?__lumeo_route=:path*" },
     { "source": "/((?!api/.*|assets/.*|icons/.*|ocr/.*|screenshots/.*|sw.js|manifest.json|onedrive-auth.html).*)", "destination": "/index.html" }
   ]
