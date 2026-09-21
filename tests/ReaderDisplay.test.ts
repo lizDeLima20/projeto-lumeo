@@ -67,7 +67,7 @@ describe("Leitura no Android como e-reader", () => {
       assert.notEqual(paper, "#ffffff"); assert.notEqual(paper, "#000000"); assert.notEqual(ink, "#000000"); assert.notEqual(ink, "#ffffff");
     }
     assert.equal(/data-native="android"\]\[data-paper=/.test(css), false, "os quatro temas não são mais duplicados só para o Android");
-    assert.match(css, /--reader-paper-lit:var\(--reader-paper,#f6f1e7\)/, "o fundo da página segue o tema escolhido em qualquer plataforma");
+    assert.match(css, /--reader-paper-lit:var\(--reader-paper,#f5f3eb\)/, "o fundo da página segue o tema escolhido em qualquer plataforma");
     assert.match(css, /\.reader\[data-font="book"\]\{--reflow-font:"Literata Variable"/);
     assert.match(css, /\.reader\[data-native="android"\] \.reflow-sheet\{padding-left:calc\(max\(var\(--reflow-margin,28px\),\(100% - 34em\)\/2\)/);
     assert.equal(/data-native="android"[^{]*reader-cover-page/.test(css), false, "a capa segue com as próprias cores");

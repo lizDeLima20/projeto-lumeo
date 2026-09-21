@@ -22,7 +22,7 @@ describe("abertura sem quadrado branco", () => {
 describe("papel, não tela acesa", () => {
   it("o fundo da página segue o tema em toda plataforma, com o mesmo mecanismo", () => {
     const rules = css();
-    assert.match(rules, /--reader-paper-lit:var\(--reader-paper,#f6f1e7\)/, "a variável de fundo lê o tema escolhido, não um branco fixo");
+    assert.match(rules, /--reader-paper-lit:var\(--reader-paper,#f5f3eb\)/, "a variável de fundo lê o tema escolhido, não um branco fixo");
     assert.equal(/reader-stage[^{}]*filter|\.reader-stage\s*\{[^}]*filter/s.test(rules), false, "nenhum filtro de brilho no palco - não é uma correção anterior a desfazer");
   });
   it("luz ambiente de cima para baixo na folha, não um brilho saindo dela", () => {
@@ -34,10 +34,10 @@ describe("papel, não tela acesa", () => {
   });
   it("Papel, Claro, Sépia, Escuro cobrem branco puro, cinza-quente, sépia e escuro-suave, sem duplicar por plataforma", () => {
     const rules = css();
-    assert.match(rules, /\.reader\[data-paper="paper"\]\{--reader-paper:#f6f1e7;--reader-ink:#2b2823;\}/);
-    assert.match(rules, /\.reader\[data-paper="pure-white"\]\{--reader-paper:#fbfbf9;--reader-ink:#1e1e1c;\}/);
-    assert.match(rules, /\.reader\[data-paper="sepia"\]\{--reader-paper:#f1e3c8;--reader-ink:#3b2e20;\}/);
-    assert.match(rules, /\.reader\[data-paper="dark"\]\{--reader-paper:#1c1b19;--reader-ink:#d3cbbd;\}/);
+    assert.match(rules, /\.reader\[data-paper="paper"\]\{--reader-paper:#f5f3eb;--reader-ink:#292824;\}/);
+    assert.match(rules, /\.reader\[data-paper="pure-white"\]\{--reader-paper:#fafaf7;--reader-ink:#252522;\}/);
+    assert.match(rules, /\.reader\[data-paper="sepia"\]\{--reader-paper:#f0e5cf;--reader-ink:#3b3024;\}/);
+    assert.match(rules, /\.reader\[data-paper="dark"\]\{--reader-paper:#1d1c1a;--reader-ink:#d7d0c1;\}/);
     assert.equal(rules.includes('[data-native="android"][data-paper="paper"]'), false, "sem cópia dedicada ao Android");
   });
   it("o painel Web/Desktop e o painel Android compartilham a mesma lista de temas", () => {
