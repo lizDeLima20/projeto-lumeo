@@ -149,6 +149,12 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
    never on per-strip rectangles, so Android WebView cannot reveal seams between slices. */
 .page-turn-active::before{display:none}
 .page-turn-active::after{position:absolute;inset:0;z-index:29;background-image:linear-gradient(270deg,rgba(22,15,8,0) 46%,rgba(22,15,8,var(--verso-shade,.2)) 100%),linear-gradient(270deg,#fff,#fff 34%,#e7e3dc);content:"";opacity:var(--verso-opacity,0);pointer-events:none}
+/* The revealed reflow page receives the contact shadow from the moving leaf.  It is
+   one gradient on the stationary page (not a texture strip on the leaf), therefore it
+   cannot produce seams in Chrome or the Android WebView. */
+.reflow-sheet{--under-shadow:0}
+.reflow-sheet.page-turn-under-active::before{position:absolute;inset:0;z-index:2;display:block;background:linear-gradient(90deg,rgba(31,21,12,var(--under-shadow)),rgba(31,21,12,calc(var(--under-shadow) * .38)) 5%,transparent 18%);content:"";pointer-events:none}
+.reflow-sheet--before.page-turn-under-active::before{background:linear-gradient(270deg,rgba(31,21,12,var(--under-shadow)),rgba(31,21,12,calc(var(--under-shadow) * .38)) 5%,transparent 18%)}
 /* The back of the leaf, carrying the real next page. It is mirrored in the leaf's own
    plane so the type reads correctly once the leaf has come past 90deg, where it is
    seen from behind. Hidden until then; the leaf is edge-on at the crossover, so the
@@ -372,6 +378,9 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .reader[data-native="android"][data-reading-optics="adaptive"]{--reader-optics-paper:color-mix(in srgb,var(--reader-paper-lit) var(--reader-optics-paper-weight,100%),#29251d);--reader-optics-ink:color-mix(in srgb,var(--reader-custom-ink,var(--reader-ink)) var(--reader-optics-ink-weight,100%),#13110d)}
 .reader[data-native="android"][data-reading-optics="adaptive"] :is(.reader-stage--reflow,.reflow-pages,.reflow-sheet:not(.reflow-sheet--cover)){background-color:var(--reader-optics-paper)!important}
 .reader[data-native="android"][data-reading-optics="adaptive"] .reflow-sheet:not(.reflow-sheet--cover){color:var(--reader-optics-ink)!important}
+.reader[data-native="android"][data-reading-optics="adaptive"] .reflow-sheet.page-turn-flexible-ready{background-color:transparent!important}
+.page-turn-flexible-ready{transform-style:flat!important}
+.page-turn-flexible{filter:drop-shadow(5px 3px 7px rgba(35,25,15,.22))}
 /* paper/pure-white/sepia/dark are defined once, above, for every platform. */
 .reader[data-paper="dark"] .reflow-sheet__number{color:#8f887c}
 /* A comfortable column: the chosen margin on phones, and at most ~34em of text on wider screens

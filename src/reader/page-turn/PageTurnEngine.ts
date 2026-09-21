@@ -1,4 +1,4 @@
-import{PageGeometry,type PageTransform}from"./PageGeometry";import{PageGestureController}from"./PageGestureController";import{PageShadowRenderer}from"./PageShadowRenderer";import{PageCurl}from"./PageCurl";
+import{PageGeometry,type PageTransform}from"./PageGeometry";import{PageGestureController}from"./PageGestureController";import{PageShadowRenderer}from"./PageShadowRenderer";import{PageCurl}from"./PageCurl";import{FlexiblePageCurl}from"./FlexiblePageCurl";
 export type PageTurnState="IDLE"|"DRAGGING"|"COMPLETING"|"RETURNING"|"DISABLED";export type TurnDirection=1|-1;
 
 /** Cubic-bezier sampled by hand: the settle now drives `progress` frame by frame so
@@ -20,29 +20,54 @@ export class PageTurnEngine {
    *  .55px/ms was faster than most thumbs swipe. */
   public static readonly flickVelocity=.3;
   private stateValue:PageTurnState="IDLE";private readonly gesture=new PageGestureController();
-  private frame=0;private pending:PageTransform|null=null;private velocity=0;private direction:TurnDirection=1;
-  public constructor(private readonly page:HTMLElement,private readonly under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.3,private readonly curl=new PageCurl()){}
+  private frame=0;private pending:PageTransform|null=null;private velocity=0;private direction:TurnDirection=1;private pointerY=0;
+  /* Covers stay with the approved rigid renderer. Internal leaves use only the
+     continuous WebGL mesh: the legacy DOM curl is deliberately not mounted for them. */
+  private readonly flexible=new FlexiblePageCurl();
+  private gestureBounds:DOMRect|null=null;
+  public constructor(private readonly page:HTMLElement,private under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.3,private readonly coverCurl=new PageCurl()){
+    if(typeof requestAnimationFrame==="function")requestAnimationFrame(()=>{if(page.isConnected&&!this.isCover())this.flexible.prepare(page);});
+  }
 
   public get state():PageTurnState{return this.stateValue;}
-  public begin(x:number,time=performance.now(),direction:TurnDirection=this.direction):boolean{
+  /** Starts the snapshot before the drag becomes horizontal. It never hides content. */
+  public prepare(x:number,y:number):void{
+    if(this.isCover())return;
+    this.gestureBounds=this.page.getBoundingClientRect();
+    this.pointerY=y-this.bounds().top;
+    this.flexible.prepare(this.page);
+    this.flexible.setPointer(x-this.bounds().left,this.pointerY,0);
+  }
+  public begin(x:number,time=performance.now(),direction:TurnDirection=this.direction,y=this.page.clientHeight/2):boolean{
     if(this.stateValue!=="IDLE")return false;
-    this.stateValue="DRAGGING";this.direction=direction;this.gesture.start(x,time);
+    this.stateValue="DRAGGING";this.direction=direction;this.gesture.start(x,time);this.pointerY=y-this.bounds().top;
+    if(this.page.classList.contains?.("reflow-sheet"))this.under=(direction===1?this.page.nextElementSibling:this.page.previousElementSibling) as HTMLElement|null;
     this.page.classList.add("page-turn-active",direction===1?"page-turn--next":"page-turn--previous");this.page.style.willChange="transform";
     /* The page below is part of the scene before the first visual frame.  This is
        * deliberately done in begin(), not when the gesture finishes. */
     this.under?.classList.add("page-turn-under-active");
-    this.curl.mount(this.page);
+    if(this.isCover())this.coverCurl.mount(this.page);
+    else {
+      /* On a single-sheet reader the physical back differs by direction: moving
+         forward reveals the prepared next-page verso; moving back carries the
+         previous sheet, already rendered below. A desktop leaf owns its own verso. */
+      const mobilePrevious=this.page.classList.contains?.("reflow-sheet")===true&&direction===-1?this.under:null;
+      this.flexible.mount(this.page,direction,mobilePrevious);
+      this.flexible.setPointer(x-this.bounds().left,this.pointerY,0);
+    }
     return true;
   }
-  public move(x:number,time=performance.now()):number{
+  public move(x:number,time=performance.now(),y=this.pointerY+this.bounds().top):number{
     if(this.stateValue!=="DRAGGING")return 0;
-    const sample=this.gesture.update(x,time);this.direction=sample.direction;this.velocity=sample.velocityX;
+    const sample=this.gesture.update(x,time);this.direction=sample.direction;this.velocity=sample.velocityX;this.pointerY=y-this.bounds().top;
+    if(!this.isCover())this.flexible.setPointer(x-this.bounds().left,this.pointerY,sample.velocityX);
     this.pending=this.geometry.calculate(sample.deltaX,this.page.clientWidth,this.direction);
     this.schedule();return this.pending.progress;
   }
-  public async end(x:number,time=performance.now()):Promise<boolean>{
+  public async end(x:number,time=performance.now(),y=this.pointerY+this.bounds().top):Promise<boolean>{
     if(this.stateValue!=="DRAGGING")return false;
-    const sample=this.gesture.finish(x,time);this.direction=sample.direction;this.velocity=sample.velocityX;
+    const sample=this.gesture.finish(x,time);this.direction=sample.direction;this.velocity=sample.velocityX;this.pointerY=y-this.bounds().top;
+    if(!this.isCover())this.flexible.setPointer(x-this.bounds().left,this.pointerY,sample.velocityX);
     const transform=this.geometry.calculate(sample.deltaX,this.page.clientWidth,this.direction);
     this.apply(transform);
     const complete=this.shouldComplete(transform.progress,this.velocity,this.direction);
@@ -72,8 +97,14 @@ export class PageTurnEngine {
   private apply(value:PageTransform):void{
     this.page.classList.toggle("page-turn--next",this.direction===1);
     this.page.classList.toggle("page-turn--previous",this.direction===-1);
-    if(this.curl.mounted)this.curl.apply(value.progress,PageGeometry.landingAngle,this.direction);
-    else{this.page.style.transformOrigin=value.origin;this.page.style.transform=`translateX(${value.translateX}px) translateZ(${value.translateZ}px) rotateY(${value.angle}deg)`;}
+    if(this.page.classList.contains?.("reflow-sheet")){
+      const under=(this.direction===1?this.page.nextElementSibling:this.page.previousElementSibling) as HTMLElement|null;
+      if(under!==this.under){this.under?.classList.remove("page-turn-under-active");this.under=under;this.under?.classList.add("page-turn-under-active");}
+    }
+    if(this.isCover()){
+      if(this.coverCurl.mounted)this.coverCurl.apply(value.progress,PageGeometry.landingAngle,this.direction);
+      else{this.page.style.transformOrigin=value.origin;this.page.style.transform=`translateX(${value.translateX}px) translateZ(${value.translateZ}px) rotateY(${value.angle}deg)`;}
+    }else this.flexible.apply(value.progress,PageGeometry.landingAngle,this.direction);
     this.shadows.render(this.page,this.under,value);
   }
   /** Swings the leaf to its landing angle (or back to the gutter) and STOPS there.
@@ -103,9 +134,13 @@ export class PageTurnEngine {
     });
   }
   private reset():void{
-    this.curl.unmount();
+    cancelAnimationFrame(this.frame);this.frame=0;this.pending=null;this.gestureBounds=null;
+    this.flexible.unmount();
+    this.coverCurl.unmount();
     this.page.style.transform="";this.page.style.transformOrigin="";this.page.style.willChange="";
     this.page.classList.remove("page-turn-active","page-turn--next","page-turn--previous");
     this.shadows.clear(this.page,this.under);this.under?.classList.remove("page-turn-under-active");this.stateValue="IDLE";
   }
+  private isCover():boolean{return this.page.classList.contains?.("reflow-sheet--cover")===true||this.page.classList.contains?.("open-book-page--cover")===true;}
+  private bounds():DOMRect{return this.gestureBounds??this.page.getBoundingClientRect?.()??({left:0,top:0,width:this.page.clientWidth,height:this.page.clientHeight} as DOMRect);}
 }
