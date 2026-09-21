@@ -3,6 +3,8 @@ import { Capacitor, registerPlugin, type Plugin } from "@capacitor/core";
 interface ReaderDisplayPlugin extends Plugin {
   setReaderBrightness(options: { value: number }): Promise<{ readerBrightness: number | null }>;
   restoreSystemBrightness(): Promise<{ readerBrightness: null }>;
+  keepScreenOn(): Promise<void>;
+  clearKeepScreenOn(): Promise<void>;
 }
 
 const NativeReaderDisplay = registerPlugin<ReaderDisplayPlugin>("ReaderDisplay");
@@ -34,6 +36,17 @@ export class ReaderDisplay {
   public static async restore(): Promise<void> {
     if (!ReaderDisplay.available) return;
     try { await NativeReaderDisplay.restoreSystemBrightness(); } catch { /* nothing to restore */ }
+  }
+
+  /** Keeps only the active Lumeo Reader window awake; the phone timeout remains unchanged. */
+  public static async keepAwake(): Promise<void> {
+    if (!ReaderDisplay.available) return;
+    try { await NativeReaderDisplay.keepScreenOn(); } catch { /* reading remains usable with the system timeout */ }
+  }
+
+  public static async allowSleep(): Promise<void> {
+    if (!ReaderDisplay.available) return;
+    try { await NativeReaderDisplay.clearKeepScreenOn(); } catch { /* Activity destruction also clears the window flag */ }
   }
 
   /** Percent of the slider to the window level Android expects (0..1). */
