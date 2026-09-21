@@ -367,6 +367,11 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
    Android additionally carries that same paper into the loading/chrome background and the
    ink colour, since it has no separate "app theme" distinct from the reading theme. */
 .reader[data-native="android"]{--reader-bg:var(--reader-paper-lit);--reader-custom-ink:var(--reader-ink)}
+/* Android's native light-sensor profile adjusts only the printed paper and ink colours.
+   Images, PDF canvases, covers and comic pages deliberately receive no global filter. */
+.reader[data-native="android"][data-reading-optics="adaptive"]{--reader-optics-paper:color-mix(in srgb,var(--reader-paper-lit) var(--reader-optics-paper-weight,100%),#29251d);--reader-optics-ink:color-mix(in srgb,var(--reader-custom-ink,var(--reader-ink)) var(--reader-optics-ink-weight,100%),#13110d)}
+.reader[data-native="android"][data-reading-optics="adaptive"] :is(.reader-stage--reflow,.reflow-pages,.reflow-sheet:not(.reflow-sheet--cover)){background-color:var(--reader-optics-paper)!important}
+.reader[data-native="android"][data-reading-optics="adaptive"] .reflow-sheet:not(.reflow-sheet--cover){color:var(--reader-optics-ink)!important}
 /* paper/pure-white/sepia/dark are defined once, above, for every platform. */
 .reader[data-paper="dark"] .reflow-sheet__number{color:#8f887c}
 /* A comfortable column: the chosen margin on phones, and at most ~34em of text on wider screens

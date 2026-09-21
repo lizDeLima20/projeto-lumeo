@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(android.os.Bundle savedInstanceState) {
         registerPlugin(NativeBookDownloadPlugin.class);
         registerPlugin(ReaderDisplayPlugin.class);
+        registerPlugin(ReadingOpticsPlugin.class);
         registerPlugin(ReadingReminderPlugin.class);
         super.onCreate(savedInstanceState);
         Log.i("Lumeo", "android.launch package=com.lumeo.reader callback=com.lumeo.reader://auth/callback");

@@ -44,7 +44,7 @@ import{I18nManager}from"../i18n/I18nManager";import{ReaderInteractionController}
 import{ReaderChromeController}from"../reader/premium/ReaderChromeController";import{FocusReadingMode}from"../reader/premium/FocusReadingMode";import{ReaderProgressModel}from"../reader/premium/ReaderProgressModel";import{ReaderProgressBar}from"./ReaderProgressBar";import{ReaderCoverPageView}from"./ReaderCoverPageView";
 import{ImagePageTurnAnimator,type ImageTurnDirection}from"../reader/image/ImagePageTurnAnimator";
 import{DesktopReaderStateMachine}from"../reader/desktop/DesktopReaderStateMachine";
-import{ReaderPomodoroView}from"./ReaderPomodoroView";import{ReaderDisplay}from"../services/ReaderDisplay";import{ReadingDayTracker}from"../reader/pomodoro/ReadingDayTracker";import{PomodoroSettingsController}from"../reader/settings/PomodoroSettingsController";import{StorageService}from"../services/StorageService";import{FirstReadGreeting}from"../reader/premium/FirstReadGreeting";
+import{ReaderPomodoroView}from"./ReaderPomodoroView";import{ReaderDisplay}from"../services/ReaderDisplay";import{AndroidReadingOptics,type ReadingOpticsProfile}from"../services/AndroidReadingOptics";import{ReadingDayTracker}from"../reader/pomodoro/ReadingDayTracker";import{PomodoroSettingsController}from"../reader/settings/PomodoroSettingsController";import{StorageService}from"../services/StorageService";import{FirstReadGreeting}from"../reader/premium/FirstReadGreeting";
 import { ReadingReviewRepository } from "../repositories/ReadingReviewRepository";
 import { ReadingReviewDialog } from "./ReadingReviewDialog";
 
@@ -102,7 +102,7 @@ export class ReaderView extends BaseView {
   public override unmount(): void {
     window.clearTimeout(this.controlsTimer); window.clearTimeout(this.resizeTimer);
     document.removeEventListener("keydown", this.handleKeydown); window.removeEventListener("resize", this.handleResize);
-    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();this.pomodoro?.destroy();this.pomodoro=null;void ReaderDisplay.restore();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();this.desktopView?.destroy();void this.reflow?.close();void this.manager.close(); super.unmount();
+    this.stopLocaleWatch();this.stopLocaleWatch=()=>undefined;this.chrome?.destroy();this.pomodoro?.destroy();this.pomodoro=null;void AndroidReadingOptics.stop();void ReaderDisplay.restore();document.body.classList.remove("reader-mode");this.notebookView?.destroy();this.chapterStudyView?.destroy();this.turnController?.unbind();this.desktopView?.destroy();void this.reflow?.close();void this.manager.close(); super.unmount();
   }
 
   private async initialize(): Promise<void> {
@@ -395,9 +395,17 @@ export class ReaderView extends BaseView {
     if (!this.element || !this.stage) return; this.element.dataset.readerTheme = this.manager.settings.settings.theme;
     const preferences=this.manager.settings.preferencesService.preferences;this.element.dataset.readingMode=preferences.readingMode;this.element.dataset.paper=preferences.paperTheme;
     // Android reads as an e-reader: the window's own brightness replaces dimming the paper.
-    const android=ReaderDisplay.available;if(android){this.element.dataset.native="android";void ReaderDisplay.apply(preferences.screenBrightness);}
+    const android=ReaderDisplay.available;if(android){this.element.dataset.native="android";void ReaderDisplay.apply(preferences.screenBrightness);void AndroidReadingOptics.start(profile=>this.applyAndroidOptics(profile));}
     const paperLightness=android?100:Math.round(45+this.manager.settings.settings.brightness*.55);
     this.element.style.setProperty("--reader-lightness",`${paperLightness}%`);
+  }
+  /** Only Android book pages consume this profile. It adjusts paper/ink variables, never text,
+   * pagination, images, gestures or the page-turn engine. */
+  private applyAndroidOptics(profile: ReadingOpticsProfile): void {
+    if (!this.element) return;
+    this.element.dataset.readingOptics = profile.sensorAvailable ? "adaptive" : "fallback";
+    this.element.style.setProperty("--reader-optics-paper-weight", `${profile.paperWeight}%`);
+    this.element.style.setProperty("--reader-optics-ink-weight", `${profile.inkWeight}%`);
   }
 
   private showPageDialog(): void {
