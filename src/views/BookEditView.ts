@@ -1,5 +1,5 @@
 import type { AppState } from "../core/AppState";
-import { Book, type ReadingStatus } from "../models/Book";
+import { Book, type BookContentType, type ReadingStatus } from "../models/Book";
 import { Genre } from "../models/Genre";
 import { GenreRepository } from "../repositories/GenreRepository";
 import { CoverService } from "../services/CoverService";
@@ -20,12 +20,18 @@ export class BookEditView extends BaseView {
     create.addEventListener("click", () => void this.createGenre(newGenre, genre)); newGenreRow.append(newGenre, create);
     const status = this.createElement("select", "input") as HTMLSelectElement; status.append(new Option(this.t("ui.book.unread"), "unread"), new Option(this.t("ui.book.reading"), "reading"), new Option(this.t("ui.book.finished"), "finished")); status.value = this.book.readingStatus;
     const statusLabel = this.createElement("label", "field"); statusLabel.append(this.createElement("span", "field__label", this.t("ui.book.status")), status);
+    const contentType = this.createElement("select", "input") as HTMLSelectElement;
+    contentType.append(new Option(this.t("ui.edit.contentType.book"), "book"), new Option(this.t("ui.edit.contentType.comic"), "comic"));
+    contentType.value = this.book.contentType; contentType.disabled = this.book.fileType !== "pdf";
+    const contentTypeLabel = this.createElement("label", "field");
+    contentTypeLabel.append(this.createElement("span", "field__label", this.t("ui.edit.contentType")), contentType,
+      this.createElement("span", "field__hint", this.t("ui.edit.contentType.help")));
     const coverLabel = this.createElement("label", "field"); coverLabel.append(this.createElement("span", "field__label", this.t("ui.edit.changeCover")));
     const cover = this.createElement("input", "input") as HTMLInputElement; cover.type = "file"; cover.accept = "image/*"; coverLabel.append(cover);
     const error = this.createElement("p", "form-error"); const actions = this.createElement("div", "form-actions");
     const save = this.createElement("button", "button button--primary", this.t("ui.edit.saveChanges")); save.type = "submit";
     const cancel = this.createElement("button", "button button--secondary", this.t("ui.common.cancel")); cancel.type = "button"; cancel.addEventListener("click", this.onCancel); actions.append(save, cancel);
-    form.append(title.wrapper, author.wrapper, genreLabel, newGenreRow, statusLabel, coverLabel, error, actions);
+    form.append(title.wrapper, author.wrapper, genreLabel, newGenreRow, statusLabel, contentTypeLabel, coverLabel, error, actions);
     form.addEventListener("submit", async (event) => {
       event.preventDefault(); save.disabled = true;
       try {
@@ -35,7 +41,7 @@ export class BookEditView extends BaseView {
           cover: chosenCover, fileType: this.book.fileType, fileName: this.book.fileName, fileSize: this.book.fileSize,
           mimeType: this.book.mimeType, readingStatus: status.value as ReadingStatus, createdAt: this.book.createdAt,
           updatedAt: new Date(), currentLocation: this.book.currentLocation, progressPercent: this.book.progressPercent, collectionId: this.book.collectionId,
-          conversionStatus:this.book.conversionStatus,availability:this.book.availability,volume:this.book.volume,summary:this.book.summary,description:this.book.description,publicationYear:this.book.publicationYear,series:this.book.series,documentMode:this.book.documentMode,textCapability:this.book.textCapability,limaCapability:this.book.limaCapability,offlineAvailability:this.book.offlineAvailability,catalogBookId:this.book.catalogBookId,source:this.book.source }));
+          conversionStatus:this.book.conversionStatus,availability:this.book.availability,volume:this.book.volume,summary:this.book.summary,description:this.book.description,publicationYear:this.book.publicationYear,series:this.book.series,documentMode:this.book.documentMode,textCapability:this.book.textCapability,limaCapability:this.book.limaCapability,offlineAvailability:this.book.offlineAvailability,contentType:contentType.value as BookContentType,catalogBookId:this.book.catalogBookId,source:this.book.source }));
       } catch (caught) { error.textContent = caught instanceof Error ? caught.message : this.t("ui.edit.saveFailed"); }
       finally { save.disabled = false; }
     }); section.append(form); return section;

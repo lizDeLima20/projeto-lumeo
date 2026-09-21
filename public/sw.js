@@ -4,7 +4,11 @@ const ASSET_CACHE = `lumeo-assets-${SW_VERSION}`;
 const RUNTIME_CACHE = `lumeo-runtime-${SW_VERSION}`;
 const LOOKUP_CACHE = `lumeo-lookup-${SW_VERSION}`;
 const CATALOG_COVER_CACHE = `lumeo-catalog-covers-${SW_VERSION}`;
-const LUMEO_CACHES = [SHELL_CACHE, ASSET_CACHE, RUNTIME_CACHE, LOOKUP_CACHE, CATALOG_COVER_CACHE];
+// The local OCR runtime (comic reader). Kept in its own cache: it is large, it is only
+// fetched by the first comic page that needs it, and it must survive alongside the shell
+// so a scanned comic still opens offline.
+const OCR_CACHE = `lumeo-ocr-${SW_VERSION}`;
+const LUMEO_CACHES = [SHELL_CACHE, ASSET_CACHE, RUNTIME_CACHE, LOOKUP_CACHE, CATALOG_COVER_CACHE, OCR_CACHE];
 // Only what the shell needs to boot offline. The 890 KB source logo used to be precached
 // here on every install; the sized icons below are a few KB each.
 const APP_SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/favicon-48.png"];
@@ -43,6 +47,13 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate" || request.headers.get("accept")?.includes("text/html")) {
     event.respondWith(networkFirst(request, SHELL_CACHE, "/index.html"));
+    return;
+  }
+
+  // Before the generic asset rule: the OCR core is .wasm/.gz too, which ASSET_PATTERN
+  // does not match, and these belong together rather than in the shell's asset cache.
+  if (url.origin === self.location.origin && url.pathname.startsWith("/ocr/")) {
+    event.respondWith(cacheFirst(request, OCR_CACHE));
     return;
   }
 

@@ -17,7 +17,10 @@ export class SecurityHeaders {
       `connect-src 'self' ${origins} ${config.supabaseUrl}`.trim(),
       "img-src 'self' blob: data:",
       "worker-src 'self' blob:",
-      "script-src 'self'",
+      // The comic reader runs Tesseract locally as WebAssembly. Chrome checks wasm
+      // compilation against script-src, so without this the engine cannot start. It permits
+      // wasm only - it is not 'unsafe-eval' and does not re-open JavaScript eval.
+      "script-src 'self' 'wasm-unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       "object-src 'none'",

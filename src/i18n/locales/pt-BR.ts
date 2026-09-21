@@ -13,6 +13,7 @@ export const PT_BR = {
   "reader.navigation": "Abrir sumário, busca e mapa", "reader.notebook": "Abrir Caderno", "reader.bookmark": "Marcar posição",
   "reader.study": "Abrir marcações", "reader.previousPage": "Página anterior", "reader.nextPage": "Próxima página",
   "reader.toggleControls": "Mostrar ou esconder controles", "reader.pdfPage": "Página do PDF", "reader.loading": "Preparando seu livro…",
+  "reader.comic.pdfOnly": "O leitor de HQ abre apenas arquivos PDF.", "reader.comic.openFailed": "Não foi possível abrir esta HQ",
   "reader.closeSettings": "Fechar configurações de leitura", "reader.customization": "Personalização da leitura",
   "reader.reading": "Leitura", "reader.futureMarks": "Marcações — em breve", "reader.text": "Texto", "reader.font": "Fonte",
   "reader.font.classic": "Clássica", "reader.font.modern": "Moderna", "reader.font.sans": "Limpa", "reader.font.accessible": "Alta legibilidade",

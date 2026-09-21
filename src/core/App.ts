@@ -74,6 +74,8 @@ import { MobileBottomNavigation } from "../views/MobileBottomNavigation";
 import { I18nManager } from "../i18n/I18nManager";
 import { AppState } from "./AppState";
 import { Router, type RouteName } from "./Router";
+import { ComicReaderView } from "../views/ComicReaderView";
+import { ComicContentTypeResolver } from "../reader/comic/ComicContentType";
 
 export class App {
   private readonly state = new AppState();
@@ -180,9 +182,17 @@ export class App {
     this.router.register("book", (params) => this.detailsView(params.get("id") ?? ""));
     this.router.register("edit-book", (params) => new BookEditView(this.state, this.findBook(params.get("id")), this.genres, this.covers,
       (book) => void this.updateBook(book), () => this.router.navigate("book", { id: params.get("id") ?? "" })));
-    this.router.register("reader", (params) => new ReaderView(params.get("id") ?? "", this.readerManager,
-      this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database,
-      this.userName(), this.state.currentUser?.id, this.state.books));
+    /* One route, two readers: a comic opens in the ComicReader, everything else keeps the
+     * book reader it has always used. */
+    this.router.register("reader", (params) => {
+      const id = params.get("id") ?? "";
+      if (new ComicContentTypeResolver().isComic(this.findBook(id)))
+        return new ComicReaderView(id, this.readerManager, this.state.settings.theme,
+          () => this.router.navigate("library"), (book) => this.syncBook(book));
+      return new ReaderView(id, this.readerManager,
+        this.state.settings.theme, () => this.router.navigate("library"), (book) => this.syncBook(book), this.database,
+        this.userName(), this.state.currentUser?.id, this.state.books);
+    });
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
         open: source => this.router.navigate("import", { source }) } : undefined, this.pwaInstall));
@@ -504,7 +514,8 @@ export class App {
   private mergeRemoteBook(remote: Book, local: Book | undefined): Book {
     if (!local) return remote;
     return new Book({ ...remote, id: local.id, cover: local.cover || remote.cover, availability: local.availability, offlineAvailability: local.offlineAvailability,
-      conversionStatus: local.conversionStatus, documentMode: local.documentMode, textCapability: local.textCapability, limaCapability: local.limaCapability });
+      conversionStatus: local.conversionStatus, documentMode: local.documentMode, textCapability: local.textCapability, limaCapability: local.limaCapability,
+      contentType: local.contentType });
   }
   private remoteReview(item: RemoteLibraryBook, userId: string, localBookId: string) {
     const value = item.metadata.review; if (!value || typeof value !== "object" || Array.isArray(value)) return null;

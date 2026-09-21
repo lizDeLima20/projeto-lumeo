@@ -11,3 +11,6 @@ server-dist/
 .vercel
 .env*
 supabase/.temp/
+
+# OCR runtime copied by "npm run ocr:assets" (multi-MB binaries, not source)
+public/ocr/
