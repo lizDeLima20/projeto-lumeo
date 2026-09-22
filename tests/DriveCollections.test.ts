@@ -100,10 +100,11 @@ describe("coleções: integração e limites", () => {
   });
   it("8. o catálogo e os livros normais seguem intactos", () => {
     const explorer = source("src/views/CatalogExplorerView.ts");
-    // The collections strip is additive: the genre filters still come only from the catalogue.
+    // Published collections are genre chips, not a second visual strip.
     assert.match(explorer, /private async offerCollections/);
     assert.match(explorer, /addGenre\("", this\.t\("ui\.catalog\.allGenres"\)\)/);
-    assert.doesNotMatch(explorer, /addCatalogGenre\(\s*"marvel/i);
+    assert.match(explorer, /addGenre\(`collection:\$\{collection\.id\}`/);
+    assert.doesNotMatch(explorer, /catalog__collection/);
     // The reader, the comic reader and the library were not touched by this feature.
     assert.doesNotMatch(source("src/views/ReaderView.ts"), /collection[A-Z]|DriveCollection/);
     assert.doesNotMatch(source("src/views/ComicReaderView.ts"), /DriveCollection/);

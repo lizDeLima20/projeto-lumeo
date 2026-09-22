@@ -20,9 +20,9 @@ export class CatalogExplorerView extends BaseView {
     const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
     const controls = this.createElement("div", "catalog__controls");
     const search = this.createElement("input", "input") as HTMLInputElement; search.type = "search"; search.placeholder = this.t("ui.catalog.search"); search.setAttribute("aria-label", this.t("ui.catalog.search"));
-    const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = ""; const availableGenres = new Set<string>();
-    const selectGenre = (id: string): void => { selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
-    const addGenre = (id: string, label: string): void => { if (availableGenres.has(id)) return; availableGenres.add(id); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
+    const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = ""; const availableGenres = new Set<string>(); const genreActions = new Map<string, () => void>();
+    const selectGenre = (id: string): void => { const action = genreActions.get(id); if (action) { action(); return; } selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
+    const addGenre = (id: string, label: string, action?: () => void): void => { if (availableGenres.has(id)) return; availableGenres.add(id); if (action) genreActions.set(id, action); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
     // Explore is the public catalogue: its filters are supplied only by the
     // active remote sources. Personal library categories belong in Biblioteca
     // and must never masquerade as catalogue genres here.
@@ -37,24 +37,17 @@ export class CatalogExplorerView extends BaseView {
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
     let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
     search.addEventListener("input", reload); more.addEventListener("click", () => void this.load(search.value, selectedGenre, more));
-    const collections = this.createElement("div", "catalog__collections");
-    section.append(heading, collections, controls, list, status, more);
-    void this.load("", "", more); void this.offerSourceManagement(heading); void this.offerCollections(collections); return section;
+    section.append(heading, controls, list, status, more);
+    void this.load("", "", more); void this.offerSourceManagement(heading); void this.offerCollections(addGenre); return section;
   }
-  /** Published Drive collections sit beside the catalogue without joining it: they are
-   *  browsed live, folder by folder, and never enter the catalogue's genre filters. The
-   *  strip stays empty - and invisible - when no collection is configured or reachable. */
-  private async offerCollections(host: HTMLElement): Promise<void> {
+  /** A published Drive collection participates in the very same genre strip as the
+   * catalogue sources. Its own page can then resolve its nested Drive folders lazily. */
+  private async offerCollections(addGenre: (id: string, label: string, action?: () => void) => void): Promise<void> {
     if (!this.published) return;
     const collections = await this.published.collections.list();
     if (!collections.length) return;
     collections.forEach((collection) => {
-      const card = this.createElement("button", "catalog__collection"); card.type = "button";
-      card.setAttribute("aria-label", `${this.t("ui.collections.open")}: ${collection.name}`);
-      card.append(this.createElement("span", "catalog__collection-name", collection.name),
-        this.createElement("span", "catalog__collection-go", "›"));
-      card.addEventListener("click", () => this.published!.open(collection.id));
-      host.append(card);
+      addGenre(`collection:${collection.id}`, collection.name, () => this.published!.open(collection.id));
     });
   }
 

@@ -52,3 +52,38 @@
   font-size: .8rem; padding: .3rem .7rem; border-radius: 999px; cursor: pointer; white-space: nowrap;
 }
 .collection-entry__add:hover { background: rgba(0, 0, 0, .06); }
+
+/* Drive-backed comic collections use the catalogue's genre language: headings and
+   horizontal cover rails. Folder names are structural only and never become file rows. */
+.drive-collection-genre { display: grid; gap: 1.25rem; align-content: start; }
+.drive-collection-genre__status:empty { display: none; }
+.drive-collection-genre__sections { display: grid; gap: 2rem; }
+.drive-collection-section { display: grid; gap: .8rem; min-height: 8rem; }
+.drive-collection-section__title, .drive-comic-carousel__title {
+  margin: 0; font: 600 clamp(1.1rem, 3vw, 1.5rem)/1.2 Georgia, serif;
+}
+.drive-collection-section__body { display: grid; gap: 1.25rem; }
+.drive-collection-section__loading, .drive-collection-section__empty { margin: 0; color: var(--color-muted); }
+.drive-comic-carousel { display: grid; gap: .75rem; }
+.drive-comic-carousel__track {
+  display: flex; gap: .85rem; overflow-x: auto; overscroll-behavior-inline: contain;
+  padding: .1rem .1rem .85rem; scroll-snap-type: x proximity; scrollbar-width: thin;
+}
+.drive-comic-card {
+  display: grid; flex: 0 0 clamp(8.8rem, 20vw, 11.5rem); gap: .5rem; align-content: start;
+  min-width: 0; padding: .6rem; border: 1px solid var(--color-border); border-radius: .35rem;
+  background: var(--color-surface); box-shadow: var(--shadow-sm); scroll-snap-align: start; cursor: pointer;
+}
+.drive-comic-card:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.drive-comic-card__cover { overflow: hidden; display: grid; place-items: center; aspect-ratio: 2 / 3; border-radius: .2rem; background: linear-gradient(145deg, #27233a, #12111a); }
+.drive-comic-card__cover img { width: 100%; height: 100%; object-fit: cover; }
+.drive-comic-card__fallback { font-size: 2.5rem; }
+.drive-comic-card__title { margin: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: .9rem; line-height: 1.25; }
+.drive-comic-card__format, .drive-comic-card__unsupported { color: var(--color-muted); font-size: .75rem; }
+.drive-comic-card__add { width: 100%; padding: .42rem .5rem; font-size: .8rem; }
+.drive-comic-card__unsupported { font-weight: 700; }
+@media (max-width: 40rem) {
+  .drive-collection-genre__sections { gap: 1.5rem; }
+  .drive-comic-carousel__track { gap: .7rem; margin-inline: -.25rem; padding-inline: .25rem; }
+  .drive-comic-card { flex-basis: min(43vw, 10.25rem); }
+}

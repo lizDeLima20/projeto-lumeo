@@ -77,6 +77,7 @@ import { Router, type RouteName } from "./Router";
 import { ComicReaderView } from "../views/ComicReaderView";
 import { ComicContentTypeResolver } from "../reader/comic/ComicContentType";
 import { CollectionBrowserView } from "../views/CollectionBrowserView";
+import { DriveCollectionGenreView } from "../views/DriveCollectionGenreView";
 import { DriveCollectionService } from "../services/DriveCollectionService";
 import { CollectionImportService } from "../services/CollectionImportService";
 import type { DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
@@ -169,7 +170,7 @@ export class App {
     this.router.register("library", () => new LibraryView(this.state,
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.openLibraryBook(bookId), (bookId) => void this.deleteBook(bookId, false)));
     this.router.register("explore", () => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }), () => this.router.navigate("catalog-admin"),
-      { collections: this.driveCollections, open: (id) => this.router.navigate("collection", { id }) }));
+      { collections: this.driveCollections, open: (id) => this.router.navigate("collection-genre", { id }) }));
     /* A published Drive folder browsed live. The folder id travels in the URL, so a
      * breadcrumb step and the browser's own Back button land on the same screen. */
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",
@@ -207,6 +208,9 @@ export class App {
         path: [...(params.get("path")?.split(",").filter(Boolean) ?? [params.get("folder")].filter((value): value is string => Boolean(value))), folderId].join(",") }),
       () => this.router.navigate("explore"),
       params.get("path")?.split(",").filter(Boolean),
+      (entry, listing) => void this.addCollectionBook(params.get("id") ?? "", entry, listing)));
+    this.router.register("collection-genre", (params) => new DriveCollectionGenreView(this.driveCollections,
+      params.get("id") ?? "", () => this.router.navigate("explore"),
       (entry, listing) => void this.addCollectionBook(params.get("id") ?? "", entry, listing)));
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
@@ -437,8 +441,12 @@ export class App {
    *  contentType "comic", so it opens in the ComicReader. */
   private async addCollectionBook(collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing): Promise<void> {
     const service = new CollectionImportService(this.catalogDownloads, this.imports, this.covers);
-    const genre = this.state.genres[0];
-    if (!genre) { this.showToast("Crie um gênero antes de adicionar uma HQ."); return; }
+    const genreName = listing.breadcrumb[0]?.name?.trim() || "HQs";
+    let genre = this.state.genres.find(item => item.name.localeCompare(genreName, undefined, { sensitivity: "accent" }) === 0);
+    if (!genre) {
+      genre = new Genre(crypto.randomUUID(), genreName);
+      await this.genres.save(genre); this.state.library.addGenre(genre);
+    }
     try {
       const result = await service.add({ collectionId, entry, listing, genreId: genre.id });
       if (result.kind === "browser-download") { this.showToast(`Baixe "${result.expectedFilename}" e importe pelo botão Adicionar livro.`); return; }
