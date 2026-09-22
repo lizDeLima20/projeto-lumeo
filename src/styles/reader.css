@@ -163,6 +163,10 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .page-turn-active>.page-turn-verso{display:block}
 .page-turn-verso>.open-book-page,.open-book-page--verso{position:absolute;inset:0;height:auto;border-radius:0;background:transparent;background-image:none}
 .page-turn-verso>.open-book-page::before{display:none}
+/* `padding:inherit` on the content only works if the verso passes the sheet's padding down:
+   without it the next page's text started at the border edge, ~3.2rem above where that
+   same page sits once the turn lands - the back of the leaf read shifted up. */
+.reflow-sheet>.page-turn-verso{padding:inherit}
 .reflow-sheet__verso-content{position:absolute;inset:0;overflow:hidden;padding:inherit;color:inherit;font:inherit;text-align:inherit}
 /* Pages a leaf uncovers: same grid cell, behind, and only while that leaf is flying. */
 .open-book-page--under-left,.open-book-page--under-right{grid-row:1;z-index:0;visibility:hidden}
