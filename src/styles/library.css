@@ -264,7 +264,9 @@
    * deliberately last because historical visual iterations left several competing
    * shelf rules above. */
 .genre-shelf>.shelf-stage{grid-column:1/-1;min-width:0}
-.genre-shelf .book-shelf__viewport{overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-x:contain;touch-action:pan-x;scroll-snap-type:x proximity}
+/* The track scrolls horizontally, but vertical gestures must reach the library.
+   pan-x alone traps mobile users in the first (potentially multi-row) genre. */
+.genre-shelf .book-shelf__viewport{overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-x:contain;touch-action:pan-x pan-y pinch-zoom;scroll-snap-type:x proximity}
 .genre-shelf .book-shelf{display:flex!important;flex-wrap:nowrap!important;width:max-content!important;min-width:100%!important;align-items:flex-end}
 .genre-shelf .book-shelf>.book-card{flex:0 0 var(--book-object-width)!important;white-space:normal}
 .book-focus-label{z-index:70;top:clamp(.2rem,1vw,.8rem);min-width:clamp(15rem,32vw,24rem);max-width:min(34rem,calc(100% - 1.25rem));gap:.26rem;padding:.78rem 1rem;border-radius:.45rem;font-size:1rem}

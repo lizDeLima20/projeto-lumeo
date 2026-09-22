@@ -1,27 +1,62 @@
 /* Comic reader. Independent of the book reader's paper, typography and page-turn layers:
-   here the artwork is the page, and everything else stays out of its way. */
+   the comic is painted on one canvas by its own engine, and everything else stays out of
+   its way. The stage colours match the renderer's palette, so the only space around a
+   page is the theme's own background. */
 .comic-reader {
   position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
-  /* The drawing is the printed page. Keep it unfiltered; only the surrounding
-     stage is a quiet neutral so bright OLED chrome does not compete with the art. */
-  background: #161613; color: #f0eee7;
+  --comic-stage: #141412; --comic-ink: #f0eee7; --comic-fab: rgba(38, 37, 31, .82);
+  background: var(--comic-stage); color: var(--comic-ink);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-.comic-reader[data-reader-theme="light"] { background: #191914; }
+.comic-reader[data-reader-theme="light"] { --comic-stage: #ebe7de; --comic-ink: #25221c; --comic-fab: rgba(246, 243, 236, .86); }
 
 .comic-stage {
-  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
-  overflow: hidden; outline: none; touch-action: pan-y pinch-zoom;
-  background: #161613; color-scheme: dark;
+  position: relative; flex: 1; min-height: 0; overflow: hidden; outline: none;
+  /* The stage owns every gesture: the page follows the finger, the browser does not pan. */
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  background: var(--comic-stage);
 }
-.comic-loading { font-size: .95rem; opacity: .75; }
+.comic-canvas { position: absolute; left: 0; top: 0; display: block; }
+.comic-loading { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: .95rem; opacity: .75; }
 
-/* Sized to the artwork itself, so every block coordinate (0..1) lands on the same spot of
-   the drawing at any screen size. */
-.comic-page { position: relative; width: fit-content; height: fit-content; max-width: 100%; max-height: 100%; }
-/* No brightness, contrast, grayscale or saturation filter here: colour in artwork is
-   semantic. The browser keeps its native high-quality interpolation for the page image. */
-.comic-page__canvas { display: block; max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: auto; }
+/* The block overlay sits exactly on the page's artwork (placed by the reader); hidden
+   while a leaf turns, so nothing floats over a moving page. */
+.comic-overlay-slot { position: absolute; pointer-events: none; }
+.comic-overlay-slot > .comic-overlay { pointer-events: none; }
+.comic-overlay-slot .comic-hotspot, .comic-overlay-slot .comic-block { pointer-events: auto; }
+/* An open block takes the next tap anywhere on the page: that tap closes it, never turns. */
+.comic-overlay-slot > .comic-overlay--open { pointer-events: auto; }
+.comic-overlay-slot--hidden { visibility: hidden; }
+
+/* The Lumeo reader's round buttons: same size, place and material. */
+.comic-fab {
+  position: fixed; top: max(.7rem, env(safe-area-inset-top)); z-index: 71; display: grid; place-items: center;
+  width: 2.35rem; height: 2.35rem; padding: 0; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 50%;
+  color: var(--comic-ink); background: var(--comic-fab); box-shadow: 0 .35rem 1rem rgba(0, 0, 0, .18);
+  backdrop-filter: blur(6px); cursor: pointer; font-size: 1rem; line-height: 1;
+}
+.comic-fab--back { left: max(.7rem, env(safe-area-inset-left)); font-size: 1.75rem; }
+.comic-fab--theme { right: max(.7rem, env(safe-area-inset-right)); }
+
+/* Beside the open book only: a phone turns by swiping or tapping the page's edges. */
+.comic-arrow {
+  position: fixed; top: 50%; z-index: 70; display: none; place-items: center; width: 3rem; height: 3rem;
+  margin-top: -1.5rem; padding: 0; border: 0; border-radius: 50%; color: var(--comic-ink);
+  background: color-mix(in srgb, var(--comic-ink) 10%, transparent); font-size: 1.25rem; opacity: .72; cursor: pointer;
+  transition: opacity .16s, transform .16s;
+}
+.comic-arrow:hover { opacity: 1; transform: scale(1.06); }
+.comic-arrow--previous { left: 1rem; }
+.comic-arrow--next { right: 1rem; }
+.comic-reader[data-mode="spread"] .comic-arrow { display: grid; }
+
+/* Where the reader is, for a moment after each turn - then out of the artwork's way. */
+.comic-progress {
+  position: fixed; left: 50%; bottom: max(.6rem, env(safe-area-inset-bottom)); z-index: 70; transform: translateX(-50%);
+  padding: .2rem .6rem; border-radius: 999px; background: var(--comic-fab); color: var(--comic-ink);
+  font-size: .78rem; letter-spacing: .04em; opacity: 0; pointer-events: none; transition: opacity .35s;
+}
+.comic-progress--visible { opacity: .85; }
 
 .comic-overlay { position: absolute; inset: 0; }
 .comic-hotspot {
@@ -47,22 +82,20 @@
 .comic-block--open { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .comic-block__text { margin: 0; font-size: clamp(1.15rem, 4.4vw, 1.65rem); line-height: 1.45; font-weight: 600; text-wrap: pretty; }
 
-.comic-controls {
-  display: flex; align-items: center; justify-content: center; gap: .9rem;
-  padding: .55rem .9rem calc(.55rem + env(safe-area-inset-bottom));
-  background: rgba(10, 10, 14, .82);
-}
-.comic-control {
-  appearance: none; border: 0; border-radius: 999px; width: 2.4rem; height: 2.4rem;
-  background: rgba(255, 255, 255, .09); color: inherit; font-size: 1rem; cursor: pointer;
-}
-.comic-control:hover { background: rgba(255, 255, 255, .16); }
-.comic-control--back { margin-right: auto; }
-.comic-indicator { font-size: .85rem; letter-spacing: .04em; opacity: .8; min-width: 5rem; text-align: center; }
-
 .comic-error { margin: auto; max-width: 28rem; padding: 1.5rem; display: grid; gap: .9rem; text-align: center; }
 
 @media (min-width: 900px) {
   .comic-block { min-width: min(38%, 22rem); max-width: min(62%, 44rem); }
   .comic-block__text { font-size: clamp(1.2rem, 1.6vw, 1.75rem); }
 }
+
+/* Comic details: the catalogue book page's layout, with a second step for "add". */
+.comic-detail__actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.comic-detail__add:disabled { opacity: .55; }
+.comic-detail__unsupported { opacity: .8; }
+
+/* A comic genre on the library shelf: one row per collection, each its own board. */
+/* The genre shelf is a two-column grid (title | count); each collection spans both, one
+   horizontal board under the other, like the library's own author rows. */
+.comic-genre-shelf .comic-shelf-row { grid-column: 1 / -1; min-width: 0; margin-top: .9rem; }
+.comic-shelf-row__title { margin: 0 0 .35rem; font-size: 1rem; font-weight: 600; letter-spacing: .01em; }

@@ -1,5 +1,6 @@
 import { AppState } from "../core/AppState";
 import { GenreShelf } from "../components/GenreShelf";
+import { ComicGenreShelf } from "../components/ComicGenreShelf";
 import { BaseView } from "./BaseView";
 
 export class LibraryView extends BaseView {
@@ -28,7 +29,10 @@ export class LibraryView extends BaseView {
     }
 
     this.state.genres.forEach((genre) => { const books = this.state.library.findBooksByGenre(genre.id);
-      if (GenreShelf.shouldRender(books)) section.append(new GenreShelf(genre, books, this.onGenreOpen, this.onBookOpen, this.onBookDelete).render()); });
+      if (!GenreShelf.shouldRender(books)) return;
+      // Comics are shelved by their Drive collection; any genre holding a single book keeps the ordinary shelf.
+      section.append(ComicGenreShelf.handles(books) ? new ComicGenreShelf(genre, books, this.onGenreOpen, this.onBookOpen, this.onBookDelete).render()
+        : new GenreShelf(genre, books, this.onGenreOpen, this.onBookOpen, this.onBookDelete).render()); });
     input.addEventListener("input",()=>{const query=input.value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase().trim();section.querySelectorAll<HTMLElement>(".genre-shelf").forEach(shelf=>{shelf.hidden=Boolean(query)&&!shelf.dataset.searchText?.includes(query);});});
     if (!section.querySelector(".genre-shelf")) section.append(this.createElement("p", "empty-state", this.t("ui.library.addFirst")));
     return section;

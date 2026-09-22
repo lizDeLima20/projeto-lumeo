@@ -13,9 +13,12 @@ describe("apresentação visual de papel", () => {
 
   it("mantém a arte de HQ sem filtros de cor e suaviza somente o palco externo", async () => {
     const css = await readFile("src/styles/comic.css", "utf8");
-    assert.match(css, /\.comic-stage[\s\S]*background: #161613/);
-    assert.match(css, /\.comic-page__canvas[\s\S]*image-rendering: auto/);
-    assert.doesNotMatch(css, /\.comic-page__canvas[^}]*filter:/);
+    // The stage around the page follows the theme; the page itself is drawn untouched.
+    assert.match(css, /\.comic-reader \{[^}]*--comic-stage: #141412/);
+    assert.match(css, /\.comic-reader\[data-reader-theme="light"\] \{ --comic-stage: #ebe7de/);
+    assert.doesNotMatch(css, /\.comic-canvas[^}]*filter:/);
+    const renderer = await readFile("src/reader/comic/ComicTurnRenderer.ts", "utf8");
+    assert.doesNotMatch(renderer, /\.filter\s*=/);
   });
 
   it("mantém texto e campos do painel de leitura em contraste correto nos dois fundos", async () => {

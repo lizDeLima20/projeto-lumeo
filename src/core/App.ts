@@ -80,6 +80,7 @@ import { CollectionBrowserView } from "../views/CollectionBrowserView";
 import { DriveCollectionGenreView } from "../views/DriveCollectionGenreView";
 import { DriveCollectionService } from "../services/DriveCollectionService";
 import { CollectionImportService } from "../services/CollectionImportService";
+import { ComicDetailsView } from "../views/ComicDetailsView";
 import type { DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 
 export class App {
@@ -208,10 +209,20 @@ export class App {
         path: [...(params.get("path")?.split(",").filter(Boolean) ?? [params.get("folder")].filter((value): value is string => Boolean(value))), folderId].join(",") }),
       () => this.router.navigate("explore"),
       params.get("path")?.split(",").filter(Boolean),
-      (entry, listing) => void this.addCollectionBook(params.get("id") ?? "", entry, listing)));
+      (entry, listing) => this.openComicDetails(params.get("id") ?? "", entry, listing)));
     this.router.register("collection-genre", (params) => new DriveCollectionGenreView(this.driveCollections,
       params.get("id") ?? "", () => this.router.navigate("explore"),
-      (entry, listing) => void this.addCollectionBook(params.get("id") ?? "", entry, listing)));
+      (entry, listing) => this.openComicDetails(params.get("id") ?? "", entry, listing)));
+    /* A comic opens to its own details page, the way a catalogue book does: download first,
+     * then add. The folder and its trail travel in the URL so the page can reload itself. */
+    this.router.register("comic", (params) => new ComicDetailsView(this.driveCollections, params.get("id") ?? "",
+      params.get("file") ?? "", params.get("folder") ?? undefined, params.get("path")?.split(",").filter(Boolean),
+      { importer: this.collectionImporter(), target: this.catalogDownloads.target,
+        genreId: (listing) => this.comicGenreId(listing),
+        pickDownloaded: () => new FileSystemFolderManager(this.database).selectDownloadedBook(),
+        added: (book) => this.addComicToLibrary(book),
+        open: (bookId) => this.openLibraryBook(bookId) },
+      () => this.router.navigate("collection-genre", { id: params.get("id") ?? "" })));
     this.router.register("settings", () => new SettingsView(this.state, (theme) => void this.changeTheme(theme),new StoragePersistenceService(),new DesktopLibraryFolderService(this.database),
       this.state.currentUser ? { connections: new OneDriveConnections(new ExternalLibraryStorage(this.database), this.state.currentUser.id),
         open: source => this.router.navigate("import", { source }) } : undefined, this.pwaInstall));
@@ -436,27 +447,36 @@ export class App {
   }
   private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await this.localFileStore().save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
 
-  /** A comic chosen in a published collection becomes an ordinary library book: the same
-   *  download service, the same ImportManager, the same shelf. It only arrives carrying
-   *  contentType "comic", so it opens in the ComicReader. */
-  private async addCollectionBook(collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing): Promise<void> {
-    const service = new CollectionImportService(this.catalogDownloads, this.imports, this.covers);
-    const genreName = listing.breadcrumb[0]?.name?.trim() || "HQs";
-    let genre = this.state.genres.find(item => item.name.localeCompare(genreName, undefined, { sensitivity: "accent" }) === 0);
+  private openComicDetails(collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing): void {
+    this.router.navigate("comic", { id: collectionId, file: entry.id, folder: listing.folderId,
+      path: listing.breadcrumb.map(step => step.id).join(",") });
+  }
+
+  private collectionImporter(): CollectionImportService {
+    return new CollectionImportService(this.catalogDownloads, this.imports, this.covers,
+      (catalogBookId) => this.state.books.find(book => book.catalogBookId === catalogBookId));
+  }
+
+  /** Comics go on the shelf of their collection's genre - "HQs da Marvel" - created once and
+   *  kept with the other genres, never in an area of their own outside the library. */
+  private async comicGenreId(listing: DriveFolderListing): Promise<string> {
+    const name = listing.collectionId === "marvel-hqs" ? "HQs da Marvel" : listing.breadcrumb[0]?.name?.trim() || "HQs";
+    let genre = this.state.genres.find(item => item.name.localeCompare(name, undefined, { sensitivity: "accent" }) === 0);
     if (!genre) {
-      genre = new Genre(crypto.randomUUID(), genreName);
-      await this.genres.save(genre); this.state.library.addGenre(genre);
+      genre = new Genre(crypto.randomUUID(), name);
+      await this.genres.save(genre); this.state.library.addGenre(genre); this.state.notify();
+      const preferences = this.preferences.fromState(this.state.onboardingCompleted, this.state.settings.theme, this.state.genres);
+      await this.preferences.save(preferences);
+      if (!this.auth.isLocalLibraryMode) void this.persistPreferences(preferences).catch(() => undefined);
     }
-    try {
-      const result = await service.add({ collectionId, entry, listing, genreId: genre.id });
-      if (result.kind === "browser-download") { this.showToast(`Baixe "${result.expectedFilename}" e importe pelo botão Adicionar livro.`); return; }
-      this.state.library.addBook(result.book); this.state.notify();
-      if (!this.auth.isLocalLibraryMode) void this.persistRemoteBook(result.book).catch(() => undefined);
-      this.showToast("HQ adicionada à biblioteca.");
-      this.router.navigate("book", { id: result.book.id });
-    } catch (error) {
-      this.showToast(error instanceof Error ? error.message : "Não foi possível adicionar esta HQ.");
-    }
+    return genre.id;
+  }
+
+  private addComicToLibrary(book: Book): void {
+    this.state.library.addBook(book); this.state.notify();
+    if (!this.auth.isLocalLibraryMode) void this.persistRemoteBook(book).catch(() => undefined);
+    void new StoragePersistenceService().requestAfterImport();
+    this.showToast("HQ adicionada à biblioteca.");
   }
 
   private findBook(id: string | null): Book | null { return id ? this.state.library.findBookById(id) ?? null : null; }
@@ -561,6 +581,7 @@ export class App {
       progressPercent: number("progressPercent"), currentLocation: text("currentLocation") ?? undefined, collectionId: text("collectionId") ?? undefined,
       volume: text("volume") ?? undefined, series: text("series") ?? undefined, description: text("description") ?? undefined,
       publicationYear: number("publicationYear") || undefined, catalogBookId: text("catalogBookId") ?? undefined,
+      contentType: data.contentType === "comic" ? "comic" : "book", collectionPath: text("collectionPath") ?? undefined,
       source: data.source === "catalog" || data.source === "google-drive" || data.source === "onedrive" || data.source === "url" ? data.source : "device",
       createdAt: text("addedAt") ? new Date(text("addedAt")!) : new Date(item.updatedAt), updatedAt: new Date(item.updatedAt),
       availability: "MISSING_FILE", offlineAvailability: "REMOTE_ONLY" });

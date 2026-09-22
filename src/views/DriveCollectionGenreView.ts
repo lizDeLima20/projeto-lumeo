@@ -118,7 +118,7 @@ export class DriveCollectionGenreView extends BaseView {
     const format = this.createElement("small", "drive-comic-card__format", entry.format?.toUpperCase() ?? this.i18n.t("ui.collections.unknownFormat"));
     card.append(cover, title, format);
     if (supported) {
-      const add = this.createElement("button", "button button--secondary drive-comic-card__add", this.i18n.t("ui.collections.add"));
+      const add = this.createElement("button", "button button--secondary drive-comic-card__add", this.i18n.t("ui.comic.details"));
       add.type = "button"; add.addEventListener("click", event => { event.stopPropagation(); this.onAdd(entry, listing); }); card.append(add);
     } else card.append(this.createElement("span", "drive-comic-card__unsupported", entry.format && entry.format !== "unknown"
       ? this.i18n.t("ui.collections.unsupported", { format: entry.format.toUpperCase() }) : this.i18n.t("ui.collections.unknownFormat")));

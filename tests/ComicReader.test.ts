@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { Book } from "../src/models/Book";
 import { ComicContentTypeResolver } from "../src/reader/comic/ComicContentType";
+import { ComicLayout } from "../src/reader/comic/ComicLayout";
 import { ComicTextBlockGrouper } from "../src/reader/comic/ComicTextBlockGrouper";
 import { ComicPageBlockCache } from "../src/reader/comic/ComicPageBlockCache";
 import { ComicBlockSelection } from "../src/reader/comic/ComicBlockSelection";
@@ -67,19 +68,21 @@ describe("comic page presentation", () => {
     const engine = source("reader/comic/ComicPageEngine.ts");
     // contain: the smaller ratio of the two, never a crop and never a stretch.
     assert.match(engine, /Math\.min\(stage\.width \/ base\.width, stage\.height \/ base\.height\)/);
-    const styles = readFileSync(new URL("../src/styles/comic.css", import.meta.url), "utf8");
-    assert.match(styles, /\.comic-page__canvas \{[^}]*object-fit: contain/);
-    assert.match(styles, /max-width: 100%; max-height: 100%/);
+    // Drawn into its slot by the same contain rule.
+    const drawn = ComicLayout.contain({ x: 0, y: 0, width: 400, height: 600 }, 1500, 2306);
+    assert.ok(Math.abs(drawn.width / drawn.height - 1500 / 2306) < 1e-9);
     // No text pipeline anywhere in the comic reader: no reflow engine, no pagination, no
     // paragraph rendering. The only shared call is the progress save.
     const view = source("views/ComicReaderView.ts");
-    assert.doesNotMatch(view, /ReflowReaderEngine|PaginationEngine|renderParagraph|PageTurnController|reader-page/);
+    assert.doesNotMatch(view, /ReflowReaderEngine|PaginationEngine|renderParagraph|reader-page/);
+    assert.match(view, /ComicTurnController/);
   });
   it("4. pageIsMountedBeforeAnyRecognitionStarts", () => {
     const view = source("views/ComicReaderView.ts");
-    const mounted = view.indexOf("this.frame.replaceChildren(canvas, this.overlay.render())");
-    const scheduled = view.indexOf("this.scheduleProcessing(pageNumber)");
-    assert.ok(mounted > 0 && scheduled > mounted, "processing must be scheduled after the page is mounted");
+    const arrived = view.slice(view.indexOf("private arrived("));
+    const drawn = arrived.indexOf("this.drawRest();");
+    const scheduled = arrived.indexOf("this.scheduleProcessing(this.currentPage)");
+    assert.ok(drawn > 0 && scheduled > drawn, "processing must be scheduled after the page is drawn");
     // Scheduled, not awaited: the draw path never blocks on recognition.
     assert.match(view, /private scheduleProcessing\(pageNumber: number\): void/);
     assert.match(view, /requestIdleCallback/);
@@ -118,7 +121,7 @@ describe("comic text recognition", () => {
     assert.deepEqual(result.blocks, []);
     assert.equal(result.source, "none");
     // The reader shows the page regardless: nothing in the draw path depends on blocks.
-    assert.match(source("views/ComicReaderView.ts"), /if \(!canvas \|\| !this\.frame\) return;/);
+    assert.match(source("views/ComicReaderView.ts"), /const canvas = await this\.engine\.render\(page, size\)\.catch\(\(\) => null\);\s*if \(canvas && !this\.disposed\) this\.bitmaps\.set/);
   });
   it("unavailableOcrIsSkippedAndTextLayerWins", async () => {
     const ocr = new FakeSource("ocr", [fragment("nunca", 0.1, 0.1)], false);
@@ -209,9 +212,12 @@ describe("comic block interaction", () => {
   });
   it("12. changingPageClosesTheOpenBlock", () => {
     const view = source("views/ComicReaderView.ts");
-    const clear = view.indexOf("this.overlay.clear();");
-    const render = view.indexOf("await this.engine.render(pageNumber, this.stageSize())");
-    assert.ok(clear > 0 && clear < render, "the open block is closed before the next page is drawn");
+    const arrived = view.slice(view.indexOf("private arrived("));
+    const clear = arrived.indexOf("this.overlay.clear();");
+    const draw = arrived.indexOf("this.drawRest();");
+    assert.ok(clear > 0 && clear < draw, "the open block is closed before the next page is drawn");
+    // And a turn in progress closes it before the leaf moves.
+    assert.match(view, /turning: \(active: boolean\): void => \{\s*if \(active\) this\.overlay\.close\(\);/);
     assert.match(source("reader/comic/ComicBlockOverlay.ts"), /public clear\(\): void \{\s*this\.selection\.close\(\);/);
   });
 });
@@ -305,5 +311,22 @@ describe("comic page cache and prefetch", () => {
     assert.deepEqual(new ComicPagePrefetchPlanner().order(20, 20), [20, 19]);
     // Never the whole album.
     assert.equal(new ComicPagePrefetchPlanner().order(10, 300).length, 3);
+  });
+});
+
+describe("página responsiva da HQ", () => {
+  it("a escala é contain por página, e a nitidez segue a densidade real até 3x", () => {
+    const engine = source("reader/comic/ComicPageEngine.ts");
+    assert.match(engine, /Math\.min\(stage\.width \/ base\.width, stage\.height \/ base\.height\)/);
+    assert.match(engine, /const ratio = Math\.min\(globalThis\.devicePixelRatio \|\| 1, 3\);/);
+    // The memory guard stays: the pixel budget still caps the bitmap.
+    assert.match(engine, /maxCanvasPixels = 18_000_000/);
+    assert.match(engine, /Math\.sqrt\(this\.maxCanvasPixels \/ Math\.max\(1, viewport\.width \* viewport\.height\)\)/);
+  });
+  it("um bitmap desenhado para o tamanho antigo nunca volta do cache depois de girar", () => {
+    const engine = source("reader/comic/ComicPageEngine.ts");
+    assert.match(engine, /if \(cached && this\.bitmapStage\.get\(pageNumber\) === size\) return cached\.canvas;/);
+    assert.match(engine, /if \(generation === this\.generation\) \{ this\.cache\.set/);
+    assert.match(engine, /public invalidate\(\): void \{ this\.generation\+\+;/);
   });
 });

@@ -1,6 +1,6 @@
 import { BaseView } from "../views/BaseView";
 
-export type RouteName = "login" | "register" | "privacy" | "onboarding" | "home" | "library" | "explore" | "catalog-book" | "catalog-admin" | "genre" | "settings" | "device-conflict" | "import" | "book" | "reader" | "edit-book" | "audiobooks" | "collection" | "collection-genre";
+export type RouteName = "login" | "register" | "privacy" | "onboarding" | "home" | "library" | "explore" | "catalog-book" | "catalog-admin" | "genre" | "settings" | "device-conflict" | "import" | "book" | "reader" | "edit-book" | "audiobooks" | "collection" | "collection-genre" | "comic";
 type ViewFactory = (params: URLSearchParams) => BaseView;
 
 export class Router {
