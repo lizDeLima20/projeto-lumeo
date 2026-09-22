@@ -158,8 +158,19 @@ export class FlexiblePageCurl {
       onclone: clonedDocument => {
         // html2canvas 1.x cannot parse modern color()/color-mix() syntax. Resolve
         // computed colors through the browser's sRGB canvas only in the capture copy.
+        const clone = [...clonedDocument.querySelectorAll<HTMLElement>("[data-curl-capture]")]
+          .find(element => element.dataset.curlCapture === marker);
+        if (!clone) return;
+        /* html2canvas paints only the captured element and its descendants, so only they
+           need their colours rewritten. Walking the whole cloned document instead cost
+           every capture one getComputedStyle per property per element of the entire
+           reader: a desktop spread keeps six full pages in the DOM against three sheets on
+           a phone, and each turn needs four captures - measured in production, the fold
+           was not ready until ~1.5s into the drag and an arrow turn never got one. */
+        const resolved=new Map<string,string>();
+        const rgb=(color:string)=>{let value=resolved.get(color);if(value===undefined){value=this.rgb(color);resolved.set(color,value);}return value;};
         const properties=["color","background-color","border-top-color","border-right-color","border-bottom-color","border-left-color","text-decoration-color","outline-color"];
-        for(const element of clonedDocument.querySelectorAll<HTMLElement>("*")){
+        for(const element of [clone,...clone.querySelectorAll<HTMLElement>("*")]){
           const computed=clonedDocument.defaultView!.getComputedStyle(element);
           /* Chromium exposes inherited ink to a number of vendor and logical colour
              properties (not only `color`). html2canvas parses those too, so normalize
@@ -167,21 +178,18 @@ export class FlexiblePageCurl {
           for(const property of computed){
             const value=computed.getPropertyValue(property);
             if(!/(?:color|lab|lch)\(/.test(value))continue;
-            const normalized=value.replace(/(?:color|oklab|oklch|lab|lch)\([^()]*\)/g,color=>this.rgb(color));
+            const normalized=value.replace(/(?:color|oklab|oklch|lab|lch)\([^()]*\)/g,color=>rgb(color));
             element.style.setProperty(property,normalized,"important");
           }
           for(const property of properties){
             const value=computed.getPropertyValue(property);
-            if(/(?:color|lab|lch)\(/.test(value))element.style.setProperty(property,this.rgb(value),"important");
+            if(/(?:color|lab|lch)\(/.test(value))element.style.setProperty(property,rgb(value),"important");
           }
           for(const property of ["background-image","box-shadow","text-shadow"]){
             const value=computed.getPropertyValue(property);
-            if(/(?:color|lab|lch)\(/.test(value))element.style.setProperty(property,value.replace(/(?:color|oklab|oklch|lab|lch)\([^()]*\)/g,color=>this.rgb(color)),"important");
+            if(/(?:color|lab|lch)\(/.test(value))element.style.setProperty(property,value.replace(/(?:color|oklab|oklch|lab|lch)\([^()]*\)/g,color=>rgb(color)),"important");
           }
         }
-        const clone = [...clonedDocument.querySelectorAll<HTMLElement>("[data-curl-capture]")]
-          .find(element => element.dataset.curlCapture === marker);
-        if (!clone) return;
         /* Pseudo-elements are not present in querySelectorAll above.  Keep their
            inherited paper/ink variables to plain rgba in the cloned tree as well:
            html2canvas 1.x otherwise encounters the WebView's computed `color()`
