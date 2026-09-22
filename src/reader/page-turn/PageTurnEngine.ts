@@ -23,9 +23,8 @@ export class PageTurnEngine {
   private frame=0;private pending:PageTransform|null=null;private velocity=0;private direction:TurnDirection=1;private pointerY=0;
   /* Covers stay with the approved rigid renderer. Internal leaves use only the
      continuous WebGL mesh: the legacy DOM curl is deliberately not mounted for them. */
-  private readonly flexible=new FlexiblePageCurl();
   private gestureBounds:DOMRect|null=null;
-  public constructor(private readonly page:HTMLElement,private under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.3,private readonly coverCurl=new PageCurl()){
+  public constructor(private readonly page:HTMLElement,private under:HTMLElement|null,private readonly commit:(direction:TurnDirection)=>void,private readonly geometry=new PageGeometry(),private readonly shadows=new PageShadowRenderer(),private readonly threshold=.3,private readonly coverCurl=new PageCurl(),private readonly flexible=new FlexiblePageCurl()){
     if(typeof requestAnimationFrame==="function")requestAnimationFrame(()=>{if(page.isConnected&&!this.isCover())this.flexible.prepare(page);});
   }
 

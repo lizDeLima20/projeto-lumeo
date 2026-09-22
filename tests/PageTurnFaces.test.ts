@@ -40,11 +40,11 @@ describe("a folha em movimento tem frente, verso e página de baixo reais", () =
   it("livro aberto: as faces são capturadas ao montar o par, como no celular", () => {
     // Measured in production before this: the spread only captured on pointerdown, the
     // textures were ready ~1.5s into the drag, and an arrow turn never had any.
-    const controller = read("reader/desktop/PageTurnInteractionController.ts");
+    const controller = read("reader/desktop/PageTurnInteractionController.ts").replace(/\s+/g, "");
     assert.match(controller, /import\{FlexiblePageCurl\}from"\.\.\/page-turn\/FlexiblePageCurl"/);
-    assert.match(controller, /document\.addEventListener\("visibilitychange",this\.visibility\);this\.warm\(\)\}/);
-    assert.match(controller, /this\.prepareLeaf\(1\);const later=\(\)=>\{this\.warmIdle=0;this\.prepareLeaf\(-1\)\}/);
-    assert.match(controller, /public unbind\(\):void\{this\.coolDown\(\);/);
+    assert.match(controller, /document\.addEventListener\("visibilitychange",this\.visibility\);this\.warm\(\);?\}/);
+    assert.match(controller, /this\.prepareLeaf\(1\);constlater=\(\)=>\{this\.warmIdle=0;this\.prepareLeaf\(-1\);?\}/);
+    assert.match(controller, /publicunbind\(\):void\{this\.disposed=true;this\.coolDown\(\);/);
     // The engine reads the same cache, so a warmed leaf turns with the approved mesh.
     assert.match(read("reader/page-turn/FlexiblePageCurl.ts"), /private static readonly snapshotCache = new WeakMap/);
   });
@@ -54,5 +54,12 @@ describe("a folha em movimento tem frente, verso e página de baixo reais", () =
     // Walking the whole cloned document is what made a desktop capture take seconds.
     assert.doesNotMatch(curl, /for\(const element of clonedDocument\.querySelectorAll/);
     assert.match(curl, /const resolved=new Map<string,string>\(\);/);
+  });
+  it("livro aberto: a orelha da página em repouso não entra na textura", () => {
+    // Measured on the desktop leaf: the resting ::after corner flew with every turn as a
+    // white square. html2canvas has already made it a real last child when onclone runs.
+    const curl = read("reader/page-turn/FlexiblePageCurl.ts");
+    assert.match(curl, /const restingAfter = clone\.lastElementChild;/);
+    assert.match(curl, /if \(restingAfter\?\.tagName\.toLowerCase\(\) === "html2canvaspseudoelement"\) restingAfter\.remove\(\);/);
   });
 });

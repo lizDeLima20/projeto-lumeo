@@ -10,6 +10,7 @@ const clamp = (value: number, low = 0, high = 1): number => Math.min(high, Math.
  * geometry is drawn. Every frame then changes one shared WebGL mesh, so there are no
  * independently composited DOM strips for the Android WebView to separate. */
 export class FlexiblePageCurl {
+  public constructor(private readonly desktopFaces = false) {}
   private static serial = 0;
   private readonly columns = 128;
   private readonly rows = 64;
@@ -41,6 +42,11 @@ export class FlexiblePageCurl {
    * DOM PageCurl underneath remains visible and opaque. */
   public get mounted(): boolean { return this.canvas !== null && this.gl !== null; }
   public get ready(): boolean { return this.page?.classList.contains("page-turn-flexible-ready") ?? false; }
+
+  public async prepareReady(page: HTMLElement): Promise<void> {
+    this.prepare(page);
+    await this.snapshots.get(page)?.get(this.snapshotKey(null));
+  }
 
   /** Started at pointerdown, before horizontal intent is resolved. No page is hidden. */
   public prepare(page: HTMLElement, backSource: HTMLElement | null = null): void {
@@ -132,10 +138,17 @@ export class FlexiblePageCurl {
   }
 
   private snapshotKey(backSource: HTMLElement | null): string {
-    return backSource ? `under:${backSource.dataset.page ?? "previous"}` : "verso";
+    return (this.desktopFaces ? "desktop:" : "") + (backSource ? `under:${backSource.dataset.page ?? "previous"}` : "verso");
   }
 
   private async capture(page: HTMLElement, backSource: HTMLElement | null): Promise<Snapshot> {
+    // A desktop leaf has two captures of the same node. Serialize them so its marker
+    // cannot be replaced by the back capture before html2canvas clones the front.
+    if (this.desktopFaces) {
+      const front = await this.captureFace(page, "front");
+      const back = await this.captureFace(backSource ?? page, backSource ? "source" : "verso");
+      return { front, back };
+    }
     const front = this.captureFace(page, "front");
     const back = backSource ? this.captureFace(backSource, "source") : this.captureFace(page, "verso");
     return Promise.all([front, back]).then(([frontFace, backFace]) => ({ front: frontFace, back: backFace }));
@@ -200,6 +213,25 @@ export class FlexiblePageCurl {
         clone.style.setProperty("--reader-custom-ink", ink, "important");
         clone.classList.remove("page-turn-active", "page-turn-curled", "page-turn-flexible-ready");
         clone.style.cssText += ";transform:none!important;visibility:visible!important;overflow:hidden!important;";
+        if (this.desktopFaces) {
+          clone.style.setProperty("width", `${page.clientWidth}px`, "important");
+          clone.style.setProperty("height", `${page.clientHeight}px`, "important");
+          clone.style.setProperty("background-color", paper, "important");
+          // Only the capture copy changes. A resting spread's perspective must not be
+          // baked into textures that the WebGL camera will project a second time.
+          for (let parent = clone.parentElement; parent; parent = parent.parentElement) {
+            parent.style.setProperty("transform", "none", "important");
+            parent.style.setProperty("perspective", "none", "important");
+          }
+          for (const child of clone.querySelectorAll<HTMLElement>("*")) child.style.setProperty("visibility", "visible", "important");
+          /* The dog-ear is drawn only while the page rests (:not(.page-turn-active)), and
+             faces are captured at rest - so it was baked into both textures and every
+             leaf flew with a white corner. html2canvas has already turned that ::after
+             into a real last child of the copy by the time onclone runs, so a style rule
+             cannot reach it: the element itself is dropped, from the copy only. */
+          const restingAfter = clone.lastElementChild;
+          if (restingAfter?.tagName.toLowerCase() === "html2canvaspseudoelement") restingAfter.remove();
+        }
         clone.querySelectorAll(".page-turn-curl,.page-turn-flexible").forEach(element => element.remove());
         const verso = clone.querySelector<HTMLElement>(":scope > .page-turn-verso");
         if (face === "front" || face === "source") verso?.remove();

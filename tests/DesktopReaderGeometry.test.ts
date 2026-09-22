@@ -24,7 +24,7 @@ describe("DesktopReaderGeometry", () => {
 
   it("cancela uma virada em blur ou quando a aba fica oculta", () => {
     const source = readFileSync("src/reader/desktop/PageTurnInteractionController.ts", "utf8");
-    assert.match(source, /window\.addEventListener\("blur",this\.cancel\)/);
-    assert.match(source, /document\.addEventListener\("visibilitychange",this\.visibility\)/);
+    assert.match(source, /window\.addEventListener\("blur",\s*this\.cancel\)/);
+    assert.match(source, /document\.addEventListener\("visibilitychange",\s*this\.visibility\)/);
   });
 });
