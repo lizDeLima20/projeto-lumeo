@@ -137,7 +137,9 @@ describe("fluxo do navegador: baixar, depois escolher o arquivo", () => {
     assert.equal((await books.getAll()).length, 0);
   });
   it("o Chrome usa o mesmo seletor de arquivo baixado dos livros do catálogo", () => {
-    assert.match(source("core/App.ts"), /pickDownloaded: \(\) => new FileSystemFolderManager\(this\.database\)\.selectDownloadedBook\(\)/);
+    assert.match(source("core/App.ts"), /pickDownloaded: \(\) => new FileSystemFolderManager\(this\.database\)\.selectDownloadedPdf\(\)/);
+    assert.match(source("services/FileSystemFolderManager.ts"), /application\/pdf.*\.pdf/);
+    assert.match(source("services/FileSystemFolderManager.ts"), /selectDownloadedBook/);
   });
 });
 

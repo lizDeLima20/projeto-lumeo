@@ -3,10 +3,10 @@ import type { DriveRequestLimiter } from "./DriveRequestLimiter.js";
 import type { DriveCollection, DriveFolderEntry } from "./types.js";
 
 const SHORTCUT_MIME = "application/vnd.google-apps.shortcut";
-const FIELDS = "nextPageToken,files(id,name,mimeType,size,modifiedTime,shortcutDetails(targetId,targetMimeType))";
+const FIELDS = "nextPageToken,files(id,name,mimeType,description,thumbnailLink,size,modifiedTime,shortcutDetails(targetId,targetMimeType))";
 
 interface DriveApiFile {
-  id: string; name: string; mimeType: string; size?: string; modifiedTime?: string;
+  id: string; name: string; mimeType: string; description?: string; thumbnailLink?: string; size?: string; modifiedTime?: string;
   parents?: string[];
   shortcutDetails?: { targetId?: string; targetMimeType?: string };
 }
@@ -89,6 +89,8 @@ export class DriveFolderBrowser {
     const format = this.classifier.format(file.mimeType, file.name);
     const supported = this.classifier.isSupported(format);
     return { id: file.id, name: file.name, kind: "file", mimeType: file.mimeType, format, supported,
+      ...(file.description ? { description: file.description } : {}),
+      ...(file.thumbnailLink ? { thumbnailUrl: file.thumbnailLink } : {}),
       ...(supported ? { contentType: collection?.contentType ?? "book" } : {}),
       size: file.size ? Number(file.size) : null, modifiedAt: file.modifiedTime ?? null,
       ...(shortcut ? { shortcut: true } : {}) };

@@ -11,6 +11,12 @@ const file = (over: Partial<DriveFolderEntry> = {}): DriveFolderEntry => ({
 });
 
 describe("3/4. capa da HQ", () => {
+  it("a miniatura do Drive é pedida no tamanho da tela, não a prévia de 220px", () => {
+    const entry = { id: "f1", name: "Capítulo 01.pdf", kind: "file", supported: true, format: "pdf",
+      thumbnailUrl: "https://lh3.googleusercontent.com/drive-storage/abc=s220" } as DriveFolderEntry;
+    assert.equal(new ComicCoverSource(480, 680).coverUrl(entry), "https://lh3.googleusercontent.com/drive-storage/abc=s680");
+    assert.equal(new ComicCoverSource().coverUrl(entry), "https://lh3.googleusercontent.com/drive-storage/abc=s452");
+  });
   it("a capa é a primeira página do próprio PDF, sem download e sem upload", () => {
     const covers = new ComicCoverSource();
     const url = covers.coverUrl(file())!;

@@ -20,6 +20,8 @@ export interface DriveFolderEntry {
   name: string;
   kind: DriveEntryKind;
   mimeType: string;
+  description?: string;
+  thumbnailUrl?: string;
   format: DriveEntryFormat | null;
   /** False for a format Lumeo cannot open yet, such as CBR. The entry is still listed:
    *  hiding it would silently lose part of the folder. */

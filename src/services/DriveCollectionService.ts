@@ -5,6 +5,7 @@ export interface DriveCollection { id: string; name: string; rootFolderId: strin
 export type DriveEntryFormat = "pdf" | "epub" | "cbr" | "cbz" | "unknown";
 export interface DriveFolderEntry {
   id: string; name: string; kind: "folder" | "file"; mimeType: string;
+  description?: string; thumbnailUrl?: string;
   format: DriveEntryFormat | null;
   /** False for a format Lumeo cannot open yet, such as CBR. Still listed, never hidden. */
   supported: boolean;

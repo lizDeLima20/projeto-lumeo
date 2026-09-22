@@ -68,18 +68,22 @@ export class ComicDetailsView extends BaseView {
     const back = this.createElement("button", "link-button catalog-detail__back", this.i18n.t("ui.common.back"));
     back.type = "button"; back.addEventListener("click", this.onBack);
     const collection = listing.breadcrumb.slice(1).map(step => step.name.trim()).filter(Boolean);
-    const readable = entry.supported && (entry.format === "pdf" || entry.format === "epub");
+    const readable = entry.supported && entry.format === "pdf";
     const title = readable ? importer.title(entry, listing) : entry.name.trim();
     copy.append(back, this.createElement("h1", "page-title", title),
       this.createElement("p", "page-subtitle", listing.breadcrumb[0]?.name ?? ""));
     const metadata = this.createElement("dl", "catalog-detail__metadata");
-    if (collection.length) this.meta(metadata, this.i18n.t("ui.catalog.collection"), collection.join(" › "));
-    this.meta(metadata, this.i18n.t("ui.catalog.format"), (entry.format ?? "?").toUpperCase());
+    if (collection[0]) this.meta(metadata, this.i18n.t("ui.catalog.collection"), collection[0]);
+    if (collection.length > 1) this.meta(metadata, this.i18n.t("ui.comic.arc"), collection.slice(1).join(" › "));
+    this.meta(metadata, this.i18n.t("ui.catalog.format"), entry.format === "pdf" ? "PDF" : (entry.format ?? "?").toUpperCase());
     if (entry.size) this.meta(metadata, this.i18n.t("ui.catalog.size"), this.formatSize(entry.size));
+    if (entry.description?.trim()) copy.append(this.createElement("p", "catalog-detail__description", entry.description.trim()));
     copy.append(metadata);
 
     const progress = this.createElement("p", "catalog__status comic-detail__progress");
     progress.setAttribute("role", "status");
+    progress.dataset.state = "ready";
+    progress.textContent = this.i18n.t("ui.comic.ready");
     if (!readable) {
       copy.append(this.createElement("p", "comic-detail__unsupported", entry.format && entry.format !== "unknown"
         ? this.i18n.t("ui.collections.unsupported", { format: entry.format.toUpperCase() }) : this.i18n.t("ui.collections.unknownFormat")));
@@ -95,12 +99,14 @@ export class ComicDetailsView extends BaseView {
     root.append(cover, copy);
 
     const request = async (): Promise<CollectionImportRequest> =>
-      ({ collectionId: this.collectionId, entry, listing, genreId: await this.actions.genreId(listing), cover: this.covers.coverUrl(entry) ?? undefined });
+      // No cover URL here: Drive's preview links are temporary or need a session, and a
+      // shelf keeps its covers offline. The importer takes the comic's own first page.
+      ({ collectionId: this.collectionId, entry, listing, genreId: await this.actions.genreId(listing) });
     const showOpen = (book: Book, message: string): void => {
       add.remove();
       download.disabled = false; download.textContent = this.i18n.t("ui.comic.open");
       download.onclick = () => this.actions.open(book.id);
-      progress.textContent = message;
+      progress.dataset.state = "added"; progress.textContent = message;
     };
 
     const existing = importer.existing({ collectionId: this.collectionId, entry });
@@ -108,22 +114,22 @@ export class ComicDetailsView extends BaseView {
 
     download.onclick = () => void (async () => {
       try {
-        download.disabled = true; progress.textContent = this.i18n.t("ui.catalog.downloading");
+        download.disabled = true; progress.dataset.state = "downloading"; progress.textContent = this.i18n.t("ui.catalog.downloading");
         const result = await importer.download(await request(), (current, total) => {
           progress.textContent = total && total > 0
             ? `${this.i18n.t("ui.catalog.downloading")} ${Math.min(100, Math.round(current * 100 / total))}%` : this.i18n.t("ui.catalog.downloading");
         });
         if (result.kind === "native-file") {
           this.downloaded = result.file;
-          progress.textContent = this.i18n.t("ui.comic.downloaded");
+          progress.dataset.state = "downloaded"; progress.textContent = this.i18n.t("ui.comic.downloaded");
         } else {
           this.browserDownloadStarted = true;
-          progress.textContent = `${this.i18n.t("catalog.downloadStarted")} ${this.i18n.t("catalog.selectExpectedFile", { filename: result.expectedFilename })}`;
+          progress.dataset.state = "downloaded"; progress.textContent = `${this.i18n.t("catalog.downloadStarted")} ${this.i18n.t("catalog.selectExpectedFile", { filename: result.expectedFilename })}`;
         }
         download.textContent = this.i18n.t("ui.comic.downloadAgain"); download.disabled = false;
         add.disabled = false;
       } catch {
-        download.disabled = false; download.textContent = this.i18n.t("ui.common.retry");
+        download.disabled = false; progress.dataset.state = "error"; download.textContent = this.i18n.t("ui.common.retry");
         progress.textContent = this.i18n.t("ui.catalog.downloadFailed");
       }
     })();
@@ -133,7 +139,7 @@ export class ComicDetailsView extends BaseView {
         add.disabled = true;
         const file = this.downloaded ?? (this.browserDownloadStarted ? await this.actions.pickDownloaded() : null);
         if (!file) { add.disabled = false; return; }
-        progress.textContent = this.i18n.t("ui.catalog.saving");
+        progress.dataset.state = "saving"; progress.textContent = this.i18n.t("ui.catalog.saving");
         const result = await importer.addDownloadedFile(await request(), file);
         if (result.kind === "browser-download") return;
         if (result.kind === "saved") this.actions.added(result.book);
@@ -141,7 +147,7 @@ export class ComicDetailsView extends BaseView {
         showOpen(result.book, result.kind === "existing" ? this.i18n.t("ui.comic.alreadyInLibrary") : this.i18n.t("ui.comic.added"));
       } catch (error) {
         add.disabled = false;
-        progress.textContent = error instanceof CollectionFileMismatchError ? this.i18n.t("ui.comic.fileMismatch")
+        progress.dataset.state = "error"; progress.textContent = error instanceof CollectionFileMismatchError ? this.i18n.t("ui.comic.fileMismatch")
           : error instanceof Error ? error.message : this.i18n.t("ui.catalog.downloadFailed");
       }
     })();

@@ -18,6 +18,9 @@ export class ComicCoverSource {
 
   public coverUrl(entry: DriveFolderEntry): string | null {
     if (!this.hasCover(entry)) return null;
+    // Drive's thumbnailLink is a 220px preview ("...=s220"); ask it for the size this
+    // screen shows, or the details page stretches a thumbnail into a blurred cover.
+    if (entry.thumbnailUrl) return entry.thumbnailUrl.replace(/=s\d+$/, `=s${Math.max(this.width, this.height)}`);
     const cached = this.urls.get(entry.id);
     if (cached) return cached;
     const url = `https://drive.google.com/thumbnail?id=${encodeURIComponent(entry.id)}&sz=w${this.width}-h${this.height}`;

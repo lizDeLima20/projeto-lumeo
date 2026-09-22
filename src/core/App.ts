@@ -219,7 +219,7 @@ export class App {
       params.get("file") ?? "", params.get("folder") ?? undefined, params.get("path")?.split(",").filter(Boolean),
       { importer: this.collectionImporter(), target: this.catalogDownloads.target,
         genreId: (listing) => this.comicGenreId(listing),
-        pickDownloaded: () => new FileSystemFolderManager(this.database).selectDownloadedBook(),
+        pickDownloaded: () => new FileSystemFolderManager(this.database).selectDownloadedPdf(),
         added: (book) => this.addComicToLibrary(book),
         open: (bookId) => this.openLibraryBook(bookId) },
       () => this.router.navigate("collection-genre", { id: params.get("id") ?? "" })));

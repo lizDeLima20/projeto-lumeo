@@ -1,5 +1,7 @@
 /** Shared, reviewed interface copy. Book titles, author names and book text never belong here. */
 export const INTERFACE_PT = {
+  "ui.comic.arc": "Arco",
+  "ui.comic.ready": "Pronta para baixar.",
   "ui.brand.tagline": "Leia · Evolua · Transforme",
   "ui.catalog.sources.title": "Fontes do catálogo",
   "ui.catalog.sources.help": "Cada gênero é uma pasta do Google Drive com books/, covers/ e catalog.json. Informe o nome e o link da pasta: os livros, capas e sinopses são lidos do catalog.json.",

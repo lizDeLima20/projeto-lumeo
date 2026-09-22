@@ -17,6 +17,7 @@ interface FilePickerOptions {
   id?: string;
   startIn?: FileSystemDirectoryHandle | "downloads";
   multiple?: boolean;
+  excludeAcceptAllOption?: boolean;
   types?: readonly { description: string; accept: Record<string, readonly string[]>; }[];
 }
 interface DirectoryPickerOptions { id?: string; startIn?: "downloads"; mode?: "read" | "readwrite"; }
@@ -86,6 +87,30 @@ export class FileSystemFolderManager {
     return this.selectWithInput();
   }
 
+  /** Comic imports are deliberately narrower than the general book picker. */
+  public async selectDownloadedPdf(): Promise<File | null> {
+    const startIn = await this.savedLumeoFolder();
+    if (this.supportsOpenFilePicker) {
+      try {
+        const handles = await this.openPdfPicker(startIn ?? "downloads");
+        return handles[0] ? handles[0].getFile() : null;
+      } catch (error) {
+        if (this.isAbort(error)) return null;
+        if (startIn) {
+          try {
+            const handles = await this.openPdfPicker("downloads");
+            return handles[0] ? handles[0].getFile() : null;
+          } catch (fallbackError) {
+            if (this.isAbort(fallbackError)) return null;
+            throw fallbackError;
+          }
+        }
+        throw error;
+      }
+    }
+    return this.selectPdfWithInput();
+  }
+
   private openFilePicker(startIn: FileSystemDirectoryHandle | "downloads"): Promise<readonly FileSystemFileHandle[]> {
     return (window as FileSystemAccessWindow).showOpenFilePicker!({
       id: "lumeo-book-import", startIn, multiple: false,
@@ -95,11 +120,29 @@ export class FileSystemFolderManager {
     });
   }
 
+  private openPdfPicker(startIn: FileSystemDirectoryHandle | "downloads"): Promise<readonly FileSystemFileHandle[]> {
+    return (window as FileSystemAccessWindow).showOpenFilePicker!({
+      id: "lumeo-comic-import", startIn, multiple: false,
+      // Only PDFs: without this the dialog still offers "All files" next to the PDF filter.
+      excludeAcceptAllOption: true,
+      types: [{ description: "HQ em PDF", accept: { "application/pdf": [".pdf"] } }],
+    });
+  }
+
   private selectWithInput(): Promise<File | null> {
     return new Promise((resolve) => {
       const input = document.createElement("input"); input.type = "file";
       input.accept = ".epub,.mobi,.pdf,application/epub+zip,application/x-mobipocket-ebook,application/pdf";
       input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true }); input.click();
+    });
+  }
+  private selectPdfWithInput(): Promise<File | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement("input"); input.type = "file"; input.accept = ".pdf,application/pdf";
+      input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true });
+      // Closing the dialog without a file must settle too, or "add" stays disabled forever.
+      input.addEventListener("cancel", () => resolve(null), { once: true });
+      input.click();
     });
   }
 
