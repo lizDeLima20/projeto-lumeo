@@ -144,7 +144,7 @@ body.reader-mode #app { position: fixed; inset: 0; width: 100%; height: 100dvh; 
 .open-book-page.page-turn-flexible-ready,.reflow-sheet.page-turn-flexible-ready{background-color:transparent!important;background-image:none!important;box-shadow:none!important}
 .page-turn-flexible-ready::before,.page-turn-flexible-ready::after{display:none!important}
 .page-turn-flexible-ready>*:not(.page-turn-flexible){visibility:hidden!important}
-.open-book-page>.page-turn-flexible,.reflow-sheet>.page-turn-flexible{position:absolute;top:0;z-index:40;display:block;max-width:none;max-height:none;visibility:visible!important;pointer-events:none;opacity:1}
+.open-book-page>.page-turn-flexible,.reflow-sheet>.page-turn-flexible,.reader-image-turn-leaf--flexible>.page-turn-flexible{position:absolute;top:0;z-index:40;display:block;max-width:none;max-height:none;visibility:visible!important;pointer-events:none;opacity:1}
 /* The moving sheet is one continuous opaque surface. Shadows are painted on that surface,
    never on per-strip rectangles, so Android WebView cannot reveal seams between slices. */
 .page-turn-active::before{display:none}
