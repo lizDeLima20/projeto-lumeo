@@ -24,7 +24,10 @@ import java.util.List;
 })
 public class ReadingReminderPlugin extends Plugin {
     @PluginMethod
-    public void getState(PluginCall call) { call.resolve(state()); }
+    public void getState(PluginCall call) {
+        ReadingReminderScheduler.ensureNotificationChannel(getContext());
+        call.resolve(state());
+    }
 
     @PluginMethod
     public void requestNotificationPermission(PluginCall call) {
@@ -45,6 +48,7 @@ public class ReadingReminderPlugin extends Plugin {
         List<ReadingReminderScheduler.ReadingReminderRecord> reminders = new ArrayList<>();
         reminders.add(record);
         ReadingReminderScheduler.replaceAll(getContext(), reminders);
+        ReadingReminderScheduler.requestExactAlarmPermission(getActivity());
         call.resolve(state());
     }
 
@@ -62,6 +66,7 @@ public class ReadingReminderPlugin extends Plugin {
             }
         } catch (Exception error) { call.reject("INVALID_REMINDERS"); return; }
         ReadingReminderScheduler.replaceAll(getContext(), reminders);
+        ReadingReminderScheduler.requestExactAlarmPermission(getActivity());
         call.resolve(state());
     }
 
@@ -84,6 +89,7 @@ public class ReadingReminderPlugin extends Plugin {
             next.add(reminder.id.equals(id) ? new ReadingReminderScheduler.ReadingReminderRecord(reminder.id, enabled, reminder.hour, reminder.minute, reminder.days, reminder.targetType, reminder.bookId, reminder.bookTitle) : reminder);
         }
         ReadingReminderScheduler.replaceAll(getContext(), next);
+        ReadingReminderScheduler.requestExactAlarmPermission(getActivity());
         call.resolve(state());
     }
 

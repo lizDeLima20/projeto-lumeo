@@ -1,6 +1,5 @@
 import { ApiError } from "../services/ApiClient";
 import { AuthManager } from "../services/AuthManager";
-import type { OfflineIdentity } from "../services/AuthManager";
 import { BaseView } from "./BaseView";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 
@@ -14,7 +13,7 @@ export class LoginView extends BaseView {
     const password = this.field("password", this.t("ui.auth.password"), "current-password", !import.meta.env.DEV);
     const error = this.createElement("p", "form-error"); error.setAttribute("role", "alert");
     const submit = this.createElement("button", "button button--primary", this.t("ui.auth.login")); submit.type = "submit";
-    const register = this.createElement("button", "text-button", this.t("ui.auth.register")); register.type = "button";
+    const register = this.createElement("button", "button button--secondary auth-action", this.t("ui.auth.register")); register.type = "button";
     register.addEventListener("click", this.onRegister);
     form.append(email.wrapper, password.wrapper, error, submit, new GoogleAuthButton("signin_with", async (credential, nonce) => {
       error.textContent = "";
@@ -35,21 +34,14 @@ export class LoginView extends BaseView {
       catch (caught) { error.textContent = caught instanceof ApiError ? caught.message : this.t("ui.auth.loginFailed"); }
       finally { submit.disabled = false; }
     });
-      section.append(form); void this.offlineOption(form, error); return section;
+      this.lumeoOption(form, error); section.append(form); return section;
   }
-    private async offlineOption(form: HTMLElement, error: HTMLElement): Promise<void> {
-      const identities = await this.auth.offlineIdentities(); if (!identities.length) return;
-      const section = this.createElement("section", "auth-offline");
-      section.append(this.createElement("h2", "auth-offline__title", this.t("ui.auth.offlineTitle")));
-      identities.forEach((identity: OfflineIdentity) => {
-        const button = this.createElement("button", "button button--secondary auth-offline__identity"); button.type = "button";
-        const label = identity.displayName || identity.email.split("@")[0] || identity.email;
-        button.textContent = `${this.t("ui.auth.offlineAs")} ${label}`;
-        button.addEventListener("click", async () => { button.disabled = true; error.textContent = ""; try { if (await this.auth.loginOffline(identity.id)) await this.onSuccess(); else error.textContent = this.t("ui.auth.offlineUnavailable"); } catch { error.textContent = this.t("ui.auth.offlineUnavailable"); } finally { button.disabled = false; } });
-        section.append(button);
-      });
-      form.append(section);
-    }
+  private lumeoOption(form: HTMLElement, error: HTMLElement): void {
+    const section = this.createElement("section", "auth-offline");
+    const button = this.createElement("button", "button button--lumeo auth-action", this.t("ui.auth.lumeo")); button.type = "button";
+    button.addEventListener("click", async () => { button.disabled = true; error.textContent = ""; try { await this.auth.enterWithLumeo(); await this.onSuccess(); } catch { error.textContent = this.t("ui.auth.offlineUnavailable"); } finally { button.disabled = false; } });
+    section.append(button); form.append(section);
+  }
   private field(type: string, label: string, autocomplete: string, required = true): { wrapper: HTMLLabelElement; input: HTMLInputElement } {
     const wrapper = this.createElement("label", "field"); wrapper.append(this.createElement("span", "field__label", label));
     const input = this.createElement("input", "input") as HTMLInputElement;

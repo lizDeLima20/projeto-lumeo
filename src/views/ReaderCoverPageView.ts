@@ -21,7 +21,12 @@ export class ReaderCoverPageView {
     image.src = cover.image;
     image.alt = `Capa de ${cover.title}`;
     image.addEventListener("load", () => this.samplePalette(image, frame), { once: true });
-    frame.append(image);
+    const backdrop = image.cloneNode() as HTMLImageElement;
+    backdrop.className = "reader-cover-page__backdrop";
+    backdrop.alt = "";
+    backdrop.setAttribute("aria-hidden", "true");
+    image.className = "reader-cover-page__image";
+    frame.append(backdrop, image);
     return frame;
   }
 

@@ -30,7 +30,7 @@ export class GoogleSignIn {
     await this.initializeOnce(api, text);
     GoogleSignIn.active = { callback: onCredential };
     host.replaceChildren();
-    api.renderButton(host, { type: "standard", theme: "outline", size: "large", text, shape: "pill", logo_alignment: "left", width: Math.min(400, Math.max(220, Math.round(host.clientWidth || 320))), locale: GoogleSignIn.locale() });
+    api.renderButton(host, { type: "standard", theme: "outline", size: "large", text, shape: "rectangular", logo_alignment: "left", width: Math.min(400, Math.max(220, Math.round(host.clientWidth || 320))), locale: GoogleSignIn.locale() });
   }
 
   private async initializeOnce(api: GoogleIdApi, text: GoogleButtonText): Promise<void> {

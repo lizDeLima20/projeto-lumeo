@@ -67,6 +67,18 @@ describe("sessão persistida", () => {
     assert.equal(state.authStatus, "OFFLINE_SESSION_AVAILABLE");
   });
 
+  it("Entrar com Lumeo reutiliza a última biblioteca local sem criar uma sessão remota", async () => {
+    const storage = new MemoryStorage(), state = new AppState(); let apiCalls = 0;
+    await storage.save("offline-identities", [{ id: "user-1", email: "reader@example.com", displayName: "Leitor" }]);
+    await storage.save("last-local-identity", "user-1");
+    const auth = new AuthManager({ setAccessToken: () => undefined, setSessionRefreshHandler: () => undefined, post: async () => { apiCalls++; throw new Error("não deveria chamar a BFF"); } } as never, storage as never, state);
+    await auth.enterWithLumeo();
+    assert.equal(apiCalls, 0);
+    assert.equal(state.currentUser?.id, "user-1");
+    assert.equal(state.authStatus, "LOCAL_LIBRARY_READY");
+    assert.equal(auth.isLocalLibraryMode, true);
+  });
+
   it("preserva a identidade quando o refresh expira sem internet", async () => {
     const storage = new MemoryStorage(), state = new AppState();
     await storage.save("auth-session", session(1));

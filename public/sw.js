@@ -1,4 +1,6 @@
-const SW_VERSION = "v12";
+// A new native bundle must also invalidate the WebView shell cache. Book files
+// live in OPFS/IndexedDB and are deliberately outside these caches.
+const SW_VERSION = "v13";
 const SHELL_CACHE = `lumeo-shell-${SW_VERSION}`;
 const ASSET_CACHE = `lumeo-assets-${SW_VERSION}`;
 const RUNTIME_CACHE = `lumeo-runtime-${SW_VERSION}`;

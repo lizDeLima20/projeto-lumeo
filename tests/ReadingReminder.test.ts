@@ -14,9 +14,17 @@ describe("lembrete de leitura Android", () => {
     assert.match(plugin, /@CapacitorPlugin\(name = "ReadingReminder"/);
     assert.match(plugin, /requestNotificationPermission/); assert.match(plugin, /saveReminders/); assert.match(plugin, /deleteReminder/); assert.match(plugin, /setReminderEnabled/);
     assert.match(receiver, /Hora da sua leitura/); assert.match(receiver, /notificacao_lembrete/); assert.match(receiver, /FLAG_INSISTENT/);
+    assert.match(receiver, /REMINDER_RECEIVED/); assert.match(receiver, /REMINDER_NOTIFICATION_CREATED/); assert.match(receiver, /REMINDER_SOUND_STARTED/);
     assert.match(receiver, /rescheduleFromSaved/); assert.match(scheduler, /setAndAllowWhileIdle/); assert.match(scheduler, /KEY_REMINDERS/);
+    assert.match(scheduler, /setExactAndAllowWhileIdle/); assert.match(scheduler, /REMINDER_SAVED/); assert.match(scheduler, /REMINDER_NEXT_TRIGGER/);
+    assert.match(scheduler, /ACTION_REQUEST_SCHEDULE_EXACT_ALARM/); assert.match(scheduler, /REMINDER_EXACT_PERMISSION_REQUESTED/);
     assert.match(manifest, /POST_NOTIFICATIONS/); assert.match(manifest, /RECEIVE_BOOT_COMPLETED/);
     assert.match(manifest, /ReadingReminderBootReceiver/); assert.match(activity, /registerPlugin\(ReadingReminderPlugin\.class\)/);
+    assert.match(activity, /registerPlugin\(ReaderSoundPlugin\.class\)/);
+    assert.match(activity, /ReadingReminderScheduler\.ensureNotificationChannel\(this\)/);
+    assert.match(activity, /ReadingReminderScheduler\.rescheduleFromSaved\(this\)/);
+    const schedulerSource = await readFile("android/app/src/main/java/com/lumeo/reader/ReadingReminderScheduler.java", "utf8");
+    assert.match(schedulerSource, /lumeo_reading_reminder_v3/); assert.match(schedulerSource, /notificacao_lembrete/); assert.match(schedulerSource, /ensureNotificationChannel/);
   });
 
   it("expõe múltiplos horários, dias e destino somente no Reader Android, sem fallback de timer Web", async () => {

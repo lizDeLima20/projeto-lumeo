@@ -56,13 +56,23 @@ describe("PageCurlGeometry",()=>{
     const source=readFileSync("src/reader/page-turn/PageCurl.ts","utf8");
     assert.match(source,/page-turn-surface/);
     assert.equal(source.includes("page-turn-strip"),false,"segmentos visiveis voltariam a mostrar costuras");
-    assert.match(source,/surface\.append\(front,back\)/,"frente e verso ficam na mesma folha fisica");
+    assert.match(source,/surface\.append\(front,back,mesh,bow,lip\)/,"frente, verso, ondulacao e borda flexivel ficam na mesma folha fisica");
+    assert.match(source,/page-turn-curl-lip/,"a folha interna tem dobra de borda continua");
+    assert.match(source,/page-turn-curl-bow/,"a ondulacao central precisa existir sem dividir a folha em tiras");
+    assert.equal(source.includes("page-turn-rib__inner"),false,"clonar a pagina em faixas volta a criar blocos visiveis no Android");
+    assert.equal(source.includes("bleed=Math.max"),false,"a folha nao deve depender de sobreposicao entre segmentos");
+    assert.match(source,/this\.nodes\.isCover\?"0":Math\.max\(\.08,lift\)/,"a capa fica rigida e as folhas internas dobram");
+    assert.equal(source.includes("feDisplacementMap"),false,"filtro SVG causou flicker/ondulacao artificial no Android");
+    assert.equal(source.includes("--curl-displacement"),false,"a dobra nao pode depender de filtro de deslocamento");
   });
   it("a folha curva nao revela faixas retangulares individuais",()=>{
     const css=readFileSync("src/styles/reader.css","utf8");
     assert.equal(css.includes(".page-turn-strip"),false,"CSS segmentado nao pode participar do folhear");
     assert.match(css,/\.page-turn-surface::before\{[^}]*linear-gradient/,"a sombra principal e continua na folha");
     assert.match(css,/\.page-turn-surface__front,\.page-turn-surface__back\{[^}]*background:var\(--reader-paper-lit\)/,"faces continuam opacas");
+    assert.doesNotMatch(css,/\.page-turn-surface--mesh>\.page-turn-surface__front/,"a folha principal nao pode ser escondida por uma malha de faixas");
+    assert.match(css,/\.page-turn-curl-bow\{[^}]*opacity:calc\(var\(--curl-lift,0\)\*\.92\)/,"a barriga da folha deve acompanhar o gesto");
+    assert.equal(css.includes(".page-turn-curl-defs"),false,"sem SVG/filter oculto no folhear");
   });
   it("a folha nao pode carregar overflow nem filter - achatam o arco",()=>{
     const css=readFileSync("src/styles/reader.css","utf8");
@@ -108,7 +118,7 @@ describe("acabamento do folhear",()=>{
     assert.match(css,/\.open-book-page:not\(\.page-turn-active\),\.reflow-sheet:not\(\.page-turn-active\)\{isolation:isolate\}/);
   });
   it("nenhuma faixa preta lateral acompanhando a borda",()=>{
-    assert.equal(/box-shadow:[^;}]*-\d{2,}px/.test(css),false,"sombra lateral pesada");
+    assert.equal(/box-shadow:[^;}]*#000/.test(css),false,"sombra preta chapada");
     assert.equal(leafRule.includes("box-shadow"),false);
   });
 });

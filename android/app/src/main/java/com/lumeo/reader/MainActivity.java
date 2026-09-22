@@ -12,8 +12,16 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeBookDownloadPlugin.class);
         registerPlugin(ReaderDisplayPlugin.class);
         registerPlugin(ReadingOpticsPlugin.class);
+        registerPlugin(ReaderSoundPlugin.class);
         registerPlugin(ReadingReminderPlugin.class);
         super.onCreate(savedInstanceState);
+        // Notification channels are created once by Android and retain their sound
+        // configuration. Create the current version at startup so a saved reminder
+        // is audible even before the user opens the Reader settings again.
+        ReadingReminderScheduler.ensureNotificationChannel(this);
+        // Android removes pending alarms when the application is updated. The saved
+        // records remain private to the app, so reconcile them every launch.
+        ReadingReminderScheduler.rescheduleFromSaved(this);
         Log.i("Lumeo", "android.launch package=com.lumeo.reader callback=com.lumeo.reader://auth/callback");
         handleReminderIntent(getIntent());
     }
@@ -23,6 +31,14 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleReminderIntent(intent);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Re-evaluate after the user returns from Android's “Alarms & reminders”
+        // special-access screen; this upgrades a saved fallback alarm to exact.
+        ReadingReminderScheduler.rescheduleFromSaved(this);
     }
 
     private void handleReminderIntent(Intent intent) {

@@ -9,6 +9,8 @@ export type SignupResult = AuthSession | { requiresEmailConfirmation: true };
 export class AuthManager {
   private static readonly SESSION_KEY = "auth-session";
   private static readonly OFFLINE_IDENTITIES_KEY = "offline-identities";
+  private static readonly LAST_LOCAL_IDENTITY_KEY = "last-local-identity";
+  private static readonly DEVICE_LIBRARY_ID = "device-local-library";
   private refreshInFlight: Promise<void> | null = null;
   public constructor(private readonly api: ApiClient, private readonly storage: StorageService, private readonly state: AppState) {
     // Small test doubles from older callers need not implement the optional
@@ -67,6 +69,26 @@ export class AuthManager {
   public async offlineIdentities(): Promise<OfflineIdentity[]> {
     return (await this.storage.load<OfflineIdentity[]>(AuthManager.OFFLINE_IDENTITIES_KEY)) ?? [];
   }
+  /** Opens only this device's existing library. This deliberately creates no BFF or
+   * Supabase session: the remembered identity is a local storage namespace, not a
+   * server authentication claim. */
+  public async enterWithLumeo(): Promise<void> {
+    const identities = await this.offlineIdentities();
+    const lastId = await this.storage.load<string>(AuthManager.LAST_LOCAL_IDENTITY_KEY);
+    const identity = identities.find(value => value.id === lastId) ?? identities.at(-1) ?? {
+      id: AuthManager.DEVICE_LIBRARY_ID,
+      email: "local@lumeo.device",
+      displayName: "Lumeo",
+    };
+    this.api.setAccessToken(null);
+    this.state.currentUser = { ...identity };
+    this.state.authStatus = "LOCAL_LIBRARY_READY";
+    this.state.deviceStatus = "authorized";
+    this.state.licenseStatus = "offline_grace";
+    await this.storage.save(AuthManager.LAST_LOCAL_IDENTITY_KEY, identity.id);
+    this.state.notify();
+  }
+  public get isLocalLibraryMode(): boolean { return this.state.authStatus === "LOCAL_LIBRARY_READY"; }
   /** Uses only a previously validated local identity. It never accepts or stores a password. */
   public async loginOffline(id: string): Promise<boolean> {
     const identity = (await this.offlineIdentities()).find(value => value.id === id);
@@ -76,6 +98,7 @@ export class AuthManager {
     this.state.authStatus = "OFFLINE_SESSION_AVAILABLE";
     this.state.deviceStatus = "authorized";
     this.state.licenseStatus = "offline_grace";
+    await this.storage.save(AuthManager.LAST_LOCAL_IDENTITY_KEY, identity.id);
     this.state.notify();
     return true;
   }
@@ -102,6 +125,7 @@ export class AuthManager {
     const next = identities.filter(value => value.id !== user.id && value.email !== user.email);
     next.push({ id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl });
     await this.storage.save(AuthManager.OFFLINE_IDENTITIES_KEY, next);
+    await this.storage.save(AuthManager.LAST_LOCAL_IDENTITY_KEY, user.id);
   }
   private async clearSession(): Promise<void> {
     this.api.setAccessToken(null);

@@ -136,7 +136,7 @@ export class App {
     await this.devices.initialize();
     await this.auth.initialize();
     if (this.isAuthenticated()) {
-        if (!this.connectivity.online || this.state.authStatus === "OFFLINE_SESSION_AVAILABLE" || this.state.authStatus === "OFFLINE_AUTHENTICATED") {
+        if (!this.connectivity.online || this.auth.isLocalLibraryMode || this.state.authStatus === "OFFLINE_SESSION_AVAILABLE" || this.state.authStatus === "OFFLINE_AUTHENTICATED") {
           if (this.state.currentUser) { this.configureLocalLibrary(this.state.currentUser.id); await this.hydrateLibrary(false); }
           this.state.authStatus = "OFFLINE_READY"; this.state.notify();
         } else {
@@ -222,6 +222,14 @@ export class App {
   }
 
   private async afterAuthentication(): Promise<void> {
+    if (this.auth.isLocalLibraryMode) {
+      if (this.state.currentUser) {
+        this.configureLocalLibrary(this.state.currentUser.id);
+        await this.hydrateLibrary(false);
+      }
+      this.router.navigate("library");
+      return;
+    }
     await this.resolveDevice();
     if (!this.isAuthenticated()) {
       throw new ApiError(403, "LICENSE_REQUIRED", "Esta conta não possui uma licença ativa.");
@@ -230,7 +238,7 @@ export class App {
   }
 
   private async resolveDevice(): Promise<void> {
-      if (this.state.authStatus === "OFFLINE_SESSION_AVAILABLE" || this.state.authStatus === "OFFLINE_AUTHENTICATED" || !this.connectivity.online) return;
+      if (this.auth.isLocalLibraryMode || this.state.authStatus === "OFFLINE_SESSION_AVAILABLE" || this.state.authStatus === "OFFLINE_AUTHENTICATED" || !this.connectivity.online) return;
     try {
       const device = await this.devices.ensureAuthorized();
       if (device.status === "authorized") {
@@ -311,7 +319,7 @@ export class App {
     const preferences = this.preferences.fromState(true, this.state.settings.theme, this.state.genres);
     await Promise.all([Promise.all(this.state.genres.map((genre) => this.genres.save(genre))),
       this.preferences.save(preferences), this.storage.save("theme", this.state.settings.theme)]);
-    void this.persistPreferences(preferences).catch(() => undefined);
+    if (!this.auth.isLocalLibraryMode) void this.persistPreferences(preferences).catch(() => undefined);
     this.applyTheme(this.state.settings.theme); this.router.navigate("home");
   }
 
@@ -336,7 +344,7 @@ export class App {
 
   private async addBook(book: Book): Promise<void> {
     this.state.library.addBook(book); this.state.notify();
-    void this.persistRemoteBook(book).catch(() => undefined);
+    if (!this.auth.isLocalLibraryMode) void this.persistRemoteBook(book).catch(() => undefined);
     void new StoragePersistenceService().requestAfterImport();
     this.router.navigate("book", { id: book.id }); this.showToast("Livro adicionado à biblioteca.");
   }
@@ -392,8 +400,8 @@ export class App {
     const accountPreferences = this.preferences.fromState(this.state.onboardingCompleted, this.state.settings.theme, this.state.genres);
     await this.preferences.save(accountPreferences);
     await Promise.all([
-      this.persistRemoteBook(libraryBook),
-      this.persistPreferences(accountPreferences),
+      this.auth.isLocalLibraryMode ? Promise.resolve() : this.persistRemoteBook(libraryBook),
+      this.auth.isLocalLibraryMode ? Promise.resolve() : this.persistPreferences(accountPreferences),
     ]).catch(() => undefined);
     this.logCatalogImport("LIBRARY_REGISTERED", { bookId: catalogBook.bookId, localBookId: saved.id });
     this.state.notify(); void new StoragePersistenceService().requestAfterImport(); this.showToast(I18nManager.shared.t("ui.catalog.complete"));
@@ -404,7 +412,7 @@ export class App {
   private async updateBook(book: Book): Promise<void> {
     await this.libraryService.saveBook(book);
     this.state.library.replaceBooks(this.state.books.map((item) => item.id === book.id ? book : item));
-    void this.persistRemoteBook(book).catch(() => undefined);
+    if (!this.auth.isLocalLibraryMode) void this.persistRemoteBook(book).catch(() => undefined);
     this.state.notify(); this.router.navigate("book", { id: book.id }); this.showToast("Livro atualizado.");
   }
 
@@ -412,7 +420,7 @@ export class App {
     this.state.library.replaceBooks(this.state.books.map((item) => item.id === book.id ? book : item));
     // Reader progress updates the Book record asynchronously. Mirror only its
     // lightweight metadata; the file, annotations and highlights stay local.
-    void this.persistRemoteBook(book).catch(() => undefined);
+    if (!this.auth.isLocalLibraryMode) void this.persistRemoteBook(book).catch(() => undefined);
     this.state.notify();
   }
 
@@ -435,7 +443,7 @@ export class App {
       const result = await service.add({ collectionId, entry, listing, genreId: genre.id });
       if (result.kind === "browser-download") { this.showToast(`Baixe "${result.expectedFilename}" e importe pelo botão Adicionar livro.`); return; }
       this.state.library.addBook(result.book); this.state.notify();
-      void this.persistRemoteBook(result.book).catch(() => undefined);
+      if (!this.auth.isLocalLibraryMode) void this.persistRemoteBook(result.book).catch(() => undefined);
       this.showToast("HQ adicionada à biblioteca.");
       this.router.navigate("book", { id: result.book.id });
     } catch (error) {
@@ -482,7 +490,8 @@ export class App {
     this.state.settings.theme = theme; this.applyTheme(theme); await this.storage.save("theme", theme);
     if (this.state.currentUser) {
       const preferences = this.preferences.fromState(this.state.onboardingCompleted, theme, this.state.genres);
-      await this.preferences.save(preferences); void this.persistPreferences(preferences).catch(() => undefined);
+      await this.preferences.save(preferences);
+      if (!this.auth.isLocalLibraryMode) void this.persistPreferences(preferences).catch(() => undefined);
     }
     this.state.notify();
   }
@@ -504,7 +513,7 @@ export class App {
     I18nManager.shared.localizeTree(this.footerRoot);
   }
 
-  private isAuthenticated(): boolean { return ["authenticated", "AUTHENTICATED", "OFFLINE_AUTHENTICATED", "OFFLINE_SESSION_AVAILABLE", "OFFLINE_READY", "SESSION_RESTORED", "USER_DATA_LOADING", "READY", "ONLINE_READY"].includes(this.state.authStatus); }
+  private isAuthenticated(): boolean { return ["authenticated", "AUTHENTICATED", "OFFLINE_AUTHENTICATED", "OFFLINE_SESSION_AVAILABLE", "OFFLINE_READY", "LOCAL_LIBRARY_READY", "SESSION_RESTORED", "USER_DATA_LOADING", "READY", "ONLINE_READY"].includes(this.state.authStatus); }
   private hasUsableLicense(): boolean { return this.state.licenseStatus === "active" || this.state.licenseStatus === "offline_grace" || this.state.licenseStatus === "grace"; }
 
   private async logout(): Promise<void> {
@@ -513,17 +522,20 @@ export class App {
     await this.auth.logout(); this.state.library.replaceBooks([]); this.state.library.replaceGenres([]); this.state.onboardingCompleted = false; this.state.notify(); this.router.navigate("login");
   }
   private persistRemoteBook(book: Book): Promise<void> {
-    const userId = this.state.currentUser?.id; if (!userId) return Promise.resolve();
+    const userId = this.state.currentUser?.id; if (!userId || this.auth.isLocalLibraryMode) return Promise.resolve();
     return new ReadingReviewRepository(this.database).get(userId, book.id)
       .then(review => this.syncOutbox().enqueueBook(book, this.state.genres.find((genre) => genre.id === book.genreId), review))
       .then(() => this.connectivity.online ? this.syncOutbox().flush() : undefined)
       .then(() => { if (this.connectivity.online) this.connectivity.markReconnected(); });
   }
-  private persistRemoteDelete(bookId: string): Promise<void> { return this.syncOutbox().enqueueDelete(bookId).then(() => this.connectivity.online ? this.syncOutbox().flush() : undefined); }
+  private persistRemoteDelete(bookId: string): Promise<void> {
+    if (this.auth.isLocalLibraryMode) return Promise.resolve();
+    return this.syncOutbox().enqueueDelete(bookId).then(() => this.connectivity.online ? this.syncOutbox().flush() : undefined);
+  }
   private persistPreferences(preferences: Parameters<SyncOutbox["enqueuePreferences"]>[0]): Promise<void> { return this.syncOutbox().enqueuePreferences(preferences).then(() => this.connectivity.online ? this.syncOutbox().flush() : undefined); }
   private syncOutbox(): SyncOutbox { return new SyncOutbox(new SyncOutboxRepository(this.database), this.accountPersistence, this.state.currentUser?.id ?? "anonymous"); }
   private async syncLocalLibrary(): Promise<void> {
-    if (!this.state.currentUser || !this.connectivity.online) return;
+    if (!this.state.currentUser || this.auth.isLocalLibraryMode || !this.connectivity.online) return;
     await Promise.all(this.state.books.map(async book => {
       const review = await new ReadingReviewRepository(this.database).get(this.state.currentUser!.id, book.id);
       await this.syncOutbox().enqueueBook(book, this.state.genres.find(genre => genre.id === book.genreId), review);

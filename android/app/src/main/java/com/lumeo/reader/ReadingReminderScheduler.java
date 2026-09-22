@@ -1,10 +1,17 @@
 package com.lumeo.reader;
 
 import android.app.AlarmManager;
+import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.AudioAttributes;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -20,6 +27,7 @@ final class ReadingReminderScheduler {
     static final String EXTRA_REMINDER_ID = "reminderId";
     private static final String TAG = "ReadingReminder";
     private static final String KEY_REMINDERS = "reminders";
+    static final String CHANNEL_ID = "lumeo_reading_reminder_v3";
 
     private ReadingReminderScheduler() {}
 
@@ -44,6 +52,8 @@ final class ReadingReminderScheduler {
     static void replaceAll(Context context, List<ReadingReminderRecord> reminders) {
         cancelAll(context);
         saveAll(context, reminders);
+        Log.i(TAG, "REMINDER_SAVED count=" + reminders.size());
+        ensureNotificationChannel(context);
         armAll(context);
     }
 
@@ -59,13 +69,57 @@ final class ReadingReminderScheduler {
 
     static void rescheduleFromSaved(Context context) { armAll(context); }
 
+    /** Android 12+ denies precise alarms by default for newly installed apps.
+     * Ask through the system's special-access screen; never fake this grant. */
+    static void requestExactAlarmPermission(Activity activity) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+        AlarmManager alarms = activity.getSystemService(AlarmManager.class);
+        if (alarms == null || alarms.canScheduleExactAlarms()) return;
+        try {
+            Intent settings = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                .setData(Uri.parse("package:" + activity.getPackageName()));
+            activity.startActivity(settings);
+            Log.i(TAG, "REMINDER_EXACT_PERMISSION_REQUESTED");
+        } catch (Exception error) {
+            Log.e(TAG, "REMINDER_ERROR stage=exact_alarm_permission_request");
+        }
+    }
+
     static void arm(Context context, ReadingReminderRecord reminder) {
         if (reminder.days.length == 0 || !reminder.enabled) return;
+        ensureNotificationChannel(context);
         long next = nextOccurrence(reminder.hour, reminder.minute, reminder.days);
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (alarms == null) return;
-        alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pendingIntent(context, reminder.id));
-        Log.i(TAG, "reminder.scheduled id=" + safe(reminder.id) + " nextTriggerAt=" + next);
+        if (alarms == null) {
+            Log.e(TAG, "REMINDER_ERROR stage=alarm_manager_unavailable");
+            return;
+        }
+        PendingIntent pending = pendingIntent(context, reminder.id);
+        boolean exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms();
+        if (exact) alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pending);
+        else alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pending);
+        Log.i(TAG, "REMINDER_NEXT_TRIGGER id=" + safe(reminder.id) + " epochMs=" + next + " timezone=" + java.util.TimeZone.getDefault().getID());
+        Log.i(TAG, "REMINDER_SCHEDULED id=" + safe(reminder.id) + " exact=" + exact + " days=" + reminder.days.length);
+    }
+
+    /** Android channels are immutable after first creation. v3 restores the
+     * configured Lumeo sound even when an older silent channel exists. */
+    static void ensureNotificationChannel(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null || manager.getNotificationChannel(CHANNEL_ID) != null) return;
+        Uri sound = Uri.parse("android.resource://" + context.getPackageName() + "/raw/notificacao_lembrete");
+        AudioAttributes attributes = new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build();
+        NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Lembrete de leitura", NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription("Lembretes diários de leitura do Lumeo");
+        channel.setSound(sound, attributes);
+        channel.enableVibration(true);
+        channel.setVibrationPattern(new long[]{0, 350, 180, 350});
+        manager.createNotificationChannel(channel);
+        Log.i(TAG, "REMINDER_CHANNEL_READY sound=notificacao_lembrete");
     }
 
     private static PendingIntent pendingIntent(Context context, String id) {
