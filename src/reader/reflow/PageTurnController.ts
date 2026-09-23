@@ -31,10 +31,13 @@ export class PageTurnController {
     this.element.addEventListener("pointermove", this.move);
     this.element.addEventListener("pointerup", this.up);
     this.element.addEventListener("pointercancel", this.cancel);
-    this.element.addEventListener("lostpointercapture", this.cancel);
+    this.element.addEventListener("lostpointercapture", this.lost);
     // Start both face captures while the reader is idle. The DOM page remains visible
-    // until the WebGL sheet is completely ready.
-    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => this.flexible.prepare(this.element));
+    // until the WebGL sheet is completely ready. Photographing a page is heavy: it waits
+    // for an idle moment so it never lands on the frames that follow a turn.
+    const warm = (): void => this.flexible.prepare(this.element);
+    if (typeof requestIdleCallback === "function") requestIdleCallback(warm, { timeout: 500 });
+    else if (typeof requestAnimationFrame === "function") requestAnimationFrame(warm);
   }
 
   public unbind(): void {
@@ -42,7 +45,7 @@ export class PageTurnController {
     this.element.removeEventListener("pointermove", this.move);
     this.element.removeEventListener("pointerup", this.up);
     this.element.removeEventListener("pointercancel", this.cancel);
-    this.element.removeEventListener("lostpointercapture", this.cancel);
+    this.element.removeEventListener("lostpointercapture", this.lost);
     this.intent.release(); this.releasePointer();
   }
 
@@ -55,7 +58,7 @@ export class PageTurnController {
     this.busy = true;
     try {
       if (this.desktop) await this.flexible.prepareReady(this.element);
-      return await this.engine.programmatic(direction);
+      return await this.engine.programmatic(direction, this.desktop ? PageTurnEngine.desktopTurn : undefined);
     } finally { this.busy = false; }
   }
 
@@ -99,6 +102,11 @@ export class PageTurnController {
     this.active = false; this.releasePointer(); this.busy = true;
     void this.engine.end(event.clientX, event.timeStamp, event.clientY).finally(() => { this.busy = false; });
   };
+
+  /* Android's WebView hands the touch capture back in the middle of a swipe - the finger
+     is still down and the leaf is still being dragged. Treating that as a cancellation
+     aborted every turn on the phone. Only a mouse losing capture means the drag is over. */
+  private readonly lost = (event: PointerEvent): void => { if (event.pointerType === "mouse") this.cancel(); };
 
   private readonly cancel = (): void => {
     this.intent.release();

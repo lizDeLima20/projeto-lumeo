@@ -55,6 +55,17 @@ describe("a folha em movimento tem frente, verso e página de baixo reais", () =
     assert.doesNotMatch(curl, /for\(const element of clonedDocument\.querySelectorAll/);
     assert.match(curl, /const resolved=new Map<string,string>\(\);/);
   });
+  it("fotografar a página não pode atrasar a virada no celular", () => {
+    const curl = read("reader/page-turn/FlexiblePageCurl.ts");
+    // Measured on the device: capturing the whole reader for every face made the leaf
+    // start ~100ms after the finger and stutter at the end of the turn.
+    assert.match(curl, /ignoreElements: \(element: Element\) => document\.body\.contains\(element\)\s*&& element !== page && !page\.contains\(element\) && !element\.contains\(page\)/);
+    assert.match(curl, /private static captureScale\(\): number \{[\s\S]*?density >= 2 \? 1 :/);
+    // One face at a time on a phone, with a frame in between for the finger.
+    assert.match(curl, /const front = await this\.captureFace\(page, "front"\);\s*await FlexiblePageCurl\.breathe\(\);/);
+    // And the warming itself waits for an idle moment after a turn.
+    assert.match(read("reader/reflow/PageTurnController.ts"), /requestIdleCallback\(warm, \{ timeout: 500 \}\)/);
+  });
   it("livro aberto: a orelha da página em repouso não entra na textura", () => {
     // Measured on the desktop leaf: the resting ::after corner flew with every turn as a
     // white square. html2canvas has already made it a real last child when onclone runs.

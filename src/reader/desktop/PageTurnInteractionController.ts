@@ -28,7 +28,7 @@ export class PageTurnInteractionController {
     this.root.addEventListener("pointermove", this.move);
     this.root.addEventListener("pointerup", this.up);
     this.root.addEventListener("pointercancel", this.cancel);
-    this.root.addEventListener("lostpointercapture", this.cancel);
+    this.root.addEventListener("lostpointercapture", this.lost);
     window.addEventListener("blur", this.cancel);
     document.addEventListener("visibilitychange", this.visibility);
     this.warm();
@@ -40,7 +40,7 @@ export class PageTurnInteractionController {
     this.root.removeEventListener("pointermove", this.move);
     this.root.removeEventListener("pointerup", this.up);
     this.root.removeEventListener("pointercancel", this.cancel);
-    this.root.removeEventListener("lostpointercapture", this.cancel);
+    this.root.removeEventListener("lostpointercapture", this.lost);
     window.removeEventListener("blur", this.cancel);
     document.removeEventListener("visibilitychange", this.visibility);
     this.cancel();
@@ -78,7 +78,7 @@ export class PageTurnInteractionController {
       if (this.desktop && !page.classList.contains("open-book-page--cover")) await this.textures.prepareReady(page);
       if (this.disposed) return false;
       this.engine = this.create(page);
-      return await this.engine.programmatic(direction);
+      return await this.engine.programmatic(direction, this.desktop ? PageTurnEngine.desktopTurn : undefined);
     } catch { return false; }
     finally { this.busy = false; }
   }
@@ -128,6 +128,11 @@ export class PageTurnInteractionController {
     const work = valid ? this.engine?.end(event.clientX, event.timeStamp, event.clientY) : this.engine?.cancel();
     void work?.finally(() => { this.busy = false; this.cover.onFinished?.(); });
   };
+  /* Android's WebView hands a touch capture back in the middle of a swipe, with the finger
+     still on the leaf. Only a mouse losing capture (another window, a drag that left the
+     page) means the gesture is over. */
+  private readonly lost = (event: PointerEvent): void => { if (event.pointerType === "mouse") this.cancel(); };
+
   private readonly cancel = (): void => {
     this.intent.release();
     if (!this.active) { this.releasePointer(); return; }

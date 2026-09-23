@@ -133,4 +133,17 @@ describe("desktop mouse turn isolation", () => {
     assert.match(source, /reader-image-turn-leaf--\$\{direction\}/,
       "the existing non-desktop animation remains available for Android");
   });
+  it("no Android, perder a captura do toque no meio do gesto não cancela a virada", () => {
+    // Measured on the device: the WebView hands the touch capture back during a swipe
+    // ("gotpointercapture -> pointermove -> lostpointercapture", finger still down). While
+    // that counted as a cancellation, no page on the phone ever finished turning.
+    const single = readFileSync(new URL("../src/reader/reflow/PageTurnController.ts", import.meta.url), "utf8");
+    assert.match(single, /addEventListener\("lostpointercapture", this\.lost\)/);
+    assert.match(single, /private readonly lost = \(event: PointerEvent\): void => \{ if \(event\.pointerType === "mouse"\) this\.cancel\(\); \};/);
+    const spread = readFileSync(new URL("../src/reader/desktop/PageTurnInteractionController.ts", import.meta.url), "utf8");
+    assert.match(spread, /addEventListener\("lostpointercapture", this\.lost\)/);
+    assert.match(spread, /private readonly lost = \(event: PointerEvent\): void => \{ if \(event\.pointerType === "mouse"\) this\.cancel\(\); \};/);
+    // A real cancellation (the system taking the gesture) still ends the turn.
+    for (const code of [single, spread]) assert.match(code, /addEventListener\("pointercancel", this\.cancel\)/);
+  });
 });

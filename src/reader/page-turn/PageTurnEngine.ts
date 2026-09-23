@@ -1,4 +1,5 @@
 import{PageGeometry,type PageTransform}from"./PageGeometry";import{PageGestureController}from"./PageGestureController";import{PageShadowRenderer}from"./PageShadowRenderer";import{PageCurl}from"./PageCurl";import{FlexiblePageCurl}from"./FlexiblePageCurl";
+export interface TurnMotion{durationMs:number;curve:readonly [number,number,number,number];}
 export type PageTurnState="IDLE"|"DRAGGING"|"COMPLETING"|"RETURNING"|"DISABLED";export type TurnDirection=1|-1;
 
 /** Cubic-bezier sampled by hand: the settle now drives `progress` frame by frame so
@@ -19,6 +20,11 @@ export class PageTurnEngine {
   /** A flick finishes the turn on its own - the range touch readers use (~0.3-0.4 px/ms).
    *  .55px/ms was faster than most thumbs swipe. */
   public static readonly flickVelocity=.3;
+  /** A whole turn with no hand on the leaf - a click or an arrow key on the desktop Web.
+   *  The settle curve above finishes a drag the hand already started: from rest it swept
+   *  most of the leaf across in the first ~150ms, so a click read as the text swapping on
+   *  a flat page. This one lifts, carries and lands the leaf at a readable pace. */
+  public static readonly desktopTurn:TurnMotion={durationMs:1050,curve:[.45,.05,.3,1]};
   private stateValue:PageTurnState="IDLE";private readonly gesture=new PageGestureController();
   private frame=0;private pending:PageTransform|null=null;private velocity=0;private direction:TurnDirection=1;private pointerY=0;
   /* Covers stay with the approved rigid renderer. Internal leaves use only the
@@ -82,10 +88,12 @@ export class PageTurnEngine {
   public shouldComplete(progress:number,velocityX:number,direction:TurnDirection):boolean{
     return progress>=this.threshold||Math.abs(velocityX)>=PageTurnEngine.flickVelocity&&(direction===1?velocityX<0:velocityX>0);
   }
-  public async programmatic(direction:TurnDirection):Promise<boolean>{
+  /** Without `motion` this is exactly the phone's turn. `motion` is the desktop Web's
+   *  full turn: the leaf starts at rest and the whole 0..1 sweep is animated. */
+  public async programmatic(direction:TurnDirection,motion?:TurnMotion):Promise<boolean>{
     if(!this.begin(direction===1?this.page.clientWidth:0,performance.now(),direction))return false;
-    const start=this.geometry.atProgress(.08,this.page.clientWidth,direction);
-    this.apply(start);await this.settle(true,start);this.commit(direction);this.reset();return true;
+    const start=this.geometry.atProgress(motion?0:.08,this.page.clientWidth,direction);
+    this.apply(start);await this.settle(true,start,motion);this.commit(direction);this.reset();return true;
   }
   public disable():void{this.stateValue="DISABLED";}
 
@@ -110,21 +118,22 @@ export class PageTurnEngine {
    *  Clearing is deliberately left to reset(), which runs only after the new spread has
    *  been committed - otherwise the leaf snapped back to 0deg still carrying the old
    *  page for one frame, which read as a flicker. */
-  private settle(complete:boolean,current:PageTransform):Promise<void>{
+  private settle(complete:boolean,current:PageTransform,motion?:TurnMotion):Promise<void>{
     this.stateValue=complete?"COMPLETING":"RETURNING";
     cancelAnimationFrame(this.frame);this.frame=0;
     const from=current.progress,to=complete?1:0;
     /* The finishing move is deliberately unhurried: the reader has to see the leaf let
        go of the gutter, sag and leave. Duration scales with how far is left to go. */
     const span=complete?PageTurnEngine.completeMs:PageTurnEngine.restoreMs;
-    const duration=span[0]+(span[1]-span[0])*Math.min(1,Math.abs(to-from));
+    const duration=motion?.durationMs??span[0]+(span[1]-span[0])*Math.min(1,Math.abs(to-from));
+    const curve=motion?.curve??PageTurnEngine.settleCurve;
     const width=this.page.clientWidth||1;
     if(typeof requestAnimationFrame!=="function")return Promise.resolve();
     return new Promise(resolve=>{
       const started=performance.now();
       const step=()=>{
         const t=Math.min(1,(performance.now()-started)/duration);
-        const eased=easeProgress(...PageTurnEngine.settleCurve,t);
+        const eased=easeProgress(...curve,t);
         this.apply(this.geometry.atProgress(from+(to-from)*eased,width,this.direction));
         if(t<1){this.frame=requestAnimationFrame(step);return;}
         this.frame=0;resolve();

@@ -137,6 +137,22 @@ export class FlexiblePageCurl {
     this.backTexture = null;
   }
 
+  /** How sharp a face is photographed. A dense phone screen is already three times the
+   *  CSS grid: capturing at that density cost more than the turn could spend, and the
+   *  texture is only on screen while the leaf is moving. */
+  private static captureScale(): number {
+    const density = window.devicePixelRatio || 1;
+    return density >= 2 ? 1 : Math.min(1.5, Math.max(1, density));
+  }
+
+  /** Hands the main thread back for one frame, so a finger on the page is answered. */
+  private static breathe(): Promise<void> {
+    return new Promise(resolve => {
+      if (typeof requestAnimationFrame !== "function") { resolve(); return; }
+      requestAnimationFrame(() => resolve());
+    });
+  }
+
   private snapshotKey(backSource: HTMLElement | null): string {
     return (this.desktopFaces ? "desktop:" : "") + (backSource ? `under:${backSource.dataset.page ?? "previous"}` : "verso");
   }
@@ -149,9 +165,13 @@ export class FlexiblePageCurl {
       const back = await this.captureFace(backSource ?? page, backSource ? "source" : "verso");
       return { front, back };
     }
-    const front = this.captureFace(page, "front");
-    const back = backSource ? this.captureFace(backSource, "source") : this.captureFace(page, "verso");
-    return Promise.all([front, back]).then(([frontFace, backFace]) => ({ front: frontFace, back: backFace }));
+    /* Phones capture one face at a time, with a frame in between. Measured on the device:
+       both captures at once held the main thread through the start of the next swipe, so
+       the leaf only began to move ~100ms after the finger. */
+    const front = await this.captureFace(page, "front");
+    await FlexiblePageCurl.breathe();
+    const back = await (backSource ? this.captureFace(backSource, "source") : this.captureFace(page, "verso"));
+    return { front, back };
   }
 
   private async captureFace(page: HTMLElement, face: "front" | "verso" | "source"): Promise<HTMLCanvasElement> {
@@ -163,7 +183,12 @@ export class FlexiblePageCurl {
     const ink = this.rgb(style.color);
     const snapshot = html2canvas(page, {
       backgroundColor: paper,
-      scale: Math.min(1.5, Math.max(1, window.devicePixelRatio || 1)),
+      scale: FlexiblePageCurl.captureScale(),
+      /* Only the page being photographed is worth copying. Without this, every capture
+         cloned and parsed the whole reader - the other sheets, the controls, the panels -
+         which is what made a turn stutter on the phone. */
+      ignoreElements: (element: Element) => document.body.contains(element)
+        && element !== page && !page.contains(element) && !element.contains(page),
       useCORS: true,
       allowTaint: false,
       logging: false,
