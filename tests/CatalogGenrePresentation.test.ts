@@ -18,3 +18,20 @@ describe("separação entre catálogo oficial e categorias pessoais", () => {
     assert.match(source, /this\.languageSelector\(\), this\.themeSelector\(\), complete/);
   });
 });
+
+describe("controles sempre acessíveis no catálogo", () => {
+  it("mantém busca e gêneros no fluxo existente de filtro remoto", () => {
+    const source = readFileSync("src/views/CatalogExplorerView.ts", "utf8");
+    assert.match(source, /controls\.append\(search, genres\)/);
+    assert.match(source, /this\.load\(search\.value, selectedGenre, more\)/);
+    assert.match(source, /this\.enableGenreDrag\(genres\)/);
+    assert.match(source, /container\.scrollLeft = startScroll - delta/);
+  });
+
+  it("fixa apenas os controles abaixo da header e mantém swipe horizontal touch", () => {
+    const styles = readFileSync("src/styles/catalog.css", "utf8");
+    assert.match(styles, /\.catalog__controls\{position:sticky;top:4\.25rem/);
+    assert.match(styles, /@media\(max-width:63\.99rem\)\{\.catalog__controls\{top:5\.35rem\}\}/);
+    assert.match(styles, /\.catalog__genre-carousel\{[^}]*touch-action:pan-x/);
+  });
+});

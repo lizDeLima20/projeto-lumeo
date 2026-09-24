@@ -8,6 +8,8 @@ export class CatalogExplorerView extends BaseView {
   private readonly catalog: CatalogService;
   private cursor: string | null = null;
   private loading = false;
+  private pendingLoad: { query: string; genreId: string; more: HTMLButtonElement } | null = null;
+  private loadVersion = 0;
   private readonly loaded = new Set<string>();
   private readonly classified: HTMLElement = document.createElement("div");
   private status: HTMLElement | null = null;
@@ -28,6 +30,7 @@ export class CatalogExplorerView extends BaseView {
     // and must never masquerade as catalogue genres here.
     addGenre("", this.t("ui.catalog.allGenres"));
     this.addCatalogGenre = addGenre;
+    this.enableGenreDrag(genres);
     controls.append(search, genres);
     const list = this.createElement("div", "catalog__sections");
     this.classified.className = "catalog__grid";
@@ -60,11 +63,15 @@ export class CatalogExplorerView extends BaseView {
       link.addEventListener("click", () => this.onManageSources?.()); heading.append(link);
     } catch { /* No admin link when the status cannot be read. */ }
   }
-  private reset(): void { this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); }
+  private reset(): void { this.loadVersion += 1; this.pendingLoad = null; this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); }
   private async load(query: string, genreId: string, more: HTMLButtonElement): Promise<void> {
-    if (this.loading || this.cursor === "end") return; this.loading = true; more.disabled = true; this.status!.textContent = this.t("ui.common.loading");
+    if (this.loading) { this.pendingLoad = { query, genreId, more }; return; }
+    if (this.cursor === "end") return;
+    const version = this.loadVersion;
+    this.loading = true; more.disabled = true; this.status!.textContent = this.t("ui.common.loading");
     try {
       const page = await this.catalog.list({ cursor: this.cursor ?? undefined, query: query.trim() || undefined, genreId: genreId || undefined });
+      if (version !== this.loadVersion) return;
       page.genres?.forEach((genre) => this.addCatalogGenre(genre.id, genre.name));
       page.items.filter((book) => !this.loaded.has(book.bookId)).forEach((book) => {
         this.loaded.add(book.bookId);
@@ -72,8 +79,46 @@ export class CatalogExplorerView extends BaseView {
       });
       this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end"; this.status!.textContent = this.loaded.size ? "" : this.t("ui.catalog.empty");
       this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
-    } catch (error) { this.status!.textContent = error instanceof Error ? error.message : this.t("ui.catalog.offline"); }
-    finally { this.loading = false; more.disabled = false; }
+    } catch (error) {
+      if (version === this.loadVersion) this.status!.textContent = error instanceof Error ? error.message : this.t("ui.catalog.offline");
+    } finally {
+      this.loading = false; more.disabled = false;
+      const pending = this.pendingLoad;
+      this.pendingLoad = null;
+      if (pending) void this.load(pending.query, pending.genreId, pending.more);
+    }
+  }
+  private enableGenreDrag(container: HTMLElement): void {
+    let pointerId: number | null = null;
+    let startX = 0;
+    let startScroll = 0;
+    let dragging = false;
+    let suppressClick = false;
+    container.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "mouse" || event.button !== 0) return;
+      pointerId = event.pointerId; startX = event.clientX; startScroll = container.scrollLeft; dragging = false;
+    });
+    container.addEventListener("pointermove", (event) => {
+      if (pointerId !== event.pointerId) return;
+      const delta = event.clientX - startX;
+      if (!dragging && Math.abs(delta) > 5) { dragging = true; container.setPointerCapture(event.pointerId); }
+      if (dragging) container.scrollLeft = startScroll - delta;
+    });
+    const finish = (event: PointerEvent): void => {
+      if (pointerId !== event.pointerId) return;
+      if (dragging) {
+        suppressClick = true;
+        if (container.hasPointerCapture(event.pointerId)) container.releasePointerCapture(event.pointerId);
+        window.setTimeout(() => { suppressClick = false; }, 0);
+      }
+      pointerId = null; dragging = false;
+    };
+    container.addEventListener("pointerup", finish);
+    container.addEventListener("pointercancel", finish);
+    container.addEventListener("click", (event) => {
+      if (!suppressClick) return;
+      event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false;
+    }, true);
   }
   private card(book: CatalogBookData): HTMLElement {
     const card = this.createElement("article", "catalog-card"); card.tabIndex = 0; card.addEventListener("click", () => this.onOpen(book.bookId)); card.addEventListener("keydown", (event) => { if (event.key === "Enter") this.onOpen(book.bookId); }); const cover = this.createElement("div", "catalog-card__cover");

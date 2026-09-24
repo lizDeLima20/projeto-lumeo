@@ -22,3 +22,9 @@
 .catalog-source-report{margin:0;padding-left:1.1rem;display:grid;gap:.15rem}
 .catalog-source-report--no_access,.catalog-source-report--no_catalog,.catalog-source-report--invalid_catalog{color:var(--color-danger,#c0473f)}
 .catalog__admin-link{justify-self:start}
+/* Search and catalogue genres remain available while scrolling the catalogue results. */
+.catalog__controls{position:sticky;top:4.25rem;z-index:35;gap:.65rem;border-bottom:1px solid var(--color-border);background:color-mix(in srgb,var(--color-background) 97%,transparent);padding:.75rem 0;backdrop-filter:blur(12px)}
+.catalog__genre-carousel{touch-action:pan-x;overscroll-behavior-x:contain;cursor:grab;user-select:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}.catalog__genre-carousel::-webkit-scrollbar{display:none}.catalog__genre-carousel:active{cursor:grabbing}
+.catalog__genre-chip{white-space:nowrap}
+@media(max-width:63.99rem){.catalog__controls{top:5.35rem}}
+@media(prefers-reduced-motion:reduce){.catalog__genre-carousel{scroll-behavior:auto}}
