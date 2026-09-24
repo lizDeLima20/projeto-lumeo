@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import { indexedDB, IDBKeyRange } from "fake-indexeddb";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import type { Block, Line, Worker } from "tesseract.js";
@@ -14,8 +15,13 @@ import type { ComicTextRegion } from "../src/reader/comic/interaction/ComicInter
 import { detectComicContainers, type ComicVisualContainer } from "../src/reader/comic/interaction/ComicContainerDetector";
 import { comicCropPlans, comicCropPolarity, comicInkThreshold, comicPrepareCrop } from "../src/reader/comic/interaction/ComicRegionCrop";
 import { comicRegionBounds } from "../src/reader/comic/interaction/ComicRegionBounds";
-import { maskArea, maskBounds, readMaskShape, simplifyContour, splitByTextBlocks, splitTouchingMasks, traceMaskContour, type ComicMask } from "../src/reader/comic/interaction/ComicShapeMask";
+import { comicReadingOrder } from "../src/reader/comic/interaction/ComicReadingOrder";
+import { maskArea, maskBounds, readMaskShape, simplifyContour, traceMaskContour, type ComicMask } from "../src/reader/comic/interaction/ComicShapeMask";
 import { comicSourceKey } from "../src/reader/comic/interaction/ComicConversionIdentity";
+import { ComicConversionService } from "../src/reader/comic/interaction/ComicConversionService";
+import { comicGrowStencil } from "../src/reader/comic/interaction/ComicObjectCutout";
+import type { ComicConversionResult } from "../src/reader/comic/interaction/ComicConverter";
+import type { ComicDocument } from "../src/reader/comic/interaction/ComicInteractionTypes";
 
 Object.assign(globalThis, { indexedDB, IDBKeyRange });
 const asset = async (index: number) => ({ path: `pages/${String(index + 1).padStart(3, "0")}.png`, data: new Uint8Array([1, 2, 3]), mimeType: "image/png" as const, width: 100, height: 150 });
@@ -354,45 +360,6 @@ const ellipseInto = (set: (x: number, y: number) => void, cx: number, cy: number
   }
 };
 
-test("dois balões desenhados encostados viram dois objetos, um balão com rabicho continua um", () => {
-  const joined = maskOf(120, 60, set => { ellipseInto(set, 35, 30, 30, 24); ellipseInto(set, 85, 30, 30, 24); });
-  const parts = splitTouchingMasks(joined);
-  assert.equal(parts.length, 2);
-  const [left, right] = parts.map(maskBounds);
-  assert.ok(left!.maxX < right!.minX, "cada um fica com a sua metade, sem pedaço do outro");
-  assert.equal(maskArea(parts[0]!) + maskArea(parts[1]!), maskArea(joined), "nenhum pixel se perde nem se repete");
-
-  const tailed = maskOf(120, 60, set => {
-    ellipseInto(set, 60, 26, 34, 20);
-    for (let y = 40; y < 56; y++) for (let x = 54; x < 60; x++) set(x, y);
-  });
-  assert.equal(splitTouchingMasks(tailed).length, 1, "o rabicho não é um segundo balão");
-});
-
-test("balões fundidos sem linha divisória são separados pelos blocos de texto", () => {
-  // One silhouette, two blocks of lettering stacked with a clear gap between them.
-  const silhouette = maskOf(120, 90, set => { ellipseInto(set, 45, 30, 40, 26); ellipseInto(set, 75, 62, 40, 26); });
-  const ink = maskOf(120, 90, set => {
-    for (const [top, left] of [[22, 22], [32, 22], [56, 52], [66, 52], [76, 52]] as const) {
-      for (let word = 0; word < 4; word++) for (let y = top; y < top + 4; y++) for (let x = left + word * 9; x < left + word * 9 + 6; x++) set(x, y);
-    }
-  });
-  const parts = splitByTextBlocks(silhouette, ink, 3);
-  assert.equal(parts.length, 2);
-  const boxes = parts.map(maskBounds).sort((a, b) => a!.minY - b!.minY);
-  assert.ok(boxes[0]!.maxY <= boxes[1]!.maxY && boxes[0]!.minY < boxes[1]!.minY);
-
-  // A caption with a little drawing beside its words is one container, never two.
-  const caption = maskOf(120, 50, set => { for (let y = 5; y < 45; y++) for (let x = 5; x < 115; x++) set(x, y); });
-  const withIcon = maskOf(120, 50, set => {
-    for (let y = 12; y < 38; y++) for (let x = 12; x < 34; x++) set(x, y);            // the drawing
-    for (const top of [14, 24, 32]) for (let word = 0; word < 5; word++) {
-      for (let y = top; y < top + 4; y++) for (let x = 46 + word * 12; x < 46 + word * 12 + 8; x++) set(x, y);
-    }
-  });
-  assert.equal(splitByTextBlocks(caption, withIcon, 3).length, 1, "o ícone pertence à legenda");
-});
-
 test("o contorno guardado descreve a forma, e não a caixa em volta dela", () => {
   const oval = maskOf(60, 40, set => ellipseInto(set, 30, 20, 26, 16));
   const contour = simplifyContour(traceMaskContour(oval), 1.1);
@@ -435,4 +402,351 @@ test("uma página com dois balões encostados é convertida em duas regiões ind
     assert.match(container.backgroundColor, /^#f/);
     assert.ok(container.textColor.length === 7);
   }
+});
+
+const emptyDocument = (pages: number, regionsPerPage: number[] = []): ComicDocument => ({
+  manifest: { format: "lima", version: 4, contentType: "comic", documentId: "d", createdAt: "now",
+    generator: "test", metadataPath: "metadata/metadata.json", pagesPath: "pages/", interactionPath: "interaction/",
+    pages: Array.from({ length: pages }, (_, index) => ({ index, id: `page-${index}`, imagePath: `pages/${index}.webp`, mimeType: "image/webp" as const })) },
+  metadata: { id: "d", title: "T", createdAt: "now" },
+  pages: Array.from({ length: pages }, (_, index) => ({ index, id: `page-${index}`, imagePath: `pages/${index}.webp`,
+    mimeType: "image/webp" as const, cover: index === 0,
+    regions: Array.from({ length: regionsPerPage[index] ?? 0 }, (_, r) => ({ ...region(index), id: `p${index}-r${r}` })) })),
+});
+
+const fakeCache = (seed: Record<string, ComicConversionResult> = {}) => {
+  const store = new Map(Object.entries(seed));
+  return {
+    store,
+    page: async () => undefined,
+    savePage: async () => undefined,
+    completed: async (key: string) => store.get(key),
+    complete: async (key: string, value: ComicConversionResult) => { store.set(key, value); },
+  };
+};
+
+test("a conversão é procurada pela chave exata: outro pipeline ou outra capa não serve", async () => {
+  const blob = new Blob(["hq"]);
+  const mine = await comicSourceKey(blob, [0]);
+  const other = await comicSourceKey(blob, [0, 1]);
+  const cache = fakeCache({ [other]: { document: emptyDocument(2), bytes: new Uint8Array() } });
+  let converted = 0;
+  const converter = { convert: async () => { converted++; return { document: emptyDocument(2), bytes: new Uint8Array() }; } };
+  const outcome = await new ComicConversionService(converter, cache)
+    .open({ bookId: "b", blob, title: "T", contentType: "comic" });
+  assert.equal(outcome.key, mine);
+  assert.equal(outcome.cached, false, "o pacote da outra configuração não foi aceito");
+  assert.equal(converted, 1);
+});
+
+test("com pacote guardado a HQ abre sem converter de novo", async () => {
+  const blob = new Blob(["hq-2"]);
+  const key = await comicSourceKey(blob, [0]);
+  const stored = { document: emptyDocument(3, [0, 2, 5]), bytes: new Uint8Array([1]) };
+  const cache = fakeCache({ [key]: stored });
+  let converted = 0;
+  const converter = { convert: async () => { converted++; return { document: emptyDocument(3), bytes: new Uint8Array() }; } };
+  const outcome = await new ComicConversionService(converter, cache)
+    .open({ bookId: "b", blob, title: "T", contentType: "comic" });
+  assert.equal(outcome.cached, true);
+  assert.equal(converted, 0, "abrir de novo não reconverte");
+  assert.equal(outcome.result.document.pages.length, 3);
+});
+
+test("um pacote guardado que não valida mais é tratado como ausente", async () => {
+  const blob = new Blob(["hq-3"]);
+  const key = await comicSourceKey(blob, [0]);
+  const broken = emptyDocument(2);
+  (broken.manifest as { version: number }).version = 99;
+  const cache = fakeCache({ [key]: { document: broken, bytes: new Uint8Array() } });
+  let converted = 0;
+  const converter = { convert: async () => { converted++; return { document: emptyDocument(2), bytes: new Uint8Array() }; } };
+  const outcome = await new ComicConversionService(converter, cache)
+    .open({ bookId: "b", blob, title: "T", contentType: "comic" });
+  assert.equal(outcome.cached, false);
+  assert.equal(converted, 1);
+});
+
+test("duas aberturas ao mesmo tempo compartilham uma conversão só", async () => {
+  const blob = new Blob(["hq-4"]);
+  let started = 0;
+  let release: (value: ComicConversionResult) => void = () => undefined;
+  const pending = new Promise<ComicConversionResult>(resolve => { release = resolve; });
+  const converter = { convert: async () => { started++; return await pending; } };
+  const service = new ComicConversionService(converter, fakeCache());
+  const request = { bookId: "b", blob, title: "T", contentType: "comic" as const };
+  const first = service.open(request), second = service.open(request);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  release({ document: emptyDocument(5), bytes: new Uint8Array() });
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(started, 1, "a segunda abertura esperou a primeira");
+  assert.equal(a.result.document.pages.length, 5);
+  assert.equal(b.result.document.pages.length, 5);
+});
+
+test("a quantidade de páginas e de regiões vem do documento, nunca de um número fixo", async () => {
+  for (const [pages, regions] of [[1, [0]], [18, []], [77, [3, 0, 12]], [250, [1]]] as const) {
+    const converted = await new ComicConverter().convert({
+      id: `n${pages}`, title: "N", totalPages: pages,
+      pageProvider: asset,
+      regionProvider: async index => Array.from({ length: regions[index] ?? 0 }, (_, r) => ({ ...region(index), id: `p${index}-r${r}` })),
+    });
+    assert.equal(converted.document.pages.length, pages);
+    assert.equal(converted.document.manifest.pages.length, pages);
+    assert.equal(converted.document.pages[1]?.regions.length ?? 0, regions[1] ?? 0);
+  }
+});
+
+test("a biblioteca abre a HQ pelo mesmo caminho da bancada", () => {
+  const view = readFileSync(new URL("../src/views/ComicReaderView.ts", import.meta.url), "utf8");
+  // The reader asks the service for a package instead of only hoping to find one.
+  assert.match(view, /new ComicConversionService\(new ComicPdfConverter\(\)\)\.open\(\{/);
+  assert.doesNotMatch(view, /completedForSource/, "nada de busca ampla por conversão compatível");
+  // While the package is being made, the older overlay stays out of the way.
+  assert.match(view, /if \(this\.interaction\.isOpen \|\| this\.preparing\) return;/);
+  assert.match(view, /comicLog\("COMIC_RENDERER_SELECTED"/);
+  // Leaving the reader stops the conversion; nothing keeps running behind a closed book.
+  assert.match(view, /this\.conversion\?\.abort\(\); this\.conversion = null;/);
+});
+
+test("a borda desenhada por estêncil crescido é exatamente a mesma que a varredura em disco", () => {
+  // The old mask asked, for every pixel, whether any pixel within `pad` belonged to the
+  // container. The new one grows the stencil once. Both must cover the same pixels.
+  const width = 40, height = 30, step = 2;
+  const data = new Uint8Array(width * height);
+  for (let y = 8; y < 20; y++) for (let x = 10; x < 28; x++) data[y * width + x] = 1;
+  for (let y = 20; y < 24; y++) for (let x = 12; x < 15; x++) data[y * width + x] = 1;   // a tail
+  const stencil = { data, width, height, step, x: 0, y: 0 };
+  const pad = step * 2;
+  const includes = (s: typeof stencil, px: number, py: number): boolean => {
+    const cx = Math.floor((px - s.x) / s.step), cy = Math.floor((py - s.y) / s.step);
+    return cx >= 0 && cy >= 0 && cx < s.width && cy < s.height && s.data[cy * s.width + cx] === 1;
+  };
+  const grown = comicGrowStencil(stencil, Math.round(pad / step));
+  for (let py = 0; py < height * step; py++) for (let px = 0; px < width * step; px++) {
+    let disc = false;
+    for (let dy = -pad; dy <= pad && !disc; dy++) for (let dx = -pad; dx <= pad; dx++) {
+      if (dx * dx + dy * dy <= pad * pad && includes(stencil, px + dx, py + dy)) { disc = true; break; }
+    }
+    // Everything the disc reached is still reached; the allowance never shrinks.
+    if (disc) assert.ok(includesGrown(grown, px, py), `perdeu o pixel ${px},${py}`);
+    // And it does not wander off into the artwork: at most one cell past the disc.
+    if (includesGrown(grown, px, py)) {
+      let near = false;
+      for (let dy = -pad - step; dy <= pad + step && !near; dy++) for (let dx = -pad - step; dx <= pad + step; dx++) {
+        if (includes(stencil, px + dx, py + dy)) { near = true; break; }
+      }
+      assert.ok(near, `pixel ${px},${py} longe demais do container`);
+    }
+  }
+});
+
+const includesGrown = (s: { data: Uint8Array; width: number; height: number; step: number; x: number; y: number }, px: number, py: number): boolean => {
+  const cx = Math.floor((px - s.x) / s.step), cy = Math.floor((py - s.y) / s.step);
+  return cx >= 0 && cy >= 0 && cx < s.width && cy < s.height && s.data[cy * s.width + cx] === 1;
+};
+
+test("a página que o leitor está vendo é convertida primeiro, e o pacote sai igual", async () => {
+  // A comic of twelve pages opened on page 9 (index 8): that page, then the two after it.
+  const order: number[] = [];
+  const reading = { at: 8 };
+  const prioritised = await new ComicConverter().convert({
+    id: "p", title: "P", totalPages: 12, pageProvider: asset,
+    regionProvider: async index => [region(index)],
+    priority: () => [reading.at, reading.at + 1, reading.at + 2],
+    onPageStarted: index => order.push(index),
+  });
+  assert.deepEqual(order.slice(0, 3), [8, 9, 10], "a página aberta e as duas seguintes vêm primeiro");
+  assert.deepEqual(order.slice(3), [0, 1, 2, 3, 4, 5, 6, 7, 11], "o resto segue em ordem normal");
+
+  // The same comic converted from the first page, and the two documents must agree.
+  const sequential = await new ComicConverter().convert({
+    id: "p", title: "P", totalPages: 12, pageProvider: asset, regionProvider: async index => [region(index)],
+  });
+  assert.deepEqual(prioritised.document.pages.map(page => page.index), sequential.document.pages.map(page => page.index));
+  assert.deepEqual(prioritised.document.manifest.pages, sequential.document.manifest.pages);
+  assert.deepEqual(Object.keys(unzipSync(prioritised.bytes)).sort(), Object.keys(unzipSync(sequential.bytes)).sort());
+});
+
+test("virar para uma página distante muda o que vem a seguir", async () => {
+  const order: number[] = [];
+  const reading = { at: 0 };
+  await new ComicConverter().convert({
+    id: "q", title: "Q", totalPages: 10, pageProvider: asset, regionProvider: async () => [],
+    priority: () => [reading.at, reading.at + 1],
+    // The reader jumps to page 8 while page 1 is being converted.
+    onPageStarted: index => { order.push(index); if (order.length === 1) reading.at = 7; },
+  });
+  assert.equal(order[0], 0);
+  assert.deepEqual(order.slice(1, 3), [7, 8], "a página nova passa à frente da fila");
+  assert.equal(new Set(order).size, 10, "e nada deixa de ser convertido");
+});
+
+test("páginas já guardadas não são refeitas, nem saem da ordem", async () => {
+  const key = crypto.randomUUID(), cache = new IndexedDbComicConversionCache();
+  const controller = new AbortController();
+  let rendered = 0;
+  const input = { id: key, title: "R", totalPages: 6, conversionKey: key,
+    pageProvider: async (index: number) => { rendered++; return asset(index); },
+    regionProvider: async () => [], priority: () => [3, 4] };
+  await assert.rejects(new ComicConverter().convert(input, { cache, signal: controller.signal,
+    onPageProcessed: page => { if (page.index === 4) controller.abort(); } }));
+  assert.equal(rendered, 2, "só as páginas prioritárias foram renderizadas antes de parar");
+  const resumed = await new ComicConverter().convert(input, { cache });
+  assert.equal(rendered, 6, "as duas já guardadas não foram renderizadas de novo");
+  assert.deepEqual(resumed.document.pages.map(page => page.index), [0, 1, 2, 3, 4, 5]);
+});
+
+test("uma página pronta já responde ao toque antes do pacote terminar", () => {
+  const engine = new ComicInteractionEngine();
+  assert.equal(engine.isOpen, false);
+  engine.addPage({ index: 8, id: "page-009", imagePath: "pages/009.webp", mimeType: "image/webp", cover: false,
+    regions: [{ ...region(8), x: .1, y: .1, width: .2, height: .2 }] });
+  assert.equal(engine.isOpen, true);
+  assert.equal(engine.regionsForPage(8).length, 1);
+  assert.equal(engine.hitTest(8, { x: .15, y: .15 })?.pageIndex, 8);
+  assert.equal(engine.regionsForPage(0).length, 0, "as outras páginas continuam vazias, não inventadas");
+  // The finished package replaces what was shown page by page.
+  engine.open({ manifest: {} as ComicDocument["manifest"], metadata: {} as ComicDocument["metadata"],
+    pages: [{ index: 8, id: "page-009", imagePath: "pages/009.webp", mimeType: "image/webp", cover: false, regions: [] }] });
+  assert.equal(engine.regionsForPage(8).length, 0);
+});
+
+test("o leitor prioriza a página aberta e acende a interação quando ela fica pronta", () => {
+  const view = readFileSync(new URL("../src/views/ComicReaderView.ts", import.meta.url), "utf8");
+  assert.match(view, /priority: \(\) => \[this\.currentPage - 1, this\.currentPage, this\.currentPage \+ 1\]/);
+  assert.match(view, /this\.interaction\.addPage\(page\);/);
+  assert.match(view, /comicLog\("COMIC_PAGE_READY"/);
+  assert.match(view, /comicLog\("COMIC_CURRENT_PAGE_CONVERSION_STARTED"/);
+  // Reading is never blocked: the pages are drawn while the package is being prepared.
+  assert.doesNotMatch(view, /await prepared;\s*this\.arrived/);
+});
+
+/** A composite balloon as an artist draws one: the lobes run into each other and a single
+ *  outline is drawn around the whole shape, never between the lobes. */
+const compositeBalloon = (page: Painted, lobes: readonly [number, number, number, number][],
+  body: [number, number, number] = [252, 250, 244], outline: [number, number, number] = [16, 14, 18]): void => {
+  const inside = (x: number, y: number, slack = 1): boolean =>
+    lobes.some(([cx, cy, rx, ry]) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= slack);
+  for (let y = 0; y < page.height; y++) for (let x = 0; x < page.width; x++) {
+    if (inside(x, y)) fill(page, x, y, 1, 1, body);
+    else if (inside(x, y, 1.14)) fill(page, x, y, 1, 1, outline);
+  }
+};
+
+/** A balloon as an artist draws one: a pale body with a drawn outline around it. */
+const balloonInto = (page: Painted, cx: number, cy: number, rx: number, ry: number,
+  body: [number, number, number] = [252, 250, 244], outline: [number, number, number] = [16, 14, 18]): void => {
+  for (let y = Math.floor(cy - ry - 3); y <= Math.ceil(cy + ry + 3); y++) {
+    for (let x = Math.floor(cx - rx - 3); x <= Math.ceil(cx + rx + 3); x++) {
+      const inside = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
+      if (inside <= 1) fill(page, x, y, 1, 1, body);
+      else if (inside <= 1.12) fill(page, x, y, 1, 1, outline);
+    }
+  }
+};
+const lettersInto = (page: Painted, left: number, top: number, lines: number, words = 4): void => {
+  for (let line = 0; line < lines; line++) for (let word = 0; word < words; word++) {
+    fill(page, left + word * 16, top + line * 16, 10, 8, [24, 20, 18]);
+  }
+};
+const covers = (found: readonly { bbox: { x0: number; y0: number; x1: number; y1: number } }[], x: number, y: number) =>
+  found.filter(c => x >= c.bbox.x0 && x <= c.bbox.x1 && y >= c.bbox.y0 && y <= c.bbox.y1);
+
+test("dois lóbulos contínuos são um balão só, e três também", () => {
+  // Lobes running into each other, one outline around the whole thing: one speech.
+  const twoLobes = painted(1000, 900, [40, 70, 150]);
+  compositeBalloon(twoLobes, [[300, 260, 105, 62], [420, 360, 105, 62]]);
+  lettersInto(twoLobes, 240, 240, 2); lettersInto(twoLobes, 365, 340, 2);
+  const twoFound = detectComicContainers(image(twoLobes), { step: 1 });
+  assert.equal(twoFound.length, 1, `dois lóbulos deveriam ser um objeto, vieram ${twoFound.length}`);
+  assert.equal(covers(twoFound, 300, 260).length, 1);
+  assert.equal(covers(twoFound, 420, 360).length, 1, "o mesmo objeto cobre os dois lóbulos");
+
+  const threeLobes = painted(1000, 1200, [40, 70, 150]);
+  compositeBalloon(threeLobes, [[320, 300, 105, 62], [430, 380, 105, 62], [370, 460, 105, 62]]);
+  lettersInto(threeLobes, 260, 280, 2); lettersInto(threeLobes, 375, 362, 2); lettersInto(threeLobes, 315, 442, 2);
+  const threeFound = detectComicContainers(image(threeLobes), { step: 1 });
+  assert.equal(threeFound.length, 1, `três lóbulos deveriam ser um objeto, vieram ${threeFound.length}`);
+  for (const [x, y] of [[320, 300], [430, 380], [370, 460]] as const) assert.equal(covers(threeFound, x, y).length, 1);
+});
+
+test("dois balões com contorno próprio continuam dois, encostados ou atravessados", () => {
+  // Side by side with a hair between them: two speakers, two objects.
+  const apart = painted(1000, 800, [40, 70, 150]);
+  balloonInto(apart, 300, 300, 100, 70);
+  balloonInto(apart, 530, 300, 100, 70);
+  lettersInto(apart, 245, 275, 2); lettersInto(apart, 475, 275, 2);
+  const two = detectComicContainers(image(apart), { step: 1 });
+  assert.equal(two.length, 2, `dois balões separados, vieram ${two.length}`);
+
+  // One balloon drawn across another, each keeping its own outline: still two.
+  const crossing = painted(1000, 900, [40, 70, 150]);
+  balloonInto(crossing, 330, 300, 120, 80);
+  balloonInto(crossing, 450, 390, 120, 80);
+  lettersInto(crossing, 270, 275, 2); lettersInto(crossing, 390, 365, 2);
+  const crossed = detectComicContainers(image(crossing), { step: 1 });
+  assert.equal(crossed.length, 2, `balão sobreposto com contorno próprio deveria continuar separado, vieram ${crossed.length}`);
+  assert.ok(crossed[0]!.bbox.x1 > crossed[1]!.bbox.x0 && crossed[0]!.bbox.y1 > crossed[1]!.bbox.y0, "e eles de fato se sobrepõem");
+});
+
+test("o rabicho fica com o balão, e a máscara é mais justa que a caixa em volta", () => {
+  const page = painted(1000, 900, [40, 70, 150]);
+  balloonInto(page, 340, 300, 120, 80);
+  // A tail running down to the speaker, drawn as part of the balloon.
+  for (let y = 330; y < 450; y++) fill(page, 270 - Math.floor((y - 330) / 4), y, 18, 1, [252, 250, 244]);
+  lettersInto(page, 280, 275, 2);
+  const [found] = detectComicContainers(image(page), { step: 1 });
+  assert.ok(found, "o balão foi encontrado");
+  // Detection trims the thin tail off the body it measures; extraction puts it back, and
+  // extraction is what the reader sees.
+  assert.ok((found!.artBbox?.y1 ?? found!.bbox.y1) >= 430, `o rabicho entrou no recorte (até ${found!.artBbox?.y1 ?? found!.bbox.y1})`);
+  // The outline follows the shape, so the object covers far less than its own box.
+  const boxArea = (found!.bbox.x1 - found!.bbox.x0) * (found!.bbox.y1 - found!.bbox.y0);
+  const shoelace = (points: readonly { x: number; y: number }[]): number => {
+    let sum = 0;
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i]!, b = points[(i + 1) % points.length]!;
+      sum += a.x * b.y - b.x * a.y;
+    }
+    return Math.abs(sum) / 2;
+  };
+  const shapeArea = shoelace(found!.contour);
+  assert.ok(shapeArea < boxArea * .8, `a forma ocupa ${Math.round(shapeArea / boxArea * 100)}% da caixa`);
+  assert.ok(shapeArea > boxArea * .3, "e continua sendo o balão inteiro, não um pedaço");
+});
+
+test("um balão simples continua um balão simples, e a leitura do conjunto segue a ordem visual", () => {
+  const page = painted(1000, 800, [40, 70, 150]);
+  balloonInto(page, 400, 300, 120, 80);
+  lettersInto(page, 340, 275, 2);
+  const found = detectComicContainers(image(page), { step: 1 });
+  assert.equal(found.length, 1);
+  assert.notEqual(found[0]!.shape, "rectangle", "um balão oval não é uma legenda");
+
+  // Sub-balloons of one composite keep reading top to bottom once they are one region.
+  const ordered = comicReadingOrder([
+    { ...region(0), id: "baixo", visualBounds: { x: .2, y: .5, width: .3, height: .2 } },
+    { ...region(0), id: "cima", visualBounds: { x: .2, y: .1, width: .3, height: .2 } },
+  ]);
+  assert.equal(ordered.find(r => r.id === "cima")?.readingOrder, 1);
+  assert.equal(ordered.find(r => r.id === "baixo")?.readingOrder, 2);
+});
+
+test("a segmentação é determinística: a mesma página dá exatamente o mesmo resultado", () => {
+  const page = painted(1000, 900, [40, 70, 150]);
+  compositeBalloon(page, [[300, 260, 105, 62], [420, 360, 105, 62]]);
+  lettersInto(page, 240, 240, 2); lettersInto(page, 365, 340, 2);
+  const shape = (found: ReturnType<typeof detectComicContainers>) =>
+    JSON.stringify(found.map(c => [c.bbox, c.shape, c.tail, c.backgroundColor, c.contour.length]));
+  assert.equal(shape(detectComicContainers(image(page), { step: 1 })), shape(detectComicContainers(image(page), { step: 1 })));
+});
+
+test("a máscara é afrouxada antes de desistir dela", () => {
+  const cutout = readFileSync(new URL("../src/reader/comic/interaction/ComicObjectCutout.ts", import.meta.url), "utf8");
+  // Loosen, ring by ring, and only then fall back to the bare rectangle.
+  assert.match(cutout, /for \(const reach of \[2, 4, 7, 11\]\)/);
+  assert.match(cutout, /clippedInk = cutsInk\(\);\s*if \(!clippedInk\) break;/);
+  const fallbackAt = cutout.indexOf("const fallback = !container || clippedInk;");
+  assert.ok(cutout.indexOf("for (const reach of") < fallbackAt, "afrouxar vem antes de desistir");
 });

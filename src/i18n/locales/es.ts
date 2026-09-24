@@ -56,6 +56,7 @@ export const ES: TranslationCatalog = {
   "ui.device.title": "Este dispositivo", "ui.device.limit": "Límite de dispositivos", "ui.device.replace": "Reemplazar dispositivo", "ui.device.authorize": "Autorizar dispositivo", "ui.license.active": "Licencia activa", "ui.license.expired": "Licencia vencida", "ui.license.offline": "Período sin conexión", "ui.license.checking": "Comprobando licencia", "ui.license.unavailable": "No se pudo validar la licencia.", "ui.license.reconnect": "Reconectar",
   "reader.back": "Volver a la biblioteca", "reader.settings": "Configuración de lectura", "reader.navigation": "Abrir contenido, búsqueda y mapa",
   "reader.study": "Abrir resaltados", "reader.previousPage": "Página anterior", "reader.nextPage": "Página siguiente", "reader.loading": "Preparando tu libro…",
+  "reader.comic.preparing": "Preparando cómic…", "reader.comic.preparingPage": "Preparando cómic… {current} de {total} páginas listas",
   "reader.comic.pdfOnly": "El lector de cómics abre solo archivos PDF.", "reader.comic.openFailed": "No se pudo abrir este cómic",
   "reader.closeSettings": "Cerrar configuración de lectura", "reader.customization": "Personalización de lectura", "reader.reading": "Lectura",
   "reader.text": "Texto", "reader.font": "Fuente", "reader.fontSize": "Tamaño", "reader.weight": "Grosor", "reader.color": "Color",

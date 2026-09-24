@@ -59,7 +59,8 @@ export class ComicInteractionValidator {
   public validateRegion(region: ComicTextRegion, expectedPageIndex = region.pageIndex): true {
     for (const path of [region.assetPath, region.maskPath]) if (path !== undefined) {
       this.safePath(path);
-      if (!/^interaction\/assets\/[a-zA-Z0-9_-]+\.png$/.test(path)) throw new ComicInteractionValidationError("Asset de HQ fora de interaction/assets/.");
+      // WebP or PNG: the browser decides which it can write, and the bytes say which it did.
+      if (!/^interaction\/assets\/[a-zA-Z0-9_-]+\.(png|webp)$/.test(path)) throw new ComicInteractionValidationError("Asset de HQ fora de interaction/assets/.");
     }
     if (!region.id) throw new ComicInteractionValidationError("Região de texto de HQ sem identificador.");
     if (region.pageIndex !== expectedPageIndex) throw new ComicInteractionValidationError("Região de texto de HQ em página inconsistente.");

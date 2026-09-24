@@ -6,6 +6,9 @@
  *  recognition expects dark letters on a light page either way. */
 export type ComicCropMode = "photo" | "ink" | "inverted";
 
+/** The capital height recognition is happiest with. */
+export const TARGET_CAP_PX = 30;
+
 export interface ComicCropPlan {
   mode: ComicCropMode;
   /** Enlargement applied to the crop. Small boxes are read far better when magnified. */
@@ -18,10 +21,18 @@ export interface ComicCropPlan {
  *
  *  A region is read more than once only while it is still unconvincing, so a clean balloon
  *  costs a single pass and a hard caption gets the alternatives it needs. */
-export function comicCropPlans(width: number, height: number, darkOnLight: boolean): ComicCropPlan[] {
+export function comicCropPlans(width: number, height: number, darkOnLight: boolean, capHeightPx = 0): ComicCropPlan[] {
   const shortest = Math.max(1, Math.min(width, height));
-  // Tesseract reads best around 30px of letter height; a caption box is roughly six lines.
-  const scale = shortest < 40 ? 4 : shortest < 90 ? 3 : shortest < 180 ? 2 : 1.5;
+  // Recognition reads best around thirty pixels of capital height. Where the lettering has
+  // been measured, that measurement decides the enlargement: big lettering is handed over
+  // smaller rather than bigger, which is the difference between reading a shout at four
+  // times its size for nothing and reading it once. Without a measurement, the size of the
+  // crop stands in for it, as it always did.
+  // Never below life size: shrinking a shout before reading it saves pixels and costs
+  // letters, which is the one place the measurement made things worse.
+  const scale = capHeightPx > 2
+    ? Math.min(4, Math.max(1, Math.round((TARGET_CAP_PX / capHeightPx) * 4) / 4))
+    : shortest < 40 ? 4 : shortest < 90 ? 3 : shortest < 180 ? 2 : 1.5;
   const margin = 14;
   return darkOnLight
     ? [{ mode: "photo", scale, margin }, { mode: "ink", scale, margin }, { mode: "inverted", scale, margin }]
@@ -124,4 +135,34 @@ function frame(grey: Uint8Array, width: number, height: number, margin: number):
   // A browser canvas only accepts the real thing; tests run where there is no such class.
   return typeof ImageData === "function" ? new ImageData(data, outWidth, outHeight)
     : { width: outWidth, height: outHeight, data, colorSpace: "srgb" } as ImageData;
+}
+
+/** The prepared crop as bitmap bytes, ready to hand straight to recognition.
+ *
+ *  Recognition takes an image; given a canvas, the library encodes it as PNG first. On a
+ *  phone that encode costs seconds - more than the reading itself - and every candidate on
+ *  a page pays it. A bitmap costs a copy: the same pixels, no compression, understood by
+ *  the same decoder. Rows run bottom-up and are padded to four bytes, as the format says. */
+export function comicBitmapBytes(image: ImageData): Uint8Array<ArrayBuffer> {
+  const { width, height, data } = image;
+  const stride = (width * 3 + 3) & ~3, pixels = stride * height, size = 54 + pixels;
+  const bytes = new Uint8Array(new ArrayBuffer(size)), view = new DataView(bytes.buffer);
+  bytes[0] = 0x42; bytes[1] = 0x4d;                 // "BM"
+  view.setUint32(2, size, true);
+  view.setUint32(10, 54, true);                     // where the pixels start
+  view.setUint32(14, 40, true);                     // header size
+  view.setInt32(18, width, true);
+  view.setInt32(22, height, true);                  // positive: rows bottom-up
+  view.setUint16(26, 1, true);                      // one plane
+  view.setUint16(28, 24, true);                     // three bytes a pixel
+  view.setUint32(34, pixels, true);
+  for (let y = 0; y < height; y++) {
+    let offset = 54 + (height - 1 - y) * stride, source = y * width * 4;
+    for (let x = 0; x < width; x++, source += 4) {
+      bytes[offset++] = data[source + 2]!;           // blue, green, red
+      bytes[offset++] = data[source + 1]!;
+      bytes[offset++] = data[source]!;
+    }
+  }
+  return bytes;
 }

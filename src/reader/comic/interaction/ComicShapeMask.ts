@@ -89,81 +89,11 @@ export function labelMask(mask: ComicMask): ComicMask[] {
     .sort((a, b) => b.size - a.size).map(entry => entry.mask);
 }
 
-/** Two balloons drawn touching are one silhouette; the reader sees two.
- *
- *  They are told apart the way touching shapes always are: the silhouette is worn down
- *  from its edges until it falls into separate cores - the neck between two balloons is
- *  thin, so it goes first - and then every pixel of the original is given back to whichever
- *  core it reaches first. A single balloon has one core however far it is eroded, and its
- *  tail is far too thin to survive as one, so nothing is split that should not be. */
-export function splitTouchingMasks(mask: ComicMask): ComicMask[] {
-  const total = maskArea(mask);
-  if (total < 60) return [mask];
-  const limit = Math.max(3, Math.floor(Math.min(mask.width, mask.height) * .3));
-  let current = mask;
-  let cores: ComicMask[] | null = null;
-  for (let step = 0; step < limit; step++) {
-    current = erodeMask(current);
-    const { sizes } = labelPieces(current);
-    const solid = sizes.filter(size => size >= total * .14);
-    if (solid.length >= 2) { cores = labelMask(current).filter(piece => maskArea(piece) >= total * .14); break; }
-    // Nothing substantial is left to wear down: this was a single shape all along.
-    if (sizes.length === 0 || Math.max(...sizes) < total * .14) break;
-  }
-  if (!cores) return [mask];
-  // Every pixel goes to the nearest core, growing the cores back through the silhouette.
-  return shareBetween(mask, cores);
-}
-
-/** Two balloons the artist drew merged, with no line between them.
- *
- *  Erosion cannot help here: there is no neck to wear through, only one shape holding two
- *  blocks of lettering. What separates them is exactly what separates them for a reader -
- *  the gap between the two blocks of words - so the words are grown until each block is
- *  solid, blocks far enough apart become seeds, and the silhouette is divided between
- *  them. Lines of the same balloon sit close together and grow into a single block, so a
- *  balloon with three lines in it is never cut in half. */
-export function splitByTextBlocks(mask: ComicMask, ink: ComicMask, reach: number): ComicMask[] {
-  const total = maskArea(ink);
-  if (total < 20) return [mask];
-  let grown = ink;
-  for (let step = 0; step < Math.max(1, reach); step++) grown = dilateMask(grown);
-  const blocks = labelMask(grown).filter(block => maskArea(block) >= maskArea(grown) * .12);
-  if (blocks.length < 2) return [mask];
-  // Every block has to be lettering in its own right. The little drawing beside the words
-  // of a caption - a hand, a symbol - belongs to that caption and never becomes a balloon.
-  if (!blocks.every(block => looksLikeLettering(ink, block))) return [mask];
-  // Balloons are stacked, not shelved: only blocks that sit clear of each other's lines
-  // are two balloons. Anything sharing a line with something else is one block of text.
-  const boxes = blocks.map(maskBounds);
-  for (let a = 0; a < boxes.length; a++) for (let b = a + 1; b < boxes.length; b++) {
-    const first = boxes[a], second = boxes[b];
-    if (!first || !second) return [mask];
-    if (Math.min(first.maxY, second.maxY) - Math.max(first.minY, second.minY) > 0) return [mask];
-  }
-  return shareBetween(mask, blocks);
-}
-
-/** Whether the marks inside a block are lettering: many of them, short, lying in rows.
- *  A drawing inside the same box is one or two long shapes instead. */
-function looksLikeLettering(ink: ComicMask, block: ComicMask): boolean {
-  const bounds = maskBounds(block);
-  if (!bounds) return false;
-  const width = bounds.maxX - bounds.minX + 1;
-  const glyphLimit = Math.max(2, Math.floor(width * .3));
-  let runs = 0, marks = 0, glyphs = 0, rows = 0;
-  for (let y = bounds.minY; y <= bounds.maxY; y++) {
-    let run = 0, rowMarks = 0;
-    for (let x = bounds.minX; x <= bounds.maxX; x++) {
-      const index = y * ink.width + x;
-      if (ink.data[index] && block.data[index]) { run++; marks++; rowMarks++; }
-      else if (run > 0) { runs++; if (run <= glyphLimit) glyphs += run; run = 0; }
-    }
-    if (run > 0) { runs++; if (run <= glyphLimit) glyphs += run; }
-    if (rowMarks >= 2) rows++;
-  }
-  return marks > 0 && runs >= 6 && glyphs >= marks * .55 && rows >= 2;
-}
+/* Two strategies for cutting one silhouette into several - wearing it down to find a
+ * neck, and dividing it by the gaps between its blocks of lettering - used to live here.
+ * Both were wrong about comics: a balloon drawn as two or three lobes running into each
+ * other is one balloon, and the only thing that separates two balloons is the outline the
+ * artist drew between them, which the fill already stops at. */
 
 /** Gives every pixel of a silhouette to whichever seed reaches it first. */
 export function shareBetween(mask: ComicMask, seeds: readonly ComicMask[]): ComicMask[] {
@@ -326,6 +256,19 @@ function readTail(mask: ComicMask, bounds: { minX: number; minY: number; maxX: n
   const vertical = Math.abs(dy) / height > .12 ? (dy > 0 ? "down" : "up") : "";
   if (vertical && horizontal) return `${vertical}-${horizontal}` as ComicTailDirection;
   return (vertical || horizontal || "none") as ComicTailDirection;
+}
+
+/** Grows the silhouette by one cell in every direction, corners included. */
+export function dilateMaskSquare(mask: ComicMask): ComicMask {
+  const { width, height, data } = mask, out = new Uint8Array(data.length);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    if (!data[y * width + x]) continue;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const ny = y + dy, nx = x + dx;
+      if (ny >= 0 && nx >= 0 && ny < height && nx < width) out[ny * width + nx] = 1;
+    }
+  }
+  return { width, height, data: out };
 }
 
 /** Grows the silhouette by one pixel all round. */

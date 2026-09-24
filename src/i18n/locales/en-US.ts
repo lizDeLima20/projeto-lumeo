@@ -56,6 +56,7 @@ export const EN_US: TranslationCatalog = {
   "ui.device.title": "This device", "ui.device.limit": "Device limit", "ui.device.replace": "Replace device", "ui.device.authorize": "Authorize device", "ui.license.active": "Active license", "ui.license.expired": "Expired license", "ui.license.offline": "Offline period", "ui.license.checking": "Checking license", "ui.license.unavailable": "Could not validate the license.", "ui.license.reconnect": "Reconnect",
   "reader.back": "Back to library", "reader.settings": "Reading settings", "reader.navigation": "Open contents, search and map",
   "reader.study": "Open highlights", "reader.previousPage": "Previous page", "reader.nextPage": "Next page", "reader.loading": "Preparing your book…",
+  "reader.comic.preparing": "Preparing comic…", "reader.comic.preparingPage": "Preparing comic… {current} of {total} pages ready",
   "reader.comic.pdfOnly": "The comic reader opens PDF files only.", "reader.comic.openFailed": "This comic could not be opened",
   "reader.closeSettings": "Close reading settings", "reader.customization": "Reading preferences", "reader.reading": "Reading",
   "reader.text": "Text", "reader.font": "Font", "reader.fontSize": "Size", "reader.weight": "Weight", "reader.color": "Color",

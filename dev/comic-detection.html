@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HQ detection debug</title>
+<style>
+body{margin:0;min-height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;font:14px system-ui;background:#f4f4f4;color:#222}
+header{padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+main{min-height:0;overflow:auto;display:flex;justify-content:center;align-items:flex-start}
+canvas{max-width:100%;height:auto}
+output{display:block;padding:8px;font-variant-numeric:tabular-nums}
+pre{margin:0;padding:8px 12px;max-height:22vh;overflow:auto;background:#fff;border-top:1px solid #ddd;white-space:pre-wrap}
+body.dark{background:#15161b;color:#eee}body.dark pre{background:#1e2028;border-color:#333}
+button,input{font:inherit}
+</style>
+<header>
+  <input id="file" type="file" accept="application/pdf">
+  <label>Página <input id="page" type="number" min="1" value="9" style="width:70px"></label>
+  <button id="run">Analisar</button>
+  <label><input id="debug" type="checkbox" checked>Retângulos</label>
+  <label><input id="dark" type="checkbox">Dark</label>
+</header>
+<output id="progress">Azul: área tocável · verde: o balão (o que é ampliado) · laranja tracejado: as letras.</output>
+<main><canvas id="art"></canvas></main>
+<pre id="texts"></pre>
+<script type="module" src="/src/reader/comic/interaction/ComicDetectionDebugPage.ts"></script>
+</html>

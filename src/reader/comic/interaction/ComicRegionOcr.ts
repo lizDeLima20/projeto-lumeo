@@ -2,6 +2,7 @@ import { createWorker, PSM, type Block, type Bbox, type ImageLike, type Line, ty
 import type { ComicTextRegion, ComicTypography, NormalizedBounds } from "./ComicInteractionTypes";
 import { comicContainerIsConvincing, type ComicStencil, type ComicVisualContainer } from "./ComicContainerDetector";
 import { comicCropPlans, type ComicCropPlan } from "./ComicRegionCrop";
+import type { ComicStageRecorder } from "./ComicStageTimer";
 
 export interface ComicTextCandidate { bbox: Bbox; lines: Line[]; }
 
@@ -16,7 +17,7 @@ export interface ComicCropRequest {
   /** The colour to paint it out with: the container's own, so nothing new appears. */
   background?: string;
 }
-export type ComicRegionCropper = (request: ComicCropRequest) => ImageLike;
+export type ComicRegionCropper = (request: ComicCropRequest) => ImageLike | Promise<ImageLike>;
 
 /** Keep segmentation boundaries: a nearby line in another paragraph is not evidence
  * that two balloons belong together. Split unusually large gaps within paragraphs. */
@@ -66,6 +67,17 @@ export function groupComicTextLines(candidates: readonly ComicTextCandidate[]): 
 
 export { comicContainerIsConvincing };
 
+/** Whether a container is worth handing to recognition at all.
+ *
+ *  A page holds a couple of dozen flat shapes that enclose something, and only a handful
+ *  of them are lettering. The others used to be read three times each before being thrown
+ *  away on the strength of measurements that were already taken - on a phone that is most
+ *  of the page's time. A container with no sign of glyphs in it is not read; one that is
+ *  convincing always is, since that bar is far higher than this one. */
+export function comicContainerIsWorthReading(container: ComicVisualContainer): boolean {
+  return container.runs >= 8 && container.glyphShare >= .5 && container.inkShare >= .015;
+}
+
 /** Whether a reading looks like words at all.
  *
  *  Recognition never returns nothing: pointed at a flame or a face it returns specks of
@@ -99,14 +111,14 @@ export class ComicRegionOcr {
   })) {}
 
   public async recognize(image: ImageLike, width: number, height: number, pageIndex: number, signal?: AbortSignal,
-    containers: readonly ComicVisualContainer[] = [], crop?: ComicRegionCropper): Promise<ComicTextRegion[]> {
+    containers: readonly ComicVisualContainer[] = [], crop?: ComicRegionCropper, timer?: ComicStageRecorder): Promise<ComicTextRegion[]> {
     signal?.throwIfAborted();
     let rejectAbort: (reason: unknown) => void = () => undefined;
     const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
     const cancel = (): void => { rejectAbort(signal?.reason ?? new DOMException("Aborted", "AbortError")); void this.dispose(); };
     signal?.addEventListener("abort", cancel, { once: true });
     try {
-      return await Promise.race([this.process(image, width, height, pageIndex, signal, containers, crop), aborted]);
+      return await Promise.race([this.process(image, width, height, pageIndex, signal, containers, crop, timer), aborted]);
     } finally { signal?.removeEventListener("abort", cancel); }
   }
 
@@ -121,7 +133,7 @@ export class ComicRegionOcr {
    *  that came out of D with nothing are read once more, with every preparation available,
    *  and the convincing ones survive marked for review rather than disappearing. */
   private async process(image: ImageLike, width: number, height: number, pageIndex: number, signal: AbortSignal | undefined,
-    containers: readonly ComicVisualContainer[], crop?: ComicRegionCropper): Promise<ComicTextRegion[]> {
+    containers: readonly ComicVisualContainer[], crop?: ComicRegionCropper, timer?: ComicStageRecorder): Promise<ComicTextRegion[]> {
     if (!this.worker) {
       const worker = await this.factory();
       if (signal?.aborted) { await worker.terminate(); signal.throwIfAborted(); }
@@ -130,7 +142,9 @@ export class ComicRegionOcr {
     const worker = this.worker;
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT, user_defined_dpi: "300" });
     signal?.throwIfAborted();
-    const layout = await worker.recognize(image, {}, { blocks: true, text: true });
+    const layout = timer
+      ? await timer.step("TEXT_DETECTION", () => worker.recognize(image, {}, { blocks: true, text: true }))
+      : await worker.recognize(image, {}, { blocks: true, text: true });
     const seeds = comicTextCandidates(layout.data.blocks ?? []).filter(candidate => {
       const letters = letterCount(candidate.lines.map(line => line.text).join(""));
       return letters >= 4 || (letters >= 2 && candidate.lines.some(line => line.confidence >= 75));
@@ -139,6 +153,7 @@ export class ComicRegionOcr {
     const taken = new Set<ComicTextCandidate>();
     const entries: Entry[] = [];
     for (const container of containers) {
+      if (!comicContainerIsWorthReading(container)) { timer?.count("ocrSkipped"); continue; }
       const inside = seeds.filter(seed => {
         const b = seed.bbox, centerX = (b.x0 + b.x1) / 2, centerY = (b.y0 + b.y1) / 2;
         return centerX >= container.bbox.x0 && centerX <= container.bbox.x1 && centerY >= container.bbox.y0 && centerY <= container.bbox.y1;
@@ -158,7 +173,7 @@ export class ComicRegionOcr {
     const regions: ComicTextRegion[] = [];
     for (const entry of entries) {
       signal?.throwIfAborted();
-      const region = await this.read(entry, { worker, image, crop, width, height, pageIndex, signal, order: regions.length + 1 });
+      const region = await this.read(entry, { worker, image, crop, width, height, pageIndex, signal, order: regions.length + 1, timer });
       if (region) regions.push(region);
     }
     // Disjoint fills can still have overlapping rectangles. Keep the better recognized
@@ -176,7 +191,7 @@ export class ComicRegionOcr {
   }
 
   /** One pairing, read on its own crop and turned into a region - or dropped. */
-  private async read(entry: Entry, context: { worker: Worker; image: ImageLike; crop?: ComicRegionCropper; width: number; height: number; pageIndex: number; signal?: AbortSignal; order: number }):
+  private async read(entry: Entry, context: { worker: Worker; image: ImageLike; crop?: ComicRegionCropper; width: number; height: number; pageIndex: number; signal?: AbortSignal; order: number; timer?: ComicStageRecorder }):
   Promise<ComicTextRegion | null> {
     const { worker, image, crop, width, height, pageIndex, signal } = context;
     const lineBoxes = entry.lines.map(line => line.bbox);
@@ -190,13 +205,18 @@ export class ComicRegionOcr {
     const readable = clampBox(entry.container ? pad(visualBox, -3, width, height) : pad(textBox, 3, width, height), width, height);
     if (readable.x1 <= readable.x0 || readable.y1 <= readable.y0) return null;
 
-    const plans = comicCropPlans(readable.x1 - readable.x0, readable.y1 - readable.y0, entry.container?.darkOnLight ?? true);
+    const plans = comicCropPlans(readable.x1 - readable.x0, readable.y1 - readable.y0,
+      entry.container?.darkOnLight ?? true, (entry.container?.typography.capHeight ?? 0) * height);
     const attempts: Attempt[] = [];
-    for (const plan of crop ? plans : [undefined]) {
+    const convincing = entry.container ? comicContainerIsConvincing(entry.container) : false;
+    for (const [index, plan] of (crop ? plans : [undefined]).entries()) {
       signal?.throwIfAborted();
-      const result = plan && crop
-        ? await worker.recognize(crop({ bounds: readable, plan, stencil: stencilFor(entry.container, height), background: entry.container?.backgroundColor }), {}, { blocks: true, text: true })
+      const read = async (): Promise<Awaited<ReturnType<Worker["recognize"]>>> => plan && crop
+        ? await worker.recognize(await crop({ bounds: readable, plan, stencil: stencilFor(entry.container, height), background: entry.container?.backgroundColor }), {}, { blocks: true, text: true })
         : await worker.recognize(image, { rectangle: { left: readable.x0, top: readable.y0, width: readable.x1 - readable.x0, height: readable.y1 - readable.y0 } }, { blocks: true, text: true });
+      context.timer?.count("ocrCalls");
+      context.timer?.count("ocrPixels", pixelsOf(readable, plan));
+      const result = context.timer ? await context.timer.step("OCR", read) : await read();
       const lines = (result.data.blocks ?? []).flatMap(block => block.paragraphs.flatMap(paragraph => paragraph.lines));
       attempts.push({ text: result.data.text.trim(), plan,
         confidence: Math.max(0, Math.min(1, (Number.isFinite(result.data.confidence) ? result.data.confidence : 0) / 100)),
@@ -204,6 +224,15 @@ export class ComicRegionOcr {
       const last = attempts.at(-1)!;
       // Convincing enough: no reason to spend two more recognitions on this region.
       if (letterCount(last.text) >= 4 && last.confidence >= .8) break;
+      // Words were read and read clearly enough to keep: that is what the other two
+      // preparations were for, so they are not spent.
+      if (comicTextLooksReadable(last.text) && last.confidence >= .6) break;
+      // And nothing came of the first reading of something that was never convincing:
+      // another two readings of the same nothing is how a page loses its minutes.
+      if (index === 0 && !convincing && letterCount(last.text) < 3) break;
+      // Free lettering has no container vouching for it. A third reading that has still
+      // convinced nobody will not save it, and most of these are not lettering at all.
+      if (index >= 1 && !entry.container) break;
     }
     // The best evidence wins, and nothing is merged between attempts: the text kept is one
     // reading of the image, never a sentence assembled from several guesses.
@@ -214,7 +243,6 @@ export class ComicRegionOcr {
     // Two ways to earn a region: words were read, or the container is so clearly a box of
     // text that losing it would be worse than keeping it unread. Everything else - a face,
     // a flame, a fold of cloth that happened to enclose some marks - is dropped here.
-    const convincing = entry.container ? comicContainerIsConvincing(entry.container) : false;
     // Free lettering has no box vouching for it, so it has to be read clearly to count.
     const floor = entry.container ? .5 : .6, minimum = 4;
     const read = comicTextLooksReadable(text) && confidence >= floor && letterCount(text) >= minimum;
@@ -274,6 +302,13 @@ function typographyOf(entry: Entry, lines: readonly Bbox[], pageHeight: number):
   if (!Number.isFinite(capHeight) || capHeight <= 0) return base;
   return { family: base?.family ?? "comic", weight: base?.weight ?? "normal", italic: base?.italic ?? false,
     align: base?.align ?? "center", capHeight, lines: lines.length };
+}
+
+/** How many pixels a reading attempt actually hands to recognition. */
+function pixelsOf(bounds: Bbox, plan?: ComicCropPlan): number {
+  const width = Math.max(1, bounds.x1 - bounds.x0), height = Math.max(1, bounds.y1 - bounds.y0);
+  const scale = plan?.scale ?? 1, margin = (plan?.margin ?? 0) * 2;
+  return Math.round((width * scale + margin) * (height * scale + margin));
 }
 
 /** Longer text and firmer recognition win; an empty reading never does. */

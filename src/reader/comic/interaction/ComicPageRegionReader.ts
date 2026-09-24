@@ -5,6 +5,7 @@ import type { ComicPageAsset, ComicTextRegion } from "./ComicInteractionTypes";
 import { comicCreateCutouts } from "./ComicObjectCutout";
 import type { ComicRegionOcr } from "./ComicRegionOcr";
 import type { ComicStencil } from "./ComicContainerDetector";
+import type { ComicStageRecorder } from "./ComicStageTimer";
 
 /** Everything one rendered page goes through: find the containers in colour, then read
  *  each of them from a crop prepared for its own background.
@@ -12,15 +13,26 @@ import type { ComicStencil } from "./ComicContainerDetector";
  *  The rendered canvas is only ever read from here - the packaged page image keeps the
  *  artist's colours exactly as they were. */
 export async function comicReadPageRegions(canvas: HTMLCanvasElement, pageIndex: number, ocr: ComicRegionOcr,
-  signal?: AbortSignal, direction: ComicReadingDirection = "ltr", assets?: ComicPageAsset[]): Promise<ComicTextRegion[]> {
+  signal?: AbortSignal, direction: ComicReadingDirection = "ltr", assets?: ComicPageAsset[],
+  timer?: ComicStageRecorder, encoded?: ComicPageAsset): Promise<ComicTextRegion[]> {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Canvas indisponivel para leitura de pagina de HQ.");
-  const page = context.getImageData(0, 0, canvas.width, canvas.height);
-  const containers = detectComicContainers(page);
+  const page = timer
+    ? await timer.step("BITMAP_CREATE", () => context.getImageData(0, 0, canvas.width, canvas.height))
+    : context.getImageData(0, 0, canvas.width, canvas.height);
+  const containers = timer
+    ? await timer.step("CONTAINER_DETECTION", () => detectComicContainers(page))
+    : detectComicContainers(page);
   signal?.throwIfAborted();
-  const crop = document.createElement("canvas");
+  // Handed a canvas, the recognition library encodes a PNG of it first - and on a phone a
+  // single PNG encode costs seconds, which every candidate on the page then pays. The page
+  // was already encoded once for the package, so those bytes are reused as they are, and
+  // each crop is encoded the same way the page was: quick to write, small to hand over.
+  const scratch = document.createElement("canvas");
+  const whole = encoded ? new Blob([new Uint8Array(encoded.data)], { type: encoded.mimeType }) : canvas;
   try {
-    const regions = await ocr.recognize(canvas, canvas.width, canvas.height, pageIndex, signal, containers, ({ bounds, plan, stencil, background }) => {
+    const regions = await ocr.recognize(whole, canvas.width, canvas.height, pageIndex, signal, containers, ({ bounds, plan, stencil, background }) => {
+      const cropStarted = timer ? Date.now() : 0;
       const width = Math.max(1, bounds.x1 - bounds.x0), height = Math.max(1, bounds.y1 - bounds.y0);
       const source = new ImageData(width, height);
       for (let y = 0; y < height; y++) {
@@ -29,15 +41,22 @@ export async function comicReadPageRegions(canvas: HTMLCanvasElement, pageIndex:
       }
       if (stencil) paintOutside(source, bounds, stencil, background);
       const prepared = comicPrepareCrop(source, plan);
-      crop.width = prepared.width; crop.height = prepared.height;
-      crop.getContext("2d")!.putImageData(prepared, 0, 0);
-      return crop;
-    });
-    if (assets) assets.push(...await comicCreateCutouts(canvas, regions, containers));
+      scratch.width = prepared.width; scratch.height = prepared.height;
+      scratch.getContext("2d")!.putImageData(prepared, 0, 0);
+      const image = comicEncodedCrop(scratch);
+      timer?.add("REGION_CROP", Date.now() - cropStarted);
+      return image;
+    }, timer);
+    if (assets) {
+      const cutouts = timer
+        ? await timer.step("MASK_GENERATION", () => comicCreateCutouts(canvas, regions, containers))
+        : await comicCreateCutouts(canvas, regions, containers);
+      assets.push(...cutouts);
+    }
     signal?.throwIfAborted();
     // Reading order is the last word on a page, once every region on it is known.
     return comicReadingOrder(regions, direction);
-  } finally { crop.width = crop.height = 0; }
+  } finally { scratch.width = scratch.height = 0; }
 }
 
 /** Paints everything outside the container's silhouette with the container's own colour,
@@ -59,4 +78,10 @@ function parse(colour?: string): { r: number; g: number; b: number } | null {
   if (!colour || !/^#[0-9a-f]{6}$/i.test(colour)) return null;
   const value = Number.parseInt(colour.slice(1), 16);
   return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+}
+
+/** A prepared crop, encoded the way the page itself is. Falls back to the canvas when the
+ *  browser cannot write WebP, which only costs what it used to cost. */
+function comicEncodedCrop(canvas: HTMLCanvasElement): Promise<Blob | HTMLCanvasElement> {
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob ?? canvas), "image/webp", .95));
 }

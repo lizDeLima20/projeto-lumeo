@@ -15,6 +15,12 @@ export interface ComicConversionInput {
   regionProvider?: (pageIndex: number, asset: ComicPageAsset, signal?: AbortSignal) => Promise<ComicTextRegion[]>;
   releasePage?: () => void;
   conversionKey?: string;
+  /** The pages the reader wants first, most wanted first - normally the page on screen
+   *  and the two after it. Asked again before every page, so turning to another part of
+   *  the comic changes what is converted next. */
+  priority?: () => readonly number[];
+  /** Which page the queue just picked up. */
+  onPageStarted?: (pageIndex: number) => void;
 }
 
 export interface ComicConversionResult {
@@ -24,6 +30,9 @@ export interface ComicConversionResult {
 
 export interface ComicConverterOptions {
   onProgress?: (progress: ComicConversionProgress) => void;
+  /** The pages the reader wants first, asked again before every page. */
+  priority?: () => readonly number[];
+  onPageStarted?: (pageIndex: number) => void;
   onPageProcessed?: (page: ComicDocument["pages"][number], asset: ComicPageAsset) => Promise<void> | void;
   signal?: AbortSignal;
   cache?: ComicConversionCache;
@@ -46,9 +55,17 @@ export class ComicConverter {
         this.progress(options, "COMPLETED", input.totalPages, input.totalPages);
         return cached;
       }
-      for (let pageIndex = 0; pageIndex < input.totalPages; pageIndex++) {
+      // Pages are converted in the order the reader needs them, not in the order they are
+      // bound. What comes out is the same either way: the document is sorted by index
+      // before the manifest is written, so a comic prepared from page eighty-seven is
+      // structurally the same package as one prepared from page one.
+      const remaining = new Set(Array.from({ length: input.totalPages }, (_, index) => index));
+      while (remaining.size > 0) {
+        const pageIndex = ComicConverter.nextPage(remaining, input.priority?.());
+        remaining.delete(pageIndex);
         options.signal?.throwIfAborted();
-        this.progress(options, "PROCESSING_PAGE", pageIndex + 1, input.totalPages);
+        this.progress(options, "PROCESSING_PAGE", pages.length, input.totalPages);
+        input.onPageStarted?.(pageIndex);
         const saved = input.conversionKey ? await options.cache?.page(input.conversionKey, pageIndex) : undefined;
         try {
           const asset = saved?.asset ?? await input.pageProvider(pageIndex, options.signal);
@@ -76,6 +93,9 @@ export class ComicConverter {
         // Yield between pages even when every stage was served from cache.
         await new Promise<void>(resolve => setTimeout(resolve, 0));
       }
+      // The package is written in the order the pages were converted; the document that
+      // describes it is always in reading order.
+      pages.sort((a, b) => a.index - b.index);
       options.signal?.throwIfAborted();
       this.progress(options, "SAVING", input.totalPages, input.totalPages);
       const document: ComicDocument = {
@@ -123,6 +143,15 @@ export class ComicConverter {
       this.progress(options, "FAILED", pages.length, input.totalPages, error instanceof Error ? error.message : "Falha ao converter HQ.");
       throw error;
     }
+  }
+
+  /** The next page to convert: the first one the reader asked for that is still missing,
+   *  or else the earliest page still missing. */
+  private static nextPage(remaining: ReadonlySet<number>, wanted?: readonly number[]): number {
+    for (const index of wanted ?? []) if (remaining.has(index)) return index;
+    let earliest = Number.MAX_SAFE_INTEGER;
+    for (const index of remaining) if (index < earliest) earliest = index;
+    return earliest;
   }
 
   private progress(options: ComicConverterOptions, stage: ComicConversionProgress["stage"], currentPage: number, totalPages: number, message?: string): void {

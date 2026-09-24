@@ -1,6 +1,6 @@
 import type { Bbox } from "tesseract.js";
 import type { ComicRegionShape, ComicRegionType, ComicTailDirection, ComicTypography } from "./ComicInteractionTypes";
-import { dilateMask, emptyMask, labelMask, maskArea, maskBounds, readMaskShape, sealComicArtMask, shareBetween, simplifyContour, splitByTextBlocks, splitTouchingMasks, traceMaskContour, type ComicMask, type ComicPoint2D } from "./ComicShapeMask";
+import { dilateMask, emptyMask, labelMask, maskArea, maskBounds, readMaskShape, sealComicArtMask, shareBetween, simplifyContour, traceMaskContour, type ComicMask, type ComicPoint2D } from "./ComicShapeMask";
 
 export interface ComicVisualContainer {
   /** The container itself: balloon, caption box, coloured panel of text. */
@@ -153,17 +153,14 @@ export function detectComicContainers(image: ImageData, options: ComicContainerO
 
     const silhouette = bodyMask(owner, seed, grid, { minX, minY, maxX, maxY });
     const group: ComicVisualContainer[] = [];
-    // Two balloons can be one silhouette in two different ways: pinched at a neck, or
-    // simply drawn merged. The first is found by wearing the shape down, the second by
-    // the gap between the blocks of lettering it holds.
-    for (const pinched of splitTouchingMasks(silhouette.body)) {
-      const ink = inkMask(pinched, silhouette.fill, grid, { minX, minY });
-      const reach = Math.max(2, Math.round(Math.min(boxWidth, boxHeight) * .07));
-      for (const part of splitByTextBlocks(pinched, ink, reach)) {
-        const container = describe(part, silhouette.fill, grid, { minX, minY }, step, image, minWidth, minHeight);
-        if (container) { found.push(container); group.push(container); }
-      }
-    }
+    // One fill, one container. A balloon drawn as two or three lobes running into each
+    // other is one balloon and one speech: the artist drew no line between them, and
+    // cutting it up by the gaps between its blocks of lettering left half a balloon on
+    // screen and made the words look like someone else's. What separates two balloons is
+    // what separated them on paper - each one's own outline, which the fill already stops
+    // at - so a balloon lying across another stays its own container without any help.
+    const only = describe(silhouette.body, silhouette.fill, grid, { minX, minY }, step, image, minWidth, minHeight);
+    if (only) { found.push(only); group.push(only); }
     // Detection trims sparse rows to reject scenery. Extraction must recover tails.
     // Only recover a bounded component; a fill leaking across a panel stays for review.
     const fullWidth = originalBox.maxX - originalBox.minX + 1, fullHeight = originalBox.maxY - originalBox.minY + 1;
@@ -230,25 +227,6 @@ function bodyMask(owner: Int32Array, seed: number, grid: Grid, box: Box): { body
   }
   for (let index = 0; index < body.data.length; index++) body.data[index] = outside[index] ? 0 : 1;
   return { body, fill };
-}
-
-/** The letters inside a silhouette: what it holds that is not its own colour. */
-function inkMask(part: ComicMask, fill: ComicMask, grid: Grid, origin: { minX: number; minY: number }): ComicMask {
-  const ink = emptyMask(part.width, part.height);
-  let sum = 0, count = 0;
-  for (let index = 0; index < part.data.length; index++) {
-    if (!part.data[index] || !fill.data[index]) continue;
-    sum += grid.luma[(origin.minY + ((index / part.width) | 0)) * grid.width + origin.minX + (index % part.width)]!;
-    count++;
-  }
-  if (count === 0) return ink;
-  const background = sum / count;
-  for (let index = 0; index < part.data.length; index++) {
-    if (!part.data[index] || fill.data[index]) continue;
-    const cell = (origin.minY + ((index / part.width) | 0)) * grid.width + origin.minX + (index % part.width);
-    if (Math.abs(grid.luma[cell]! - background) >= 46) ink.data[index] = 1;
-  }
-  return ink;
 }
 
 /** One silhouette, measured and described - or rejected. */

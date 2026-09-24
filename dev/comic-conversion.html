@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HQ conversion debug</title>
+<style>
+body{margin:0;height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr);font:14px system-ui;background:#f4f4f4;color:#222}header{padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}main{min-height:0;display:flex;justify-content:center;align-items:center}canvas{max-width:100%;max-height:100%;object-fit:contain}output{display:block;padding:8px}body.dark{background:#15161b;color:#eee}button,input{font:inherit}
+</style>
+<header><input id="file" type="file" accept="application/pdf"><label><input id="cover" type="checkbox" checked>Capa</label><button id="convert">Converter</button><button id="cancel" disabled>Cancelar</button><button id="download" disabled>Baixar .lima</button><label><input id="debug" type="checkbox">Bounds</label><label><input id="dark" type="checkbox">Dark</label><input id="page" type="number" min="1" value="1" aria-label="Pagina" style="width:64px"></header>
+<output id="progress"></output><main><canvas id="art"></canvas></main>
+<script type="module" src="/src/reader/comic/interaction/ComicConversionDebugPage.ts"></script>
+</html>

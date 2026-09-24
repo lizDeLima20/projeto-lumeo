@@ -20,14 +20,20 @@ export class ComicObjectArtwork {
   private generation = 0;
   public load(bytes: Uint8Array): void {
     this.clear();
-    this.bytes = unzipSync(bytes, { filter: entry => entry.name.startsWith("interaction/assets/") && !entry.name.endsWith("-mask.png") });
+    this.bytes = unzipSync(bytes, { filter: entry => entry.name.startsWith("interaction/assets/") && !/-mask\.[a-z]+$/.test(entry.name) });
   }
+  /** The cutouts of one page, ready before the package that will hold them all. */
+  public add(assets: readonly { path: string; data: Uint8Array }[] = []): void {
+    for (const asset of assets) if (!/-mask\.[a-z]+$/.test(asset.path)) this.bytes[asset.path] = asset.data;
+  }
+
   public async get(region: ComicTextRegion): Promise<ComicOriginalArt | null> {
     const path = region.assetPath; if (!path || !this.bytes[path]) return null;
     let bitmap = this.decoded.get(path);
     if (!bitmap) {
       const generation = this.generation;
-      bitmap = await createImageBitmap(new Blob([new Uint8Array(this.bytes[path]!)], { type: "image/png" }));
+      // The type comes from the bytes themselves; the extension only names the entry.
+      bitmap = await createImageBitmap(new Blob([new Uint8Array(this.bytes[path]!)]));
       if (generation !== this.generation) { bitmap.close(); return null; }
       this.decoded.set(path, bitmap);
       if (this.decoded.size > 24) {

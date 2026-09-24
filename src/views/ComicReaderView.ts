@@ -12,10 +12,10 @@ import { ComicTurnRenderer, type ComicTheme } from "../reader/comic/ComicTurnRen
 import type { ComicFold } from "../reader/comic/ComicFoldGeometry";
 import { PdfTextLayerFragmentSource } from "../reader/comic/PdfTextLayerFragmentSource";
 import { TesseractComicOcrSource } from "../reader/comic/TesseractComicOcrSource";
-import { IndexedDbComicConversionCache } from "../reader/comic/interaction/ComicConversionCache";
-import { comicSourceKey } from "../reader/comic/interaction/ComicConversionIdentity";
+import { ComicConversionService, comicLog } from "../reader/comic/interaction/ComicConversionService";
+import { ComicPdfConverter } from "../reader/comic/interaction/ComicPdfConverter";
+import type { ComicPage, ComicPageAsset } from "../reader/comic/interaction/ComicInteractionTypes";
 import { ComicInteractionEngine } from "../reader/comic/interaction/ComicInteractionEngine";
-import { ComicInteractionValidator } from "../reader/comic/interaction/ComicInteractionValidator";
 import { ComicHitMap, type ComicPageArt } from "../reader/comic/interaction/ComicHitMap";
 import { ComicBubbleView } from "../reader/comic/interaction/ComicBubbleView";
 import { ComicObjectArtwork } from "../reader/comic/interaction/ComicObjectArtwork";
@@ -62,6 +62,10 @@ export class ComicReaderView extends BaseView {
   private resizeTimer = 0;
   private labelTimer = 0;
   private processing: AbortController | null = null;
+  private conversion: AbortController | null = null;
+  /** True while this comic's package is being made: the older recognition stays out of the
+   *  way so the reader never shows the blocks it is about to replace. */
+  private preparing = false;
   private disposed = false;
   private readonly interaction = new ComicInteractionEngine();
   private readonly objectArtwork = new ComicObjectArtwork();
@@ -136,6 +140,7 @@ export class ComicReaderView extends BaseView {
     document.body.classList.remove("reader-mode");
     this.controller?.unbind(); this.controller = null;
     this.processing?.abort(); this.processing = null;
+    this.conversion?.abort(); this.conversion = null; this.preparing = false;
     this.bitmaps.clear();
     this.bubble?.destroy(); this.bubble = null; this.hitMapKey = "";
     this.hints?.destroy(); this.hints = null;
@@ -168,15 +173,10 @@ export class ComicReaderView extends BaseView {
       if (source.book.fileType !== "pdf") throw new ReaderFileMissingError(this.i18n.t("reader.comic.pdfOnly"));
       this.book = source.book;
       this.totalPages = await this.engine.open(source.blob);
-      try {
-        const key = await comicSourceKey(source.blob);
-        const completed = await new IndexedDbComicConversionCache().completedForSource(key);
-        if (completed && !this.disposed) {
-          new ComicInteractionValidator().validateDocument(completed.document);
-          this.interaction.open(completed.document);
-          this.objectArtwork.load(completed.bytes);
-        }
-      } catch { /* An unavailable conversion cache must not prevent reading the PDF. */ }
+      // The interaction package is prepared alongside the pages, not instead of them: the
+      // comic is readable from the first moment, and its balloons answer to a touch as
+      // soon as the conversion this comic needs is ready or found.
+      const prepared = this.prepare(source.book, source.blob);
       // The book's page shape, from a few pages - read from the PDF, nothing is drawn.
       const samples = await Promise.all(Array.from({ length: Math.min(8, this.totalPages) }, (_, index) => this.engine.aspect(index + 1)));
       this.aspect = ComicLayout.aspect(samples.filter((value): value is number => value !== null));
@@ -189,7 +189,84 @@ export class ComicReaderView extends BaseView {
       if (this.disposed) return;
       this.element?.querySelector(".comic-loading")?.remove();
       this.arrived(false);
+      await prepared;
+      if (!this.disposed && this.interaction.isOpen) { this.hitMapKey = ""; this.drawRest(); }
     } catch (error) { this.showError(error); }
+  }
+
+  /** Finds this comic's interaction package, or makes it.
+   *
+   *  This is where the library meets the converter. Until now the reader only looked for a
+   *  package and, finding none, read the comic flat with the older block overlay - so a
+   *  comic prepared on the workbench behaved one way and the same comic opened from the
+   *  library behaved another. One service now answers both. */
+  private async prepare(book: Book, blob: Blob): Promise<void> {
+    const conversion = new AbortController();
+    this.conversion = conversion;
+    // Set before the first page is even looked at: whatever the reader does in the
+    // meantime, the overlay this package replaces must not appear and then vanish.
+    this.preparing = true;
+    const status = this.element?.querySelector<HTMLElement>(".comic-progress");
+    const announce = (message: string): void => { if (status && !this.disposed) status.textContent = message; };
+    try {
+      const outcome = await new ComicConversionService(new ComicPdfConverter()).open({
+        bookId: this.bookId, blob, title: book.title, fileName: book.fileName,
+        // The library marks a book as a comic or not; it has no separate mark for manga
+        // yet, so every comic is prepared as one and read left to right. The converter
+        // already knows the other direction for the day that mark exists.
+        contentType: "comic",
+      }, {
+        signal: conversion.signal,
+        // The page being read comes first, then the two after it, then whatever is left.
+        // Asked again before every page, so turning to another part of the comic moves
+        // that part to the front of the queue.
+        priority: () => [this.currentPage - 1, this.currentPage, this.currentPage + 1],
+        onProgress: progress => {
+          if (progress.stage !== "PROCESSING_PAGE") return;
+          announce(this.i18n.t("reader.comic.preparingPage", { current: progress.currentPage, total: progress.totalPages }));
+        },
+        onPageStarted: pageIndex => {
+          if (pageIndex !== this.currentPage - 1) return;
+          comicLog("COMIC_CURRENT_PAGE_CONVERSION_STARTED", { bookId: this.bookId, pageIndex });
+        },
+        onPageReady: (page, asset) => this.pageReady(page, asset),
+      });
+      if (this.disposed) return;
+      this.interaction.open(outcome.result.document);
+      this.objectArtwork.load(outcome.result.bytes);
+      comicLog("COMIC_RENDERER_SELECTED", { bookId: this.bookId, conversionKey: outcome.key,
+        renderer: "comic-interaction", cache: outcome.cached ? "hit" : "miss",
+        manifestVersion: outcome.result.document.manifest.version,
+        pageCount: outcome.result.document.pages.length,
+        regionCount: outcome.result.document.pages.reduce((total, page) => total + page.regions.length, 0) });
+    } catch (error) {
+      // A comic that cannot be prepared is still a comic to read: the older block overlay
+      // takes over rather than leaving the reader with nothing.
+      if (!this.disposed) {
+        comicLog("COMIC_RENDERER_SELECTED", { bookId: this.bookId, renderer: "block-overlay",
+          reason: conversion.signal.aborted ? "aborted" : error instanceof Error ? error.name : "failed",
+          // Our own conversion messages, which say which stage gave up and why.
+          detail: error instanceof Error ? error.message.slice(0, 200) : undefined });
+      }
+    } finally {
+      this.conversion = null;
+      this.preparing = false;
+      if (!this.disposed) { this.showProgress(); this.scheduleProcessing(this.currentPage); }
+    }
+  }
+
+  /** A page finished converting while the rest of the comic is still being prepared.
+   *
+   *  Its regions and its cutouts go to the reader immediately: the balloons of the page in
+   *  front of the reader answer to a touch minutes before the last page of the comic has
+   *  been looked at. The finished package replaces all of this when it arrives. */
+  private pageReady(page: ComicPage, asset: ComicPageAsset): void {
+    if (this.disposed) return;
+    this.interaction.addPage(page);
+    this.objectArtwork.add(asset.interactionAssets);
+    comicLog("COMIC_PAGE_READY", { bookId: this.bookId, pageIndex: page.index, regionCount: page.regions.length });
+    // Only the pages on screen need their targets rebuilt; the rest are waiting anyway.
+    if (this.pageArts().some(art => art.pageIndex === page.index)) { this.hitMapKey = ""; this.drawRest(); }
   }
 
   /** Measures the stage and fixes the geometry every state will use until the next resize. */
@@ -381,8 +458,9 @@ export class ComicReaderView extends BaseView {
 
   private scheduleProcessing(pageNumber: number): void {
     // Completed LIMA data is authoritative, including intentionally empty cover regions:
-    // its regions are the hit map, so the older block recognition does not run.
-    if (this.interaction.isOpen) return;
+    // its regions are the hit map, so the older block recognition does not run - and while
+    // that data is still being prepared, neither does it.
+    if (this.interaction.isOpen || this.preparing) return;
     const controller = new AbortController(); this.processing = controller;
     const size = this.slotSize;
     const run = async (): Promise<void> => {
