@@ -132,12 +132,15 @@ describe("HQ: o asset original é ampliado sem distorcer ou reescrever sua arte"
 });
 
 describe("HQ: quem recebe o gesto", () => {
-  it("um toque parado é oferecido à camada de texto antes de virar a página", () => {
+  it("um clique parado é da camada de texto, e nunca vira a página", () => {
     const controller = source("reader/comic/ComicTurnController.ts");
-    assert.match(controller, /if \(duration < COMIC_TURN\.regionTapMs && this\.host\.tap\?\.\(this\.local\(event\), duration\)\) return;/);
+    assert.match(controller, /if \(still && !hotspot && duration < COMIC_TURN\.regionTapMs\) this\.host\.tap\?\.\(this\.local\(event\), duration\);/);
     // Only a still press: a swipe never opens a balloon.
     assert.match(controller, /if \(state !== "DRAGGING" \|\| !this\.drag\) return;/);
-    assert.ok(COMIC_TURN.regionTapMs > COMIC_TURN.tapMs);
+    // No corner, edge or half of the spread turns on a click any more: on the open book
+    // the balloon under the pointer was unreachable because the page moved first.
+    assert.doesNotMatch(controller, /tapSide|COMIC_TURN\.tapMs/);
+    assert.ok(COMIC_TURN.regionTapMs >= 350);
   });
 
   it("uma tremida do dedo não é um arrasto, e um peteleco precisa ter andado", () => {

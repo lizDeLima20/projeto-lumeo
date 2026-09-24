@@ -32,9 +32,8 @@ export const COMIC_TURN = {
   flick: .35,
   /** ...once it has actually travelled: a twitch is not a swipe. */
   flickMinPx: 24,
-  /** A press this short and this still is a tap. */
-  tapMs: 350,
-  /** A tap on a text region may linger a little longer than a tap that turns. */
+  /** A press this short and this still is a tap, offered to the balloons. Longer than a
+   *  quick click, because a mouse held a moment over a balloon still means that balloon. */
   regionTapMs: 650,
   /** Programmatic turns (tap, arrow, key). */
   turnMs: 820,
@@ -150,15 +149,12 @@ export class ComicTurnController {
       const still = Math.hypot(event.clientX - this.downX, event.clientY - this.downY) < COMIC_TURN.slop;
       const hotspot = within(this.downTarget, ".comic-hotspot");
       const duration = event.timeStamp - this.downTime;
-      if (still && !hotspot) {
-        // The text layer decides first: a region opens its balloon, and while one is open
-        // any tap only closes or switches it - never turns the page by accident.
-        if (duration < COMIC_TURN.regionTapMs && this.host.tap?.(this.local(event), duration)) return;
-        if (duration < COMIC_TURN.tapMs) {
-          const side = this.tapSide(this.local(event));
-          if (side) void this.turn(side);
-        }
-      }
+      // A still press belongs to the balloons, never to the leaf. The open book used to
+      // turn on a click on either page, which made the balloon under the pointer
+      // unreachable: the page moved before the click could open it. The leaf is taken by
+      // pressing and dragging it sideways - and by the arrows and the keyboard, which is
+      // how it already worked on the phone.
+      if (still && !hotspot && duration < COMIC_TURN.regionTapMs) this.host.tap?.(this.local(event), duration);
       return;
     }
     if (state !== "DRAGGING" || !this.drag) return;
@@ -280,19 +276,6 @@ export class ComicTurnController {
   private release(): void {
     const id = this.pointerId; this.pointerId = null;
     if (id !== null && this.element.hasPointerCapture?.(id)) this.element.releasePointerCapture(id);
-  }
-
-  private tapSide(point: ComicPoint): ComicTurnDirection | null {
-    const geometry = this.host.geometry();
-    if (geometry.mode === "spread") {
-      if (point.y < geometry.top || point.y > geometry.top + geometry.pageHeight) return null;
-      if (point.x >= geometry.spineX && point.x <= geometry.spineX + geometry.pageWidth) return 1;
-      if (point.x < geometry.spineX && point.x >= geometry.spineX - geometry.pageWidth) return -1;
-      return null;
-    }
-    // On a phone a tap never turns the page - not even on its edges. Only pressing and
-    // dragging the leaf sideways does; a tap is left to the balloons.
-    return null;
   }
 
   private velocity(): number {
