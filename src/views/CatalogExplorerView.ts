@@ -16,13 +16,13 @@ export class CatalogExplorerView extends BaseView {
   /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
   private addCatalogGenre: (id: string, label: string) => void = () => undefined;
   public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void,
-    private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void }) { super(); this.catalog = api; }
+    private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void }, private readonly initialGenreId = "") { super(); this.catalog = api; }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog page-shell");
     const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
     const controls = this.createElement("div", "catalog__controls");
     const search = this.createElement("input", "input") as HTMLInputElement; search.type = "search"; search.placeholder = this.t("ui.catalog.search"); search.setAttribute("aria-label", this.t("ui.catalog.search"));
-    const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = ""; const availableGenres = new Set<string>(); const genreActions = new Map<string, () => void>();
+    const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = this.initialGenreId; const availableGenres = new Set<string>(); const genreActions = new Map<string, () => void>();
     const selectGenre = (id: string): void => { const action = genreActions.get(id); if (action) { action(); return; } selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
     const addGenre = (id: string, label: string, action?: () => void): void => { if (availableGenres.has(id)) return; availableGenres.add(id); if (action) genreActions.set(id, action); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
     // Explore is the public catalogue: its filters are supplied only by the
@@ -41,7 +41,7 @@ export class CatalogExplorerView extends BaseView {
     let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
     search.addEventListener("input", reload); more.addEventListener("click", () => void this.load(search.value, selectedGenre, more));
     section.append(heading, controls, list, status, more);
-    void this.load("", "", more); void this.offerSourceManagement(heading); void this.offerCollections(addGenre); return section;
+    void this.load("", selectedGenre, more); void this.offerSourceManagement(heading); void this.offerCollections(addGenre); return section;
   }
   /** A published Drive collection participates in the very same genre strip as the
    * catalogue sources. Its own page can then resolve its nested Drive folders lazily. */

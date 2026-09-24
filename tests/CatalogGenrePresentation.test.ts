@@ -34,4 +34,23 @@ describe("controles sempre acessíveis no catálogo", () => {
     assert.match(styles, /@media\(max-width:63\.99rem\)\{\.catalog__controls\{top:5\.35rem\}\}/);
     assert.match(styles, /\.catalog__genre-carousel\{[^}]*touch-action:pan-x/);
   });
+  it("inclui busca e seletor horizontal de gêneros na página de HQs, sem botão Voltar", () => {
+    const source = readFileSync("src/views/DriveCollectionGenreView.ts", "utf8");
+    assert.match(source, /ui\.catalog\.search/);
+    assert.match(source, /ui\.catalog\.allGenres/);
+    assert.match(source, /page\.genres\?\.forEach/);
+    assert.match(source, /collections\.forEach\(collection => this\.addGenre/);
+    assert.match(source, /private async search\(raw: string\)/);
+    assert.match(source, /listing\.entries\.filter\(entry => entry\.kind === "folder"\)/);
+    assert.doesNotMatch(source, /ui\.common\.back/);
+  });
+
+  it("reduz levemente as capas do catálogo e usa o rótulo curto", () => {
+    const catalogStyles = readFileSync("src/styles/catalog.css", "utf8");
+    const collectionStyles = readFileSync("src/styles/collections.css", "utf8");
+    const pt = readFileSync("src/i18n/locales/pt-BR.ts", "utf8");
+    assert.match(catalogStyles, /\.catalog-card__cover\{width:92%;justify-self:center\}/);
+    assert.match(collectionStyles, /\.drive-comic-card__cover \{ width: 92%; justify-self: center; \}/);
+    assert.match(pt, /"catalog\.findBook": "Buscar"/);
+  });
 });

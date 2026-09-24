@@ -26,5 +26,6 @@
 .catalog__controls{position:sticky;top:4.25rem;z-index:35;gap:.65rem;border-bottom:1px solid var(--color-border);background:color-mix(in srgb,var(--color-background) 97%,transparent);padding:.75rem 0;backdrop-filter:blur(12px)}
 .catalog__genre-carousel{touch-action:pan-x;overscroll-behavior-x:contain;cursor:grab;user-select:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}.catalog__genre-carousel::-webkit-scrollbar{display:none}.catalog__genre-carousel:active{cursor:grabbing}
 .catalog__genre-chip{white-space:nowrap}
+.catalog-card__cover{width:92%;justify-self:center}
 @media(max-width:63.99rem){.catalog__controls{top:5.35rem}}
 @media(prefers-reduced-motion:reduce){.catalog__genre-carousel{scroll-behavior:auto}}
