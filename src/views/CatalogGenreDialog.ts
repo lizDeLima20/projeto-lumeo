@@ -1,5 +1,6 @@
 import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
+import { Genre } from "../models/Genre";
 import { I18nManager } from "../i18n/I18nManager";
 
 /** Local confirmation before a catalogue file is committed to the library. */
@@ -22,11 +23,15 @@ export class CatalogGenreDialog {
       const select = document.createElement("select"); select.className = "input";
       const seen = new Set<string>();
       const addOption = (value: string, text: string): void => { if (!seen.has(value)) { select.add(new Option(text, value)); seen.add(value); } };
-      addOption(this.book.genreId || "sem-genero", this.book.genreName || i18n.t("ui.catalog.unclassified"));
+      // The catalogue's genre is offered once: if the library already has a genre with that
+      // name, that genre is the one selected - never a second shelf with the same name.
+      const existing = this.book.genreName ? this.state.genres.find((genre) => Genre.sameName(genre.name, this.book.genreName)) : undefined;
+      const suggested = existing?.id ?? (this.book.genreId || "sem-genero");
+      addOption(suggested, existing?.name ?? (this.book.genreName || i18n.t("ui.catalog.unclassified")));
       this.state.genres.forEach((genre) => addOption(genre.id, genre.name));
       const customValue = "__catalog_custom_genre__";
       addOption(customValue, i18n.t("ui.onboarding.customGenres"));
-      select.value = seen.has(this.book.genreId) ? this.book.genreId : "sem-genero";
+      select.value = seen.has(suggested) ? suggested : "sem-genero";
       const custom = document.createElement("input"); custom.className = "input"; custom.hidden = true; custom.placeholder = i18n.t("ui.onboarding.customGenrePlaceholder"); custom.maxLength = 80;
       const error = document.createElement("p"); error.className = "form-error"; error.setAttribute("role", "alert");
       select.addEventListener("change", () => { custom.hidden = select.value !== customValue; if (!custom.hidden) custom.focus(); });

@@ -28,7 +28,8 @@ export class AccountPersistenceService {
       readingStatus: book.readingStatus, progressPercent: book.progressPercent ?? 0, currentLocation: book.currentLocation ?? null,
       collectionId: book.collectionId ?? null, volume: book.volume ?? null, series: book.series ?? null,
       description: book.description ?? null, publicationYear: book.publicationYear ?? null,
-      catalogBookId: book.catalogBookId ?? null, source: book.source, cover,
+      catalogBookId: book.catalogBookId ?? null, source: book.source, contentType: book.contentType,
+      collectionPath: book.collectionPath ?? null, cover,
       addedAt: book.createdAt.toISOString(), updatedAt,
       review: review ? { rating: review.rating, comment: review.comment ?? null, createdAt: review.createdAt, updatedAt: review.updatedAt } : null,
     };

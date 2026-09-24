@@ -1,6 +1,13 @@
 export type ComicLayoutMode = "single" | "spread";
 
 export interface ComicRect { x: number; y: number; width: number; height: number; }
+export interface ComicPageFit extends ComicRect {
+  viewportAspectRatio: number;
+  pageAspectRatio: number;
+  scale: number;
+  /** Reserved analysis hint; it never changes the visible bounds or crops the art. */
+  contentBounds?: ComicRect;
+}
 
 /** The one geometry a comic is drawn with. REST, DRAG, ANIMATION, COMPLETE and CANCEL all
  *  read these same numbers, so a page can never change size when a gesture starts or ends.
@@ -65,9 +72,14 @@ export class ComicLayout {
    *  whose proportions differ from the comic's is letterboxed, never stretched or cut. */
   public static contain(slot: ComicRect, width: number, height: number): ComicRect {
     if (!width || !height) return slot;
+    return ComicLayout.presentationFit(slot, width, height);
+  }
+
+  public static presentationFit(slot: ComicRect, width: number, height: number, contentBounds?: ComicRect): ComicPageFit {
     const scale = Math.min(slot.width / width, slot.height / height);
     const drawnWidth = width * scale, drawnHeight = height * scale;
-    return { x: slot.x + (slot.width - drawnWidth) / 2, y: slot.y + (slot.height - drawnHeight) / 2, width: drawnWidth, height: drawnHeight };
+    return { x: slot.x + (slot.width - drawnWidth) / 2, y: slot.y + (slot.height - drawnHeight) / 2, width: drawnWidth, height: drawnHeight,
+      viewportAspectRatio: slot.width / slot.height, pageAspectRatio: width / height, scale, contentBounds };
   }
 
   /** The comic's page proportion: the median of the sampled pages, so one odd page (a

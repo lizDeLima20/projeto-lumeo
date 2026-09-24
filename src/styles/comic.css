@@ -91,6 +91,7 @@
 
 /* Comic details: the catalogue book page's layout, with a second step for "add". */
 .comic-detail__actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.comic-detail__actions .button { flex: 1 1 13rem; min-width: 0; }
 .comic-detail__add:disabled { opacity: .55; }
 .comic-detail__unsupported { opacity: .8; }
 

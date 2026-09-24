@@ -386,7 +386,10 @@ export class App {
     const extractedCover = await this.covers.fromBookFile(file, link.format, catalogBook.title);
     const confirmed = await new CatalogGenreDialog(this.state, catalogBook).open(extractedCover);
     if (!confirmed) return null;
-    let genre = this.state.genres.find((item) => item.id === confirmed.genreId);
+    // One genre per name: a catalogue genre joins the library genre of the same name,
+    // whichever id either of them carries.
+    let genre = this.state.genres.find((item) => item.id === confirmed.genreId)
+      ?? (confirmed.genreName ? this.state.genres.find((item) => Genre.sameName(item.name, confirmed.genreName)) : undefined);
     if (!genre) { genre = new Genre(confirmed.genreId || crypto.randomUUID(), confirmed.genreName || "Sem gênero"); await this.genres.save(genre); this.state.library.addGenre(genre); }
     let collectionId: string | undefined;
     if (confirmed.collection) {
