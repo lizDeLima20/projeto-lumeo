@@ -99,3 +99,39 @@
    horizontal board under the other, like the library's own author rows. */
 .comic-genre-shelf .comic-shelf-row { grid-column: 1 / -1; min-width: 0; margin-top: .9rem; }
 .comic-shelf-row__title { margin: 0 0 .35rem; font-size: 1rem; font-weight: 600; letter-spacing: .01em; }
+
+/* ---- Text regions: an invisible hit map over the page, one enlarged balloon ---------- */
+/* The hit map follows each page's artwork rectangle (placed by the reader); regions are
+   percentages of it, so every scale and orientation keeps them on their words. Pointer
+   input goes to the stage, which decides tap versus swipe; the targets are for keyboard
+   and screen readers only. */
+.comic-hitmap { position: absolute; inset: 0; pointer-events: none; }
+.comic-hitmap--hidden { visibility: hidden; }
+.comic-hitmap__page { position: absolute; }
+.comic-hitmap__target {
+  position: absolute; margin: 0; padding: 0; border: 0; border-radius: .35rem;
+  background: transparent; appearance: none; pointer-events: none; opacity: 1;
+}
+.comic-hitmap__target:focus-visible { outline: 2px solid #2f6fed; outline-offset: 2px; }
+/* Development only (localStorage "lumeo.comic.debug" = "1"): region bounds. */
+.comic-hitmap--debug .comic-hitmap__target { outline: 1.5px solid rgba(0, 140, 105, .9); background: rgba(0, 140, 105, .08); }
+.comic-hitmap--debug .comic-hitmap__target[data-review="needs-review"] { outline-color: rgba(222, 101, 26, .95); background: rgba(222, 101, 26, .1); }
+
+.comic-bubble-layer { position: absolute; inset: 0; z-index: 30; pointer-events: none; overflow: hidden; }
+
+/* Enlargement displays the original masked pixels stored in the .lima. */
+.comic-bubble {
+  position: absolute; box-sizing: border-box; display: block; pointer-events: auto;
+  transform-origin: 0 0; will-change: transform, opacity; outline: none;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, .34)) drop-shadow(0 2px 4px rgba(0, 0, 0, .22));
+}
+.comic-bubble--leaving { pointer-events: none; }
+.comic-bubble__art { display: block; width: 100%; height: 100%; object-fit: contain; background: transparent; }
+
+/* The discovery nudge: the page's own balloon, cut to its outline, over itself. */
+.comic-hint { position: absolute; pointer-events: none; transform-origin: 50% 50%; will-change: transform; filter: none; }
+.comic-hint canvas { display: block; width: 100%; height: 100%; }
+
+/* Development only: an uncertain recognition is marked, never announced to readers. */
+.comic-bubble-layer--debug .comic-bubble[data-review="needs-review"] { outline: 2px solid #de651a; }
+@media (prefers-reduced-motion: reduce) { .comic-bubble { will-change: auto; } .comic-hint { display: none; } }

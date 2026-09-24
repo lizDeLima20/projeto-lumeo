@@ -7,6 +7,11 @@ import { ComicFoldGeometry, type ComicFold, type ComicPoint } from "../src/reade
 import { ComicTurnController, COMIC_TURN, type ComicTurnHost } from "../src/reader/comic/ComicTurnController";
 
 const source = (path: string): string => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
+const tsFiles = (path: string): string[] => readdirSync(new URL(`../src/${path}`, import.meta.url), { withFileTypes: true }).flatMap(entry => {
+  const child = `${path}${entry.name}`;
+  if (entry.isDirectory()) return tsFiles(`${child}/`);
+  return entry.isFile() && entry.name.endsWith(".ts") ? [child] : [];
+});
 const close = (a: number, b: number, epsilon = 1e-6): boolean => Math.abs(a - b) < epsilon;
 const desktop = { native: false, finePointer: true };
 
@@ -209,14 +214,11 @@ describe("HQ: o gesto controla a própria folha", () => {
     assert.equal(position(), 2);
   });
 
-  it("toque na borda vira pela mesma folha; o meio da página fica para os balões", async () => {
-    const { element, flush, position } = harness();
-    element.fire("pointerdown", 390, 0); element.fire("pointerup", 390, 80);
-    await Promise.resolve(); await Promise.resolve(); flush();
-    assert.equal(position(), 4);
-    element.fire("pointerdown", 206, 500); element.fire("pointerup", 206, 560);
-    await Promise.resolve(); flush();
-    assert.equal(position(), 4);
+  it("no celular um toque não vira a página, nem nos cantos: só segurar e arrastar", () => {
+    const { element, flush, position, log } = harness();
+    for (const x of [5, 40, 206, 370, 408]) { element.fire("pointerdown", x, 0); element.fire("pointerup", x, 80); flush(); }
+    assert.equal(position(), 3);
+    assert.deepEqual(log, []);
   });
 
   it("os parâmetros do gesto ficam num lugar só", () => {
@@ -228,7 +230,7 @@ describe("HQ: o gesto controla a própria folha", () => {
 describe("HQ: motor isolado do Reader de livros", () => {
   const comicFiles = [
     "views/ComicReaderView.ts",
-    ...readdirSync(new URL("../src/reader/comic/", import.meta.url)).map(name => `reader/comic/${name}`),
+    ...tsFiles("reader/comic/"),
   ];
   it("o motor de HQ não usa o motor, o CSS nem as capturas dos livros", () => {
     for (const file of comicFiles) {

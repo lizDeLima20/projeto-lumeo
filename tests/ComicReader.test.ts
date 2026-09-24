@@ -217,7 +217,7 @@ describe("comic block interaction", () => {
     const draw = arrived.indexOf("this.drawRest();");
     assert.ok(clear > 0 && clear < draw, "the open block is closed before the next page is drawn");
     // And a turn in progress closes it before the leaf moves.
-    assert.match(view, /turning: \(active: boolean\): void => \{\s*if \(active\) this\.overlay\.close\(\);/);
+    assert.match(view, /turning: \(active: boolean\): void => \{[\s\S]{0,200}if \(active\) \{ this\.overlay\.close\(\); this\.bubble\?\.closeNow\(\); this\.hints\?\.interrupt\(\); \}/);
     assert.match(source("reader/comic/ComicBlockOverlay.ts"), /public clear\(\): void \{\s*this\.selection\.close\(\);/);
   });
 });

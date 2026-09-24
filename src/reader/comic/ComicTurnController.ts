@@ -14,20 +14,28 @@ export interface ComicTurnHost {
   /** The turn landed: the reader moves to `plan.target`. */
   commit(plan: ComicTurnPlan): void;
   turning(active: boolean): void;
+  /** A still tap on the stage, offered before any turn: the text-region layer answers true
+   *  when it took it (opened, switched or closed a balloon). Never called for a swipe. */
+  tap?(point: ComicPoint, durationMs: number): boolean;
 }
 
 export type ComicTurnState = "IDLE" | "PRESSED" | "DRAGGING" | "SETTLING";
 
 /** Tunables, in one place. */
 export const COMIC_TURN = {
-  /** Pixels of travel before a press becomes a turn, and how horizontal it must be. */
-  slop: 8, horizontalBias: 1.1,
+  /** Pixels of travel before a press becomes a turn, and how horizontal it must be. A
+   *  finger that wobbles during a tap stays under it: a tap is never a turn. */
+  slop: 12, horizontalBias: 1.1,
   /** Share of the turn past which releasing completes it. */
   threshold: .32,
-  /** A flick completes a turn on its own (px/ms), whatever the distance. */
+  /** A flick completes a turn on its own (px/ms)... */
   flick: .35,
+  /** ...once it has actually travelled: a twitch is not a swipe. */
+  flickMinPx: 24,
   /** A press this short and this still is a tap. */
   tapMs: 350,
+  /** A tap on a text region may linger a little longer than a tap that turns. */
+  regionTapMs: 650,
   /** Programmatic turns (tap, arrow, key). */
   turnMs: 820,
   /** Release: time to cover the remaining distance. */
@@ -106,7 +114,8 @@ export class ComicTurnController {
 
   private readonly down = (event: PointerEvent): void => {
     if (event.button !== 0 || !event.isPrimary) return;
-    if (within(event.target, ".comic-block, .comic-fab, .comic-arrow, .comic-overlay--open")) return;
+    // An open balloon owns every gesture inside it (reading, scrolling a long one).
+    if (within(event.target, ".comic-block, .comic-fab, .comic-arrow, .comic-overlay--open, .comic-bubble")) return;
     // A new hand on the page while the last leaf is still landing: land it now.
     this.finishNow();
     if (this.stateValue !== "IDLE") return;
@@ -140,9 +149,15 @@ export class ComicTurnController {
       this.stateValue = "IDLE";
       const still = Math.hypot(event.clientX - this.downX, event.clientY - this.downY) < COMIC_TURN.slop;
       const hotspot = within(this.downTarget, ".comic-hotspot");
-      if (still && !hotspot && event.timeStamp - this.downTime < COMIC_TURN.tapMs) {
-        const side = this.tapSide(this.local(event));
-        if (side) void this.turn(side);
+      const duration = event.timeStamp - this.downTime;
+      if (still && !hotspot) {
+        // The text layer decides first: a region opens its balloon, and while one is open
+        // any tap only closes or switches it - never turns the page by accident.
+        if (duration < COMIC_TURN.regionTapMs && this.host.tap?.(this.local(event), duration)) return;
+        if (duration < COMIC_TURN.tapMs) {
+          const side = this.tapSide(this.local(event));
+          if (side) void this.turn(side);
+        }
       }
       return;
     }
@@ -153,7 +168,8 @@ export class ComicTurnController {
     // In the leaf's own terms: forward is "towards 1", a reversed (backward) turn "towards 0".
     const turned = drag.plan.reversed ? 1 - drag.progress : drag.progress;
     const fling = drag.plan.reversed ? velocity : -velocity;
-    const complete = turned > COMIC_TURN.threshold || (fling > COMIC_TURN.flick && turned > .02);
+    const travelled = Math.abs(event.clientX - this.downX);
+    const complete = turned > COMIC_TURN.threshold || (fling > COMIC_TURN.flick && turned > .02 && travelled >= COMIC_TURN.flickMinPx);
     void this.settle(complete);
   };
 
@@ -274,9 +290,8 @@ export class ComicTurnController {
       if (point.x < geometry.spineX && point.x >= geometry.spineX - geometry.pageWidth) return -1;
       return null;
     }
-    // A phone keeps its middle free for the balloons: only the outer thirds turn.
-    if (point.x > geometry.width * .7) return 1;
-    if (point.x < geometry.width * .3) return -1;
+    // On a phone a tap never turns the page - not even on its edges. Only pressing and
+    // dragging the leaf sideways does; a tap is left to the balloons.
     return null;
   }
 
