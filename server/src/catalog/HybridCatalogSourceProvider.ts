@@ -1,5 +1,6 @@
 import type { CatalogSourceProvider } from "./CatalogSourceProvider.js";
 import type { CatalogBookRecord, CatalogGenre, CatalogPage, CatalogQuery, CatalogSourceDiagnostic } from "./types.js";
+import { matchesCatalogText } from "../../../shared/CatalogTextSearch.js";
 
 /** Aggregates independent public sources without exposing their account/provider to readers. */
 export class HybridCatalogSourceProvider {
@@ -106,7 +107,7 @@ export class HybridCatalogSourceProvider {
     if (query.author && !book.author.toLocaleLowerCase().includes(query.author.toLocaleLowerCase())) return false;
     if (query.collection && !(book.collection ?? "").toLocaleLowerCase().includes(query.collection.toLocaleLowerCase())) return false;
     if (!query.query) return true;
-    const needle = query.query.toLocaleLowerCase(); return [book.title, book.author, book.genreName, book.collection ?? ""].some((value) => value.toLocaleLowerCase().includes(needle));
+    return matchesCatalogText(query.query, [book.title, book.author, book.collection, ...(!query.genreId ? [book.genreName] : [])]);
   }
   private static errorCode(error: unknown): string { return error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN"; }
 }

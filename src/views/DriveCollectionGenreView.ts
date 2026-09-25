@@ -4,6 +4,7 @@ import type { CatalogService } from "../services/CatalogService";
 import type { DriveCollectionService, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 import { BaseView } from "./BaseView";
 
+import { matchesCatalogText } from "../../shared/CatalogTextSearch";
 /**
  * Presents a published Drive collection as a catalogue genre. Drive folders remain the
  * source of truth, but are resolved behind the scenes into named comic sections rather
@@ -180,7 +181,7 @@ export class DriveCollectionGenreView extends BaseView {
     container.addEventListener("click", event => { if (!suppressClick) return; event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }, true);
   }
   private async search(raw: string): Promise<void> {
-    const query = raw.trim().toLocaleLowerCase();
+    const query = raw.trim();
     const version = ++this.searchVersion;
     if (!query) { this.results?.replaceChildren(); this.sections?.removeAttribute("hidden"); if (this.status) this.status.textContent = ""; return; }
     this.sections?.setAttribute("hidden", ""); this.results?.replaceChildren();
@@ -196,8 +197,8 @@ export class DriveCollectionGenreView extends BaseView {
         visited.add(listing.folderId);
         const entries = listing.entries.filter(entry => {
           if (entry.kind !== "file" || seenFiles.has(entry.id)) return false;
-          const text = `${entry.name} ${entry.description ?? ""} ${listing.breadcrumb.map(step => step.name).join(" ")}`.toLocaleLowerCase();
-          if (!text.includes(query)) return false;
+          const searchable = [entry.name, entry.description, ...listing.breadcrumb.slice(1).map(step => step.name)];
+          if (!matchesCatalogText(query, searchable)) return false;
           seenFiles.add(entry.id); return true;
         });
         if (entries.length) groups.push({ listing, entries, label: listing.breadcrumb[listing.breadcrumb.length - 1]?.name ?? "" });

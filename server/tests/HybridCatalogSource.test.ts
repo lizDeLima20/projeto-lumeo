@@ -65,6 +65,18 @@ describe("hybrid catalog sources", () => {
     assert.match(structuredBook.coverUrl ?? "", /id=cover-file-123/);
   });
 
+  it("searches title and author by word prefixes inside the selected genre", async () => {
+    const science = new MemoryProvider(source("science"), [
+      { ...book("estudar", "file-study"), title: "Como estudar para vencer", author: "João Silva", genreId: "ciencias", genreName: "Ciências" },
+      { ...book("other", "file-other"), title: "A Guerra dos Reinos", author: "Outra Autora", genreId: "aventura", genreName: "Aventura" },
+    ]);
+    const hybrid = new HybridCatalogSourceProvider(async () => [science]);
+    const page = await hybrid.list({ offset: 0, limit: 24, genreId: "ciencias", query: "EST ven" });
+    assert.deepEqual(page.items.map((item) => item.bookId), ["estudar"]);
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, genreId: "ciencias", query: "jo sil" })).items.map((item) => item.bookId), ["estudar"]);
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, genreId: "ciencias", query: "guer" })).items, []);
+  });
+
   it("searches and paginates beyond the former 500-record source cap", async () => {
     const values = Array.from({ length: 1_501 }, (_, index) => book(`catalog-${index}`, `drive-${index}`));
     const provider = new PagedMemoryProvider(source("large"), values);
