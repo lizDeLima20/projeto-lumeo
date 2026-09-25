@@ -5,6 +5,7 @@ import type { DriveCollection } from "./types.js";
  *  folder name: the tree inside the root folder supplies all of that at runtime. */
 export const DEFAULT_DRIVE_COLLECTIONS: readonly DriveCollection[] = [
   { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: "1wXs64lZ0nOBAAWwGutDHfjO-TnfYO6Ee", contentType: "comic" },
+  { id: "dc-hqs", name: "HQs da DC", rootFolderId: "1-9bSxiCfavMPf9g0wzSDFVkzJqS6j2nI", contentType: "comic" },
 ];
 
 const ID_PATTERN = /^[a-z0-9-]{3,60}$/i;

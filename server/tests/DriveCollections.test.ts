@@ -59,10 +59,11 @@ const service = (nodes = marvel) => {
 };
 
 describe("coleções do Drive: configuração", () => {
-  it("1. HQs da Marvel vem de uma configuração única", () => {
-    assert.equal(DEFAULT_DRIVE_COLLECTIONS.length, 1);
-    const [marvelConfig] = DEFAULT_DRIVE_COLLECTIONS;
+  it("1. Marvel permanece intacta e DC usa o mesmo motor de coleções", () => {
+    assert.equal(DEFAULT_DRIVE_COLLECTIONS.length, 2);
+    const [marvelConfig, dcConfig] = DEFAULT_DRIVE_COLLECTIONS;
     assert.deepEqual({ ...marvelConfig }, { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT, contentType: "comic" });
+    assert.deepEqual({ ...dcConfig }, { id: "dc-hqs", name: "HQs da DC", rootFolderId: "1-9bSxiCfavMPf9g0wzSDFVkzJqS6j2nI", contentType: "comic" });
   });
   it("uma coleção nova é configuração, não código", () => {
     const parsed = driveCollectionsFromEnvironment(JSON.stringify([
@@ -70,6 +71,24 @@ describe("coleções do Drive: configuração", () => {
     ]));
     assert.equal(parsed.length, 1);
     assert.equal(parsed[0]!.id, "dc-hqs");
+  });
+  it("DC mostra subcoleções e PDF sem misturar com a Marvel", async () => {
+    const dc = DEFAULT_DRIVE_COLLECTIONS.find(item => item.id === "dc-hqs")!;
+    const batman = "1XeniEgdVAXn_BFYV81LHEN2_GGJlzyWw";
+    const nodes: FakeNode[] = [
+      { id: dc.rootFolderId, name: dc.name, mimeType: FOLDER, parent: null },
+      { id: batman, name: "Batman", mimeType: FOLDER, parent: dc.rootFolderId },
+      { id: "dc-issue-01", name: "Batman 01.pdf", mimeType: "application/pdf", parent: batman },
+    ];
+    const drive = fakeDrive(nodes);
+    const dcService = new DriveCollectionService(DEFAULT_DRIVE_COLLECTIONS, new DriveFolderBrowser(drive.request));
+    const root = await dcService.open("dc-hqs");
+    assert.deepEqual(root.entries.map(entry => entry.name), ["Batman"]);
+    const folder = await dcService.open("dc-hqs", batman, [dc.rootFolderId, batman]);
+    assert.deepEqual(folder.breadcrumb.map(step => step.name), ["HQs da DC", "Batman"]);
+    assert.equal(folder.entries[0]?.name, "Batman 01.pdf");
+    assert.equal(folder.entries[0]?.contentType, "comic");
+    assert.deepEqual(drive.calls, [`list:${dc.rootFolderId}`, `list:${batman}`]);
   });
   it("configuração inválida não derruba o app", () => {
     assert.deepEqual(driveCollectionsFromEnvironment("{ não é json"), DEFAULT_DRIVE_COLLECTIONS);
