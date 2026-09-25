@@ -66,9 +66,37 @@ export class GoogleCatalogDriveClient {
     const file = ((await listing.json()) as { files?: Array<{ id: string }> }).files?.[0];
     if (!file) return null;
     const response = await this.media(file.id);
-    try { return await response.json() as unknown; } catch { throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json não possui JSON válido."); }
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = await response.text();
+    if (/text\/html/i.test(contentType) || /^\s*<!doctype\s+html/i.test(body)) {
+      this.log("CATALOG_SOURCE_HTML_RESPONSE", { url: response.url, status: response.status, contentType, preview: body.slice(0, 120) });
+      throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json retornou HTML em vez de JSON.");
+    }
+    try { return JSON.parse(body) as unknown; }
+    catch { throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json não possui JSON válido."); }
   }
   public static publicDownloadUrl(fileId: string): string { return new GoogleDrivePublicUrlResolver().resolve(fileId, "pdf").downloadUrl; }
+
+  /** Metadata-only listing for genre discovery. Never downloads books. */
+  public async listFolderEntries(folderId: string): Promise<readonly { id: string; name: string; mimeType: string }[]> {
+    const entries: Array<{ id: string; name: string; mimeType: string }> = [];
+    let pageToken = "";
+    do {
+      const url = new URL("https://www.googleapis.com/drive/v3/files");
+      url.searchParams.set("q", "'" + folderId.replace(/'/g, "\\'") + "' in parents and trashed = false");
+      url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType)");
+      url.searchParams.set("pageSize", "1000");
+      url.searchParams.set("supportsAllDrives", "true");
+      url.searchParams.set("includeItemsFromAllDrives", "true");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+      const response = await this.authorized(url);
+      if (!response.ok) throw this.driveError(response.status);
+      const page = await response.json() as { files?: Array<{ id: string; name: string; mimeType: string }>; nextPageToken?: string };
+      entries.push(...(page.files ?? []));
+      pageToken = page.nextPageToken ?? "";
+    } while (pageToken);
+    return entries;
+  }
 
   private async visitFolder(folderId: string, visited: Set<string>, books: Map<string, CatalogDriveFile>, audit: CatalogSourceAudit): Promise<void> {
     if (visited.has(folderId)) return; visited.add(folderId); audit.foldersVisited++; this.log("CATALOG_FOLDER_VISITED", { folderIndex: audit.foldersVisited });

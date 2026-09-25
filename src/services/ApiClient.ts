@@ -48,7 +48,24 @@ export class ApiClient {
 
   private async request<T>(path: string, init: RequestInit, authenticated: boolean): Promise<T> {
     const response = await this.fetchWithRefresh(path, init, authenticated);
-    const data = await response.json() as T | ApiErrorBody;
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = await response.text();
+    let data: T | ApiErrorBody;
+    const endpoint = path.split("?", 1)[0]!;
+    const isCatalog = endpoint.startsWith("/catalog/") || endpoint === "/collections";
+    const isJson = /(?:^|\/)(?:[\w.-]+\+)?json(?:\s*;|$)/i.test(contentType);
+    if (!isJson) {
+      const html = /text\/html/i.test(contentType) || /^\s*<!doctype\s+html/i.test(body);
+      if (isCatalog) console.error(JSON.stringify({ event: "CATALOG_FETCH_PARSE_ERROR", url: `${this.baseUrl}${path}`, status: response.status, statusText: response.statusText, contentType, preview: body.slice(0, 200) }));
+      throw new ApiError(response.status, html ? "API_NON_JSON_RESPONSE" : "API_INVALID_JSON", html ? "A API do catálogo respondeu uma página HTML em vez dos dados. Verifique a conexão e tente novamente." : "A API do catálogo retornou uma resposta não JSON. Tente novamente.");
+    }
+    try {
+      data = JSON.parse(body) as T | ApiErrorBody;
+    } catch {
+      const html = /text\/html/i.test(contentType) || /^\s*<!doctype\s+html/i.test(body);
+      if (isCatalog) console.error(JSON.stringify({ event: "CATALOG_FETCH_PARSE_ERROR", url: `${this.baseUrl}${path}`, status: response.status, statusText: response.statusText, contentType, preview: body.slice(0, 200) }));
+      throw new ApiError(response.status, html ? "API_NON_JSON_RESPONSE" : "API_INVALID_JSON", html ? "A API do catálogo respondeu uma página HTML em vez dos dados. Verifique a conexão e tente novamente." : "A API do catálogo retornou uma resposta inválida. Tente novamente.");
+    }
     if (!response.ok) this.throwBodyError(response.status, data as ApiErrorBody);
     return data as T;
   }
@@ -73,9 +90,17 @@ export class ApiClient {
         console.info(JSON.stringify({ event: "ANDROID_API_RESPONSE", endpoint, status, authorizationPresent: headers.has("Authorization") }));
       }
     };
+    const catalogFetch = endpoint.startsWith("/catalog/") || endpoint === "/collections";
+    const url = `${this.baseUrl}${path}`;
+    if (catalogFetch) console.info(JSON.stringify({ event: "CATALOG_FETCH_START", url }));
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
+      const response = await fetch(url, { ...init, headers });
       logAndroid(response.status);
+      if (catalogFetch) {
+        console.info(JSON.stringify({ event: "CATALOG_FETCH_RESPONSE", url }));
+        console.info(JSON.stringify({ event: "CATALOG_FETCH_STATUS", status: response.status, statusText: response.statusText }));
+        console.info(JSON.stringify({ event: "CATALOG_FETCH_CONTENT_TYPE", contentType: response.headers.get("content-type") ?? "" }));
+      }
       return response;
     }
     catch (error) {

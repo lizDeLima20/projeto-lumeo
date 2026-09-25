@@ -18,11 +18,17 @@ export function genreSourceConfig(source: CatalogGenreSource, priority = 100): C
  */
 export class ConfiguredCatalogSources {
   private cache: { expiresAt: number; sources: readonly CatalogSourceConfig[] } | null = null;
-  public constructor(private readonly base: readonly CatalogSourceConfig[], private readonly store: CatalogSourceStore | null, private readonly ttlMs = 60_000) {}
+  public constructor(
+    private readonly base: readonly CatalogSourceConfig[],
+    private readonly store: CatalogSourceStore | null,
+    private readonly ttlMs = 60_000,
+    private readonly discovery?: { sources(): Promise<readonly CatalogSourceConfig[]> },
+  ) {}
 
   public async all(): Promise<readonly CatalogSourceConfig[]> {
     if (this.cache && this.cache.expiresAt > Date.now()) return this.cache.sources;
-    let sources = this.base;
+    let sources: readonly CatalogSourceConfig[] = this.base;
+    let failed = false;
     if (this.store) {
       try {
         const known = new Set(this.base.map((source) => source.sourceId));
@@ -30,12 +36,28 @@ export class ConfiguredCatalogSources {
         sources = [...this.base, ...genres];
       } catch (error) {
         console.warn(JSON.stringify({ event: "CATALOG_SOURCE_STORE_UNAVAILABLE", code: error instanceof Error ? ("code" in error ? String((error as { code: unknown }).code) : error.message.slice(0, 80)) : "UNKNOWN" }));
-        // Retry soon rather than holding a partial list for the full minute.
-        this.cache = { expiresAt: Date.now() + Math.min(this.ttlMs, 10_000), sources };
-        return sources;
+        failed = true;
       }
     }
-    this.cache = { expiresAt: Date.now() + this.ttlMs, sources };
+    if (this.discovery) {
+      try {
+        const knownFolders = new Set(sources.map((source) => source.folderId));
+        const discovered = (await this.discovery.sources()).filter((source) => {
+          if (knownFolders.has(source.folderId)) {
+            console.info(JSON.stringify({ event: "CATALOG_CATEGORY_SKIPPED", folderId: source.folderId, reason: "ALREADY_CONFIGURED" }));
+            return false;
+          }
+          knownFolders.add(source.folderId);
+          return true;
+        });
+        sources = [...sources, ...discovered];
+        console.info(JSON.stringify({ event: "CATALOG_CATEGORY_MERGED", configured: sources.length - discovered.length, discovered: discovered.length, total: sources.length }));
+      } catch (error) {
+        failed = true;
+        console.warn(JSON.stringify({ event: "CATALOG_DISCOVERY_FAILED", code: error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN" }));
+      }
+    }
+    this.cache = { expiresAt: Date.now() + (failed ? Math.min(this.ttlMs, 10_000) : this.ttlMs), sources };
     return sources;
   }
 

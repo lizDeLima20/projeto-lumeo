@@ -17,10 +17,13 @@ export class HybridCatalogSourceProvider {
       const provider = providers[index]!;
       if (result.status === "rejected") {
         console.warn(JSON.stringify({ event: "CATALOG_SOURCE_FAILED", sourceId: provider.source.sourceId, locale: provider.source.locale, provider: provider.provider, code: HybridCatalogSourceProvider.errorCode(result.reason) }));
+        console.warn(JSON.stringify({ event: "CATALOG_CATEGORY_INVALID", sourceId: provider.source.sourceId, genre: provider.source.genre, reason: "CATALOG_READ_FAILED" }));
         sourceCounts.push({ sourceId: provider.source.sourceId, items: 0, pages: 0, failed: true });
         return;
       }
       sourceCounts.push({ sourceId: provider.source.sourceId, items: result.value.items.length, pages: result.value.pages, failed: false });
+      if (provider.source.genre && result.value.items.length > 0) console.info(JSON.stringify({ event: "CATALOG_CATEGORY_VALID", sourceId: provider.source.sourceId, genre: provider.source.genre, books: result.value.items.length }));
+      if (provider.source.genre && result.value.items.length === 0) console.warn(JSON.stringify({ event: "CATALOG_CATEGORY_INVALID", sourceId: provider.source.sourceId, genre: provider.source.genre, reason: "NO_VALID_BOOKS" }));
       for (const book of result.value.items) {
         // A book belongs to every genre whose catalogue lists it: the same content in two
         // genre folders is two memberships, not a duplicate. Only repeats inside one genre drop.
@@ -59,8 +62,9 @@ export class HybridCatalogSourceProvider {
     const known = this.providersByBookId.get(bookId);
     if (known) return known.get(bookId);
     const providers = await this.sources(locale);
+    const hasExactLocale = !locale || providers.some((provider) => provider.source.locale === locale);
     for (const provider of providers) {
-      if (locale && provider.source.locale !== locale) continue;
+      if (hasExactLocale && locale && provider.source.locale !== locale) continue;
       try { const book = await provider.get(bookId); if (book) { this.providersByBookId.set(bookId, provider); return book; } }
       catch (error) { console.warn(JSON.stringify({ event: "CATALOG_SOURCE_FAILED", sourceId: provider.source.sourceId, locale: provider.source.locale, provider: provider.provider, code: HybridCatalogSourceProvider.errorCode(error) })); }
     }
@@ -68,7 +72,9 @@ export class HybridCatalogSourceProvider {
   }
 
   public async diagnostics(locale?: string): Promise<readonly CatalogSourceDiagnostic[]> {
-    return (await this.sources(locale)).filter((provider) => !locale || provider.source.locale === locale).map((provider) => provider.diagnostic());
+    const providers = await this.sources(locale);
+    const hasExactLocale = !locale || providers.some((provider) => provider.source.locale === locale);
+    return providers.filter((provider) => !hasExactLocale || !locale || provider.source.locale === locale).map((provider) => provider.diagnostic());
   }
 
   private async allProviderItems(provider: CatalogSourceProvider, query: CatalogQuery): Promise<{ items: readonly CatalogBookRecord[]; pages: number }> {
@@ -79,7 +85,12 @@ export class HybridCatalogSourceProvider {
     while (true) {
       if (seenCursors.has(offset)) throw new Error("CATALOG_SOURCE_CURSOR_LOOP");
       seenCursors.add(offset);
-      const page = await provider.list({ ...query, offset, limit: 250 });
+      // Genre chips describe the full source, even while the reader searches or
+      // opens a preselected genre. Apply user filters only after aggregation.
+      const page = await provider.list({
+        ...query, query: undefined, genreId: undefined, author: undefined,
+        collection: undefined, format: undefined, offset, limit: 250,
+      });
       pages++;
       items.push(...page.items);
       if (!page.nextCursor) return { items, pages };

@@ -73,4 +73,23 @@ describe("hybrid catalog sources", () => {
     const result = await hybrid.list({ offset: 0, limit: 24, query: "catalog-1500" });
     assert.deepEqual(result.items.map((item) => item.bookId), ["catalog-1500"]);
   });
+  it("falls back to PT-BR sources only when the requested locale has none", async () => {
+    const portuguese = new MemoryProvider(source("pt-catalog", "pt-BR", "legacy"), [book("livro-pt", "drive-pt")]);
+    const registry = new CatalogSourceRegistry([portuguese.source], {
+      legacy: () => portuguese,
+      structured: (item) => new MemoryProvider(item, [], "structured") as MemoryProvider & { hasCatalog(): Promise<boolean> },
+    });
+    const hybrid = new HybridCatalogSourceProvider((locale) => registry.providers(locale));
+    const page = await hybrid.list({ offset: 0, limit: 24, locale: "en-US" });
+    assert.deepEqual(page.items.map((item) => item.bookId), ["livro-pt"]);
+    assert.equal((await new HybridCatalogSourceProvider((locale) => registry.providers(locale)).get("livro-pt", "en-US"))?.bookId, "livro-pt");
+
+    const english = new MemoryProvider(source("en-catalog", "en-US", "legacy"), [book("livro-en", "drive-en")]);
+    const localizedRegistry = new CatalogSourceRegistry([portuguese.source, english.source], {
+      legacy: (item) => item.locale === "en-US" ? english : portuguese,
+      structured: (item) => new MemoryProvider(item, [], "structured") as MemoryProvider & { hasCatalog(): Promise<boolean> },
+    });
+    assert.deepEqual((await localizedRegistry.providers("en-US")).map((item) => item.source.sourceId), ["en-catalog"]);
+  });
+
 });

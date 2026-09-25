@@ -19,6 +19,7 @@ import { CatalogRepository } from "./catalog/CatalogRepository.js";
 import { CatalogApplicationService } from "./catalog/CatalogApplicationService.js";
 import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js";
 import { CatalogSourceRegistry } from "./catalog/CatalogSourceRegistry.js";
+import { CatalogRootDiscovery } from "./catalog/CatalogRootDiscovery.js";
 import { CatalogSourceRepository } from "./catalog/CatalogSourceRepository.js";
 import { ConfiguredCatalogSources } from "./catalog/CatalogGenreSources.js";
 import { CatalogSourceAdminService } from "./catalog/CatalogSourceAdminService.js";
@@ -59,13 +60,17 @@ export class ServerApp {
       const createDrive = (folderId = config.googleCatalogFolderId) => new GoogleCatalogDriveClient(config.googleCatalogServiceAccountJson, folderId, config.catalogSyncMaxFileBytes);
       // Environment sources plus the genre folders saved in the admin screen.
       const sourceStore = new CatalogSourceRepository(supabase.admin);
-      const configuredSources = new ConfiguredCatalogSources(config.catalogSources, sourceStore);
+      const metadataDrive = config.googleCatalogServiceAccountJson.trim() ? createDrive() : null;
+      const discovery = metadataDrive && config.catalogDiscoveryRoots?.length
+        ? new CatalogRootDiscovery(config.catalogDiscoveryRoots, metadataDrive)
+        : undefined;
+      const configuredSources = new ConfiguredCatalogSources(config.catalogSources, sourceStore, 60_000, discovery);
       // Public Drive HTML exposes only its initially rendered rows. When the server account is
       // configured, folders are read through the paginated Drive API instead: a structured
       // folder by its catalog.json, any other by listing its files.
       const catalogSources = new CatalogSourceRegistry(() => configuredSources.all(), config.googleCatalogServiceAccountJson.trim() ? {
         legacy: (source) => new AuthorizedDriveCatalogProvider(source, () => createDrive(source.folderId)),
-        structured: (source) => new StructuredDriveCatalogProvider(source, new PublicDriveFolderReader(), fetch, { read: (folderId) => createDrive(folderId).readCatalogJson() }),
+        structured: (source) => new StructuredDriveCatalogProvider(source, new PublicDriveFolderReader(), fetch, { read: (folderId) => metadataDrive!.readCatalogJson(folderId) }),
       } : undefined);
       const catalogStore = new CatalogRepository(supabase.admin);
       controller = new ApiController(

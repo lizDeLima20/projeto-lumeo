@@ -35,4 +35,37 @@ describe("catálogo público no WebView Android", () => {
     globalThis.fetch = (async () => { throw new TypeError("offline"); }) as typeof fetch;
     await assert.rejects(catalog.list(), (error: unknown) => error instanceof ApiError && error.code === "NETWORK_ERROR");
   });
+  it("converte respostas HTML 404/500 em erros controlados em vez de expor JSON.parse", async () => {
+    const catalog = new CatalogService(new ApiClient("https://lumeo-livros.vercel.app/api"));
+    for (const status of [404, 500]) {
+      globalThis.fetch = (async () => new Response("<!doctype html><html><body>not found</body></html>", {
+        status,
+        statusText: status === 404 ? "Not Found" : "Internal Server Error",
+        headers: { "content-type": "text/html; charset=utf-8" },
+      })) as typeof fetch;
+      await assert.rejects(catalog.list(), (error: unknown) => error instanceof ApiError
+        && error.status === status
+        && error.code === "API_NON_JSON_RESPONSE"
+        && !error.message.includes("Unexpected token"));
+    }
+  });
+
+  it("rejeita payload JSON servido com content-type text/html", async () => {
+    const catalog = new CatalogService(new ApiClient("https://lumeo-livros.vercel.app/api"));
+    globalThis.fetch = (async () => new Response(JSON.stringify({ items: [], nextCursor: null }), {
+      status: 200,
+      headers: { "content-type": "text/html" },
+    })) as typeof fetch;
+    await assert.rejects(catalog.list(), (error: unknown) => error instanceof ApiError
+      && error.status === 200
+      && error.code === "API_NON_JSON_RESPONSE");
+  });
+
+  it("mantém a bypass de /api no Service Worker para não responder JSON com cache de SPA", async () => {
+    const { readFileSync } = await import("node:fs");
+    const serviceWorker = readFileSync("public/sw.js", "utf8");
+    const apiBypass = serviceWorker.indexOf('url.pathname.startsWith("/api/")');
+    const runtimeCache = serviceWorker.indexOf('event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE))');
+    assert.ok(apiBypass >= 0 && apiBypass < runtimeCache);
+  });
 });

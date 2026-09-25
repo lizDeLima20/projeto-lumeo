@@ -20,6 +20,7 @@ export interface ServerConfig {
   localAuthMode: boolean;
   googleCatalogFolderId: string;
   catalogSources: readonly CatalogSourceConfig[];
+  catalogDiscoveryRoots?: readonly string[];
   googleCatalogServiceAccountJson: string;
   catalogSyncMaxFileBytes: number;
   /** Published Drive folders browsed live, folder by folder. */
@@ -30,6 +31,8 @@ export class Config {
   public static fromEnvironment(environment: NodeJS.ProcessEnv = process.env): ServerConfig {
     const nodeEnv = environment.NODE_ENV ?? "development";
     const googleCatalogFolderId = environment.GOOGLE_CATALOG_FOLDER_ID ?? "1JUbxHjUzyYruG9LWyz1HRYv9matGU7ad";
+    const discoveryRoots = environment.GOOGLE_CATALOG_DISCOVERY_ROOTS?.trim()
+      || "1bMwUwTOKGrcZfKyEgL-yyS69Xk1CxFYe,1E66iTORF03TJ6hPMi5jjwwK2pvZReDmx";
     const configuredOrigins = environment.ALLOWED_ORIGINS
       ?? (nodeEnv === "production" ? environment.APP_BASE_URL ?? "" : "http://localhost:5173,http://127.0.0.1:5173");
     // Capacitor Android serves the packaged frontend at this secure local
@@ -61,6 +64,9 @@ export class Config {
       googleCatalogFolderId,
       // Public metadata only. The fallback preserves the published legacy source.
       catalogSources: catalogSourcesFromEnvironment(environment.GOOGLE_CATALOG_SOURCES_JSON, googleCatalogFolderId),
+      // Roots already published by the two catalogue Drives. The backend discovers genre
+      // folders from their actual contents; no genre list is maintained in the frontend.
+      catalogDiscoveryRoots: [...new Set(discoveryRoots.split(",").map((id) => id.trim()).filter((id) => /^[A-Za-z0-9_-]{10,}$/.test(id)))],
       // JSON or base64 JSON are accepted only in backend environment variables.
       googleCatalogServiceAccountJson: environment.GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON ?? "",
       catalogSyncMaxFileBytes: Number(environment.CATALOG_SYNC_MAX_FILE_BYTES ?? 104_857_600),

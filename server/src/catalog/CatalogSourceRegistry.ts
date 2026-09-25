@@ -19,7 +19,10 @@ export class CatalogSourceRegistry {
   }) { this.sources = typeof sources === "function" ? sources : async () => sources; }
 
   public async providers(locale = "pt-BR"): Promise<readonly CatalogSourceProvider[]> {
-    const eligible = (await this.sources()).filter((source) => source.enabled && source.locale === locale).sort((left, right) => left.priority - right.priority || left.sourceId.localeCompare(right.sourceId));
+    const all = await this.sources();
+    const localized = all.filter((source) => source.enabled && source.locale === locale);
+    const eligible = (localized.length || locale === "pt-BR" ? localized : all.filter((source) => source.enabled && source.locale === "pt-BR"))
+      .sort((left, right) => left.priority - right.priority || left.sourceId.localeCompare(right.sourceId));
     return (await Promise.all(eligible.map((source) => this.provider(source)))).filter((provider): provider is CatalogSourceProvider => provider !== null);
   }
 

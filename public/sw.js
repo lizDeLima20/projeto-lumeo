@@ -39,6 +39,8 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== "GET") return;
+  // JSON/API calls must never be answered by the SPA shell or stale runtime cache.
+  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
   // Authenticated Drive API requests are browser-only and must never enter Cache Storage.
   if (url.hostname === "www.googleapis.com") return;
   // Private account/session responses must never be persisted by the service worker.

@@ -31,7 +31,14 @@ export class PublicCatalogJsonReader implements CatalogJsonReader {
     if (!catalogId) return null;
     const response = await this.fetcher(this.urls.resolve(catalogId, "pdf").downloadUrl, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new ApiError(503, "CATALOG_SOURCE_UNAVAILABLE", "Não foi possível ler o catálogo estruturado.");
-    try { return await response.json() as unknown; } catch { throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json não possui JSON válido."); }
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = await response.text();
+    if (/text\/html/i.test(contentType) || /^\s*<!doctype\s+html/i.test(body)) {
+      console.warn(JSON.stringify({ event: "CATALOG_SOURCE_HTML_RESPONSE", url: response.url, status: response.status, contentType, preview: body.slice(0, 120) }));
+      throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json retornou HTML em vez de JSON.");
+    }
+    try { return JSON.parse(body) as unknown; }
+    catch { throw new ApiError(422, "CATALOG_SOURCE_INVALID", "catalog.json não possui JSON válido."); }
   }
 }
 
