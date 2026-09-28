@@ -89,6 +89,6 @@ describe("10/11/12. nada mais foi tocado", () => {
     assert.doesNotMatch(source("src/views/ComicReaderView.ts"), /DriveCollection|ComicCoverSource|collection/i);
     assert.match(source("src/reader/comic/TesseractComicOcrSource.ts"), /tessedit_pageseg_mode: "3"/);
     assert.doesNotMatch(source("src/views/ReaderView.ts"), /DriveCollection|ComicCoverSource/);
-    assert.equal(source("src/models/Book.ts").includes('export type BookFileType = "pdf" | "epub";'), true);
+    assert.equal(source("src/models/Book.ts").includes('export type BookFileType = "pdf" | "epub" | "cbr" | "cbz";'), true);
   });
 });

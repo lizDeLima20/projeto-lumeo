@@ -8,7 +8,7 @@ export type BookContentType = "book" | "comic";
 export class ComicContentTypeResolver {
   public resolve(book: Pick<Book, "contentType" | "fileType"> | null): BookContentType {
     if (!book) return "book";
-    if (book.fileType !== "pdf") return "book";
+    if (book.fileType !== "pdf" && book.fileType !== "cbr" && book.fileType !== "cbz") return "book";
     return book.contentType === "comic" ? "comic" : "book";
   }
   public isComic(book: Pick<Book, "contentType" | "fileType"> | null): boolean { return this.resolve(book) === "comic"; }

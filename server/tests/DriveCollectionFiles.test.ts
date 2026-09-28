@@ -52,8 +52,8 @@ describe("tipos de arquivo vêm da metadata do Drive", () => {
     assert.equal(classifier.format("application/octet-stream", "Guerras 02.cbr"), "cbr");
     // A RAR with no extension at all is still not a PDF.
     assert.equal(classifier.format("application/x-rar-compressed", "Anual"), "cbr");
-    assert.equal(classifier.isSupported("cbr"), false);
-    assert.equal(classifier.isSupported("cbz"), false);
+    assert.equal(classifier.isSupported("cbr"), true);
+    assert.equal(classifier.isSupported("cbz"), true);
   });
   it("extensão estranha não engana: o mimeType manda", () => {
     assert.equal(classifier.format("application/pdf", "Capítulo 03.pdf.txt"), "pdf");
@@ -80,11 +80,11 @@ describe("listagem da pasta com os tipos reais", () => {
     assert.equal(pdf.contentType, "comic");
     assert.equal(pdf.supported, true);
   });
-  it("5b. CBR aparece na pasta, marcado como não suportado", async () => {
+  it("5b. CBR aparece na pasta como HQ suportada", async () => {
     const listing = await service().open("marvel-hqs");
     const cbrs = listing.entries.filter(entry => entry.format === "cbr");
     assert.equal(cbrs.length, 3, "os três CBR - com mime próprio, genérico e sem extensão");
-    cbrs.forEach(entry => { assert.equal(entry.supported, false); assert.equal(entry.contentType, undefined); });
+    cbrs.forEach(entry => { assert.equal(entry.supported, true); assert.equal(entry.contentType, "comic"); });
   });
   it("nenhum item da pasta é descartado", async () => {
     const listing = await service().open("marvel-hqs");

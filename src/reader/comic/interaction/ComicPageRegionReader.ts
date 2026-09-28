@@ -1,8 +1,9 @@
-import { detectComicContainers } from "./ComicContainerDetector";
+import { detectComicContainersMultiScale, comicEncodedMatchesCanvas } from "./ComicMultiScaleDetector";
+import { comicGroupConnectedContainers } from "./ComicContainerGrouping";
 import { comicReadingOrder, type ComicReadingDirection } from "./ComicReadingOrder";
 import { comicPrepareCrop } from "./ComicRegionCrop";
 import type { ComicPageAsset, ComicTextRegion } from "./ComicInteractionTypes";
-import { comicCreateCutouts } from "./ComicObjectCutout";
+import { comicCreateOriginalCutouts } from "./ComicOriginalCutoutSource";
 import type { ComicRegionOcr } from "./ComicRegionOcr";
 import type { ComicStencil } from "./ComicContainerDetector";
 import type { ComicStageRecorder } from "./ComicStageTimer";
@@ -20,16 +21,21 @@ export async function comicReadPageRegions(canvas: HTMLCanvasElement, pageIndex:
   const page = timer
     ? await timer.step("BITMAP_CREATE", () => context.getImageData(0, 0, canvas.width, canvas.height))
     : context.getImageData(0, 0, canvas.width, canvas.height);
-  const containers = timer
-    ? await timer.step("CONTAINER_DETECTION", () => detectComicContainers(page))
-    : detectComicContainers(page);
+  const found = timer
+    ? await timer.step("CONTAINER_DETECTION", () => detectComicContainersMultiScale(page, signal))
+    : await detectComicContainersMultiScale(page, signal);
   signal?.throwIfAborted();
+  // Two balloons joined only by a connector too thin to share a flood fill are still one
+  // piece of speech - grouped once, here, so OCR and the cutout that follows agree on
+  // exactly the same containers: a click on either lobe opens both, and the mask cut for
+  // them is the union the reader actually sees, not a stale pair of smaller shapes.
+  const containers = comicGroupConnectedContainers(found);
   // Handed a canvas, the recognition library encodes a PNG of it first - and on a phone a
   // single PNG encode costs seconds, which every candidate on the page then pays. The page
   // was already encoded once for the package, so those bytes are reused as they are, and
   // each crop is encoded the same way the page was: quick to write, small to hand over.
   const scratch = document.createElement("canvas");
-  const whole = encoded ? new Blob([new Uint8Array(encoded.data)], { type: encoded.mimeType }) : canvas;
+  const whole = comicEncodedMatchesCanvas(encoded, canvas.width, canvas.height) ? new Blob([new Uint8Array(encoded!.data)], { type: encoded!.mimeType }) : canvas;
   try {
     const regions = await ocr.recognize(whole, canvas.width, canvas.height, pageIndex, signal, containers, ({ bounds, plan, stencil, background }) => {
       const cropStarted = timer ? Date.now() : 0;
@@ -49,8 +55,8 @@ export async function comicReadPageRegions(canvas: HTMLCanvasElement, pageIndex:
     }, timer);
     if (assets) {
       const cutouts = timer
-        ? await timer.step("MASK_GENERATION", () => comicCreateCutouts(canvas, regions, containers))
-        : await comicCreateCutouts(canvas, regions, containers);
+        ? await timer.step("MASK_GENERATION", () => comicCreateOriginalCutouts(canvas, regions, containers, encoded))
+        : await comicCreateOriginalCutouts(canvas, regions, containers, encoded);
       assets.push(...cutouts);
     }
     signal?.throwIfAborted();

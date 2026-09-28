@@ -33,6 +33,8 @@ export interface ComicConverterOptions {
   /** The pages the reader wants first, asked again before every page. */
   priority?: () => readonly number[];
   onPageStarted?: (pageIndex: number) => void;
+  /** How far the page being converted has got, from 0 to 1, as its own stages report it. */
+  onPageProgress?: (pageIndex: number, share: number) => void;
   onPageProcessed?: (page: ComicDocument["pages"][number], asset: ComicPageAsset) => Promise<void> | void;
   signal?: AbortSignal;
   cache?: ComicConversionCache;
@@ -88,6 +90,9 @@ export class ComicConverter {
           options.signal?.throwIfAborted();
           writer.page(page, asset);
           pages.push(page);
+          // A page held by the cache never runs a stage, so this is where it reports the
+          // only thing there is to report about it: it is ready.
+          options.onPageProgress?.(pageIndex, 1);
           await options.onPageProcessed?.(page, asset);
         } finally { input.releasePage?.(); }
         // Yield between pages even when every stage was served from cache.

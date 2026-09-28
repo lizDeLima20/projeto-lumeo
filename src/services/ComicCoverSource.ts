@@ -13,7 +13,8 @@ export class ComicCoverSource {
 
   /** Only a supported PDF has a first page worth showing. */
   public hasCover(entry: DriveFolderEntry): boolean {
-    return entry.kind === "file" && entry.supported && entry.format === "pdf";
+    return entry.kind === "file" && entry.supported &&
+      (entry.format === "pdf" || ((entry.format === "cbr" || entry.format === "cbz") && Boolean(entry.thumbnailUrl)));
   }
 
   public coverUrl(entry: DriveFolderEntry): string | null {

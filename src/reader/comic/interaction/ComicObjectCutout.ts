@@ -1,7 +1,8 @@
 import type { ComicStencil, ComicVisualContainer } from "./ComicContainerDetector";
-import { dilateMaskSquare, type ComicMask } from "./ComicShapeMask";
+import { dilateMaskSquare, sealComicArtMask, type ComicMask } from "./ComicShapeMask";
 import type { ComicPageAsset, ComicTextRegion } from "./ComicInteractionTypes";
 import { comicRegionBounds } from "./ComicRegionBounds";
+import { comicSealCutoutAlpha } from "./ComicCutoutIntegrity";
 
 /** Copy RGB verbatim; only alpha is changed. Interior drawings/lettering are never
  * classified as background. A mask describes the whole container, including its holes. */
@@ -38,6 +39,7 @@ export async function comicCreateCutouts(canvas: HTMLCanvasElement, regions: Com
     const width = right - x, height = bottom - y;
     const pixels = source.getImageData(x, y, width, height);
     const alpha = new Uint8Array(width * height);
+    const excluded = new Uint8Array(width * height);
     const includes = (item: ComicVisualContainer, px: number, py: number): boolean => {
       const s = item.artStencil ?? item.stencil, cx = Math.floor((px - s.x) / s.step), cy = Math.floor((py - s.y) / s.step);
       return cx >= 0 && cy >= 0 && cx < s.width && cy < s.height && s.data[cy * s.width + cx] === 1;
@@ -55,7 +57,7 @@ export async function comicCreateCutouts(canvas: HTMLCanvasElement, regions: Com
       const px = x + col, py = y + row;
       if (!container) { alpha[row * width + col] = 255; continue; }
       if (includes(container, px, py)) { alpha[row * width + col] = 255; continue; }
-      if (neighbours.some(item => includes(item, px, py))) continue;
+      if (neighbours.some(item => includes(item, px, py))) { excluded[row * width + col] = 1; continue; }
       if (grown && includesStencil(grown, px, py)) alpha[row * width + col] = 255;
     }
     // A colour component may open into the page through lettering near its edge.
@@ -76,6 +78,7 @@ export async function comicCreateCutouts(canvas: HTMLCanvasElement, regions: Com
     // inside it. The mask is loosened instead, a ring at a time, until it stops cutting -
     // the balloon keeps its shape and only gains a little of its own drawn edge. The bare
     // rectangle stays as the last resort, and says so.
+    alpha.set(comicSealCutoutAlpha(alpha, width, height, excluded).alpha);
     let clippedInk = cutsInk();
     if (clippedInk && container) {
       const source = container.artStencil ?? container.stencil;
@@ -84,6 +87,7 @@ export async function comicCreateCutouts(canvas: HTMLCanvasElement, regions: Com
         for (let row = 0; row < height; row++) for (let col = 0; col < width; col++) {
           if (!alpha[row * width + col] && includesStencil(loosened, x + col, y + row)) alpha[row * width + col] = 255;
         }
+        alpha.set(comicSealCutoutAlpha(alpha, width, height, excluded).alpha);
         clippedInk = cutsInk();
         if (!clippedInk) break;
       }
@@ -104,6 +108,10 @@ export async function comicCreateCutouts(canvas: HTMLCanvasElement, regions: Com
     region.visualBounds = { x: x / canvas.width, y: y / canvas.height, width: width / canvas.width, height: height / canvas.height };
     region.hitBounds = { ...region.visualBounds }; Object.assign(region, region.hitBounds);
     region.segmentationMethod = fallback ? "original-crop-fallback" : "component-mask";
+    if (region.bubbleGroup) {
+      region.bubbleGroup.unionBounds = { ...region.visualBounds };
+      region.bubbleGroup.unionMaskPath = maskPath;
+    }
     // Shape confidence is heuristic, not a calibrated probability of pixel accuracy.
     region.segmentationConfidence = container && !fallback ? Math.min(.85, container.styleConfidence) : 0;
     region.segmentationNeedsReview = fallback || region.segmentationConfidence < .8;
@@ -121,7 +129,7 @@ function includesStencil(stencil: ComicStencil, px: number, py: number): boolean
 
 /** The same silhouette, widened by `reach` cells in every direction. */
 export function comicGrowStencil(stencil: ComicStencil, reach: number): ComicStencil {
-  let mask: ComicMask = { width: stencil.width, height: stencil.height, data: stencil.data };
+  let mask: ComicMask = sealComicArtMask({ width: stencil.width, height: stencil.height, data: stencil.data }, 0);
   for (let step = 0; step < Math.max(0, reach); step++) mask = dilateMaskSquare(mask);
   return { ...stencil, data: mask.data };
 }

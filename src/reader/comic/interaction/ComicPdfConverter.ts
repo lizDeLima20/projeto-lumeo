@@ -51,7 +51,9 @@ export class ComicPdfConverter {
         id: key, title: input.title, sourceFormat: "pdf", sourceFileName: input.fileName, language: "por", totalPages: pdf.numPages, conversionKey: key,
         pageProvider: async (index, signal) => {
           signal?.throwIfAborted();
-          timer = new ComicStageTimer();
+          // The page reports its own progress while it is being made, so the reader can
+          // show what is happening to the page it is looking at.
+          timer = new ComicStageTimer(share => options.onPageProgress?.(index, share));
           page = await pdf.getPage(index + 1);
           const base = page.getViewport({ scale: 1 });
           const viewport = page.getViewport({ scale: 3072 / Math.max(base.width, base.height) });

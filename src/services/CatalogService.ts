@@ -1,5 +1,6 @@
 import type { ApiClient } from "./ApiClient";
 import type { CatalogBookData, CatalogPage } from "../models/CatalogBook";
+import type { BookFileType } from "../models/Book";
 import { I18nManager } from "../i18n/I18nManager";
 
 export interface CatalogDownloadLink {
@@ -11,7 +12,7 @@ export interface CatalogDownloadLink {
   author: string;
   genreId: string;
   genreName: string;
-  format: CatalogBookData["format"];
+  format: BookFileType;
   sha256?: string | null;
   coverUrl?: string | null;
   fileSize?: number | null;

@@ -41,8 +41,9 @@ describe("download nativo Android do catálogo", () => {
     assert.match(plugin, /bookDownloadCompleted/);
     assert.match(plugin, /UNEXPECTED_HTML_RESPONSE/);
     assert.match(plugin, /TIMEOUT/);
-    assert.match(plugin, /DOWNLOAD_INVALID_MIME/);
-    assert.match(plugin, /INVALID_PDF/);
+    assert.match(plugin, /DOWNLOAD_INVALID_FILE/);
+    assert.match(plugin, /application\/x-cbr/);
+    assert.match(plugin, /application\/x-cbz/);
     assert.match(plugin, /NO_SPACE/);
     assert.match(plugin, /FINAL_HOST/);
     assert.match(plugin, /REDIRECT_RECEIVED/);

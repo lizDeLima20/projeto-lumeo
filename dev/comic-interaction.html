@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Bancada: toque, troca e posicionamento dos balões</title>
+<link rel="stylesheet" href="/src/styles/variables.css">
+<link rel="stylesheet" href="/src/styles/comic.css">
+<style>
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: #111; color: #eee; }
+  .comic-stage { position: relative; width: 900px; height: 700px; margin: 0; background: #1b1b1f; }
+  #log { padding: .6rem 1rem; font-family: ui-monospace, monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="comic-stage" id="stage">
+  <div class="comic-hitmap" id="hitmap"></div>
+  <div class="comic-preparing-layer" id="preparing"></div>
+  <div class="comic-bubble-layer" id="bubbles"></div>
+</div>
+<div id="log">carregando…</div>
+<script type="module" src="/dev/comic-interaction.ts"></script>
+</body>
+</html>

@@ -71,12 +71,12 @@ export class CollectionImportService {
    *  the extension its own mimeType already proves it has. */
   public filename(entry: DriveFolderEntry): string {
     const format = this.assertReadable(entry);
-    return /\.(pdf|epub)$/i.test(entry.name.trim()) ? entry.name.trim() : `${entry.name.trim()}.${format}`;
+    return /\.(pdf|epub|cbr|cbz)$/i.test(entry.name.trim()) ? entry.name.trim() : `${entry.name.trim()}.${format}`;
   }
 
   /** "Capítulo 01" alone says nothing on a shelf; the arc it belongs to does. */
   public title(entry: DriveFolderEntry, listing: Pick<DriveFolderListing, "breadcrumb">): string {
-    const file = entry.name.replace(/\.(pdf|epub)$/i, "").trim() || entry.name.trim();
+    const file = entry.name.replace(/\.(pdf|epub|cbr|cbz)$/i, "").trim() || entry.name.trim();
     const parent = listing.breadcrumb.length > 1 ? listing.breadcrumb[listing.breadcrumb.length - 1]!.name.trim() : "";
     return parent && !file.toLocaleLowerCase().includes(parent.toLocaleLowerCase()) ? `${parent} — ${file}` : file;
   }
@@ -149,7 +149,7 @@ export class CollectionImportService {
   public matches(entry: DriveFolderEntry, file: File): boolean {
     if (entry.size !== null && entry.size !== undefined && entry.size > 0) return file.size === entry.size;
     const normalize = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase()
-      .replace(/\s*\(\d+\)(?=\.[^.]+$)/, "").replace(/\.(pdf|epub)$/i, "").replace(/[^a-z0-9]+/g, "");
+      .replace(/\s*\(\d+\)(?=\.[^.]+$)/, "").replace(/\.(pdf|epub|cbr|cbz)$/i, "").replace(/[^a-z0-9]+/g, "");
     return normalize(file.name) === normalize(this.filename(entry));
   }
 
@@ -158,8 +158,8 @@ export class CollectionImportService {
   }
 
   /** CBR is listed and named, but it cannot enter the library while no reader can open it. */
-  private assertReadable(entry: DriveFolderEntry): "pdf" | "epub" {
-    if (entry.kind !== "file" || !entry.supported || (entry.format !== "pdf" && entry.format !== "epub")) {
+  private assertReadable(entry: DriveFolderEntry): "pdf" | "cbr" | "cbz" {
+    if (entry.kind !== "file" || !entry.supported || (entry.format !== "pdf" && entry.format !== "cbr" && entry.format !== "cbz")) {
       throw new CollectionFormatUnsupportedError(entry.format ?? "unknown");
     }
     return entry.format;

@@ -18,6 +18,7 @@ import { comicRegionBounds } from "../src/reader/comic/interaction/ComicRegionBo
 import { comicReadingOrder } from "../src/reader/comic/interaction/ComicReadingOrder";
 import { maskArea, maskBounds, readMaskShape, simplifyContour, traceMaskContour, type ComicMask } from "../src/reader/comic/interaction/ComicShapeMask";
 import { comicSourceKey } from "../src/reader/comic/interaction/ComicConversionIdentity";
+import { ComicStageTimer } from "../src/reader/comic/interaction/ComicStageTimer";
 import { ComicConversionService } from "../src/reader/comic/interaction/ComicConversionService";
 import { comicGrowStencil } from "../src/reader/comic/interaction/ComicObjectCutout";
 import type { ComicConversionResult } from "../src/reader/comic/interaction/ComicConverter";
@@ -500,7 +501,8 @@ test("a quantidade de páginas e de regiões vem do documento, nunca de um núme
 test("a biblioteca abre a HQ pelo mesmo caminho da bancada", () => {
   const view = readFileSync(new URL("../src/views/ComicReaderView.ts", import.meta.url), "utf8");
   // The reader asks the service for a package instead of only hoping to find one.
-  assert.match(view, /new ComicConversionService\(new ComicPdfConverter\(\)\)\.open\(\{/);
+  assert.match(view, /new ComicConversionService\(converter\)\.open\(\{/);
+  assert.match(view, /new ComicArchiveConverter\(book\.fileType,/);
   assert.doesNotMatch(view, /completedForSource/, "nada de busca ampla por conversão compatível");
   // While the package is being made, the older overlay stays out of the way.
   assert.match(view, /if \(this\.interaction\.isOpen \|\| this\.preparing\) return;/);
@@ -749,4 +751,67 @@ test("a máscara é afrouxada antes de desistir dela", () => {
   assert.match(cutout, /clippedInk = cutsInk\(\);\s*if \(!clippedInk\) break;/);
   const fallbackAt = cutout.indexOf("const fallback = !container || clippedInk;");
   assert.ok(cutout.indexOf("for (const reach of") < fallbackAt, "afrouxar vem antes de desistir");
+});
+
+test("uma página relata o próprio progresso, sempre para a frente, do zero ao pronto", async () => {
+  const seen: number[] = [];
+  const timer = new ComicStageTimer(share => seen.push(share));
+  await timer.step("PDF_RENDER", () => undefined);
+  await timer.step("ASSET_ENCODING", () => undefined);
+  await timer.step("BITMAP_CREATE", () => undefined);
+  await timer.step("CONTAINER_DETECTION", () => undefined);
+  await timer.step("TEXT_DETECTION", () => undefined);
+  const afterDetection = seen.at(-1)!;
+  // Recognition is most of the page and says where it is while it runs.
+  timer.note("OCR", .25); timer.note("OCR", .5);
+  // Nothing ever goes backwards, not even a late report from an earlier stage.
+  timer.note("OCR", .3); timer.note("CONTAINER_DETECTION", .1);
+  assert.deepEqual(seen, [...seen].sort((a, b) => a - b), "o progresso nunca volta");
+  assert.ok(seen.at(-1)! > afterDetection);
+  timer.note("OCR", 1);
+  await timer.step("REGION_CROP", () => undefined);
+  await timer.step("MASK_GENERATION", () => undefined);
+  await timer.step("INDEXEDDB_WRITE", () => undefined);
+  assert.equal(Math.round(seen.at(-1)! * 100), 100, "a página termina em cem por cento");
+  assert.ok(seen[0]! > 0 && seen[0]! < 1, "começa em algum lugar entre zero e pronto");
+});
+
+test("cada página avisa quando fica pronta, inclusive a que veio do cache", async () => {
+  const key = crypto.randomUUID(), cache = new IndexedDbComicConversionCache();
+  const ready: [number, number][] = [];
+  const input = { id: key, title: "Progresso", totalPages: 3, conversionKey: key,
+    pageProvider: asset, regionProvider: async (index: number) => [region(index)] };
+  await new ComicConverter().convert(input, { cache, onPageProgress: (page, share) => ready.push([page, share]) });
+  assert.deepEqual(ready.map(([page]) => page).sort(), [0, 1, 2]);
+  assert.ok(ready.every(([, share]) => share === 1));
+  // Reopened: the finished package answers for the whole comic, so there is no page to
+  // prepare and nothing to report - every page is interactive from the first frame.
+  const again: number[] = [];
+  let converted = 0;
+  const reopened = await new ComicConverter().convert({ ...input, pageProvider: async (index: number) => { converted++; return asset(index); } },
+    { cache, onPageProgress: page => again.push(page) });
+  assert.equal(converted, 0, "nenhuma página pronta foi convertida de novo");
+  assert.deepEqual(again, [], "nenhuma página voltou a ser preparada");
+  assert.equal(reopened.document.pages.length, 3);
+});
+
+test("páginas prontas sobrevivem ao fechamento do aplicativo", async () => {
+  const key = crypto.randomUUID(); const controller = new AbortController();
+  let rendered = 0, read = 0;
+  const input = { id: key, title: "Persistência", totalPages: 4, conversionKey: key,
+    pageProvider: async (index: number) => { rendered++; return asset(index); },
+    regionProvider: async (index: number) => { read++; return [region(index)]; } };
+  // The reader closes the app after three pages: a new cache object stands for the new
+  // session, over the same stored database.
+  await assert.rejects(new ComicConverter().convert(input, { cache: new IndexedDbComicConversionCache(), signal: controller.signal,
+    onPageProcessed: page => { if (page.index === 2) controller.abort(); } }));
+  assert.equal(rendered, 3); assert.equal(read, 2, "a capa não é lida");
+  const result = await new ComicConverter().convert(input, { cache: new IndexedDbComicConversionCache() });
+  assert.equal(rendered, 4, "só a página que faltava foi renderizada de novo");
+  assert.equal(read, 3);
+  assert.equal(result.document.pages.length, 4);
+  assert.deepEqual(result.document.pages.map(page => page.index), [0, 1, 2, 3]);
+  // And once the whole comic is converted, opening it again converts nothing at all.
+  await new ComicConverter().convert(input, { cache: new IndexedDbComicConversionCache() });
+  assert.equal(rendered, 4); assert.equal(read, 3);
 });

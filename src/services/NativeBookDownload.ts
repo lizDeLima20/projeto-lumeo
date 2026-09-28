@@ -2,7 +2,7 @@ import { Capacitor, registerPlugin, type Plugin, type PluginListenerHandle } fro
 import type { CatalogDownloadLink } from "./CatalogService";
 import type { AndroidCatalogDownloadBridge, CatalogDownloadProgress } from "./CatalogDownloadService";
 
-interface NativeDownloadOptions { bookId: string; url: string; expectedSize?: number; sha256?: string; }
+interface NativeDownloadOptions { bookId: string; url: string; format: CatalogDownloadLink["format"]; expectedSize?: number; sha256?: string; }
 interface NativeDownloadResult { bookId: string; uri: string; size: number; sha256: string | null; mimeType: string; existing: boolean; }
 interface NativeDownloadProgress { bookId: string; bytesDownloaded: number; totalBytes: number | null; percentage: number | null; }
 interface NativeBookDownloadPlugin extends Plugin {
@@ -50,7 +50,7 @@ export class CapacitorNativeBookDownloadBridge implements AndroidCatalogDownload
           this.log("BFF_URL_OK", { bookId: link.bookId, sourceHost: new URL(url).host });
           this.log("DOWNLOAD_URL_RECEIVED", { bookId: link.bookId, host: new URL(url).host });
           this.log("PLUGIN_CALLED", { bookId: link.bookId });
-          const result = await NativeBookDownload.downloadBook({ bookId: link.bookId, url, expectedSize: link.fileSize ?? undefined, sha256: link.sha256 ?? undefined });
+          const result = await NativeBookDownload.downloadBook({ bookId: link.bookId, url, format: link.format, expectedSize: link.fileSize ?? undefined, sha256: link.sha256 ?? undefined });
           const file = await this.asImportFile(result, link);
           this.log("FILE_SAVED", { bookId: link.bookId, bytes: result.size, existing: result.existing });
           return file;

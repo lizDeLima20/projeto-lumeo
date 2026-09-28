@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
+import { ComicArchiveSource } from "../reader/comic/ComicArchiveSource";
 import type { BookFileType } from "../models/Book";
 
 export class CoverService {
@@ -14,7 +15,15 @@ export class CoverService {
   }
 
   public async fromBookFile(file: File, fileType: BookFileType, title: string): Promise<string> {
-    try { return fileType === "pdf" ? await this.fromBlob(await (await import("./PdfCoverExtractor")).PdfCoverExtractor.extract(file)) : await this.fromEpub(file); }
+    try {
+      if (fileType === "pdf") return await this.fromBlob(await (await import("./PdfCoverExtractor")).PdfCoverExtractor.extract(file));
+      if (fileType === "epub") return await this.fromEpub(file);
+      const archive = new ComicArchiveSource(fileType);
+      try {
+        await archive.open(file);
+        return await this.fromBlob(await archive.image(1));
+      } finally { await archive.close(); }
+    }
     catch { return this.placeholder(title, fileType); }
   }
 

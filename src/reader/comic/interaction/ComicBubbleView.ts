@@ -10,12 +10,19 @@ interface Shown { region: ComicTextRegion; source: ComicRect; target: ComicBubbl
 export class ComicBubbleView {
   private shown: Shown | null = null;
   private request = 0;
+  private openedAtValue = 0;
   public constructor(private readonly layer: HTMLElement, private readonly options: {
     compact: () => boolean;
     art?: (region: ComicTextRegion) => ComicOriginalArt | null | Promise<ComicOriginalArt | null>;
+    /** The other balloons of the page on screen, so the enlarged one can avoid covering
+     *  them; the region being opened is never among them. */
+    obstacles?: (region: ComicTextRegion) => readonly ComicRect[];
     onClose?: () => void;
   }) {}
   public get activeRegion(): ComicTextRegion | null { return this.shown?.region ?? null; }
+  /** When the balloon on screen finished opening, so a late click from the same tap is
+   *  not mistaken for the reader asking for something else. */
+  public get openedAt(): number { return this.openedAtValue; }
   public get isOpen(): boolean { return this.shown !== null; }
   public async open(region: ComicTextRegion, source: ComicRect): Promise<void> {
     if (this.shown?.region.id === region.id) return;
@@ -24,11 +31,17 @@ export class ComicBubbleView {
     try { art = await this.options.art?.(region) ?? null; } catch { return; }
     if (!art || request !== this.request) return;
     const viewport = { width: this.layer.clientWidth || window.innerWidth, height: this.layer.clientHeight || window.innerHeight };
-    const target = comicBubbleTarget({ source, viewport, compact: this.options.compact(), region });
+    const layerTop = this.layer.getBoundingClientRect().top;
+    const safeTop = Math.max(0, ...Array.from(this.layer.closest(".comic-reader")?.querySelectorAll<HTMLElement>(".comic-fab") ?? [])
+      .filter(control => control.getBoundingClientRect().height > 0)
+      .map(control => control.getBoundingClientRect().bottom - layerTop + 6));
+    const target = comicBubbleTarget({ source, viewport, compact: this.options.compact(), region,
+      obstacles: this.options.obstacles?.(region), safeTop });
     const element = ComicBubbleView.build(region, target.width, target.height, art);
     Object.assign(element.style, { left: `${target.x}px`, top: `${target.y}px`, width: `${target.width}px`, height: `${target.height}px` });
     this.layer.append(element);
     const previous = this.shown; this.shown = { region, source, target, element };
+    this.openedAtValue = typeof performance === "object" ? performance.now() : Date.now();
     if (previous) this.retire(previous, true);
     element.style.pointerEvents = "none";
     const opening = element.animate([
@@ -55,6 +68,8 @@ export class ComicBubbleView {
     element.dataset.review = region.recognitionStatus ?? "needs-review";
     const canvas = comicArtworkCanvas(art); canvas.className = "comic-bubble__art"; canvas.setAttribute("aria-hidden", "true");
     Object.assign(element.style, { width: `${width}px`, height: `${height}px` }); element.append(canvas);
+    // The original asset already carries its complete alpha mask. A second simplified
+    // polygon clip cuts lettering, tails and icons that were preserved in that asset.
     return element;
   }
   private retire(shown: Shown, switching: boolean): void {

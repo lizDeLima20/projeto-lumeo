@@ -3,6 +3,8 @@ import { I18nManager } from "../i18n/I18nManager";
 import type { Book } from "../models/Book";
 import { ComicBlockOverlay } from "../reader/comic/ComicBlockOverlay";
 import { ComicLayout, type ComicGeometry, type ComicRect } from "../reader/comic/ComicLayout";
+import { ComicArchiveSource } from "../reader/comic/ComicArchiveSource";
+import type { ComicPageSource } from "../reader/comic/ComicPageSource";
 import { ComicPageEngine, type ComicStageSize } from "../reader/comic/ComicPageEngine";
 import { ComicPagePrefetchPlanner } from "../reader/comic/ComicPagePrefetchPlanner";
 import { ComicPageProcessor } from "../reader/comic/ComicPageProcessor";
@@ -13,11 +15,12 @@ import type { ComicFold } from "../reader/comic/ComicFoldGeometry";
 import { PdfTextLayerFragmentSource } from "../reader/comic/PdfTextLayerFragmentSource";
 import { TesseractComicOcrSource } from "../reader/comic/TesseractComicOcrSource";
 import { ComicConversionService, comicLog } from "../reader/comic/interaction/ComicConversionService";
+import { ComicArchiveConverter } from "../reader/comic/interaction/ComicArchiveConverter";
 import { ComicPdfConverter } from "../reader/comic/interaction/ComicPdfConverter";
 import type { ComicPage, ComicPageAsset } from "../reader/comic/interaction/ComicInteractionTypes";
 import { ComicInteractionEngine } from "../reader/comic/interaction/ComicInteractionEngine";
 import { ComicHitMap, type ComicPageArt } from "../reader/comic/interaction/ComicHitMap";
-import { ComicBubbleView } from "../reader/comic/interaction/ComicBubbleView";
+import { ComicBubbleView, COMIC_BUBBLE_MOTION } from "../reader/comic/interaction/ComicBubbleView";
 import { ComicObjectArtwork } from "../reader/comic/interaction/ComicObjectArtwork";
 import { ComicHintAnimator, type ComicHintArt } from "../reader/comic/interaction/ComicHintAnimator";
 import type { ComicTextRegion } from "../reader/comic/interaction/ComicInteractionTypes";
@@ -40,7 +43,7 @@ const THEME_KEY = "lumeo.comic.theme";
  *  background, under the transparent overlay that sits on the page's artwork. */
 export class ComicReaderView extends BaseView {
   private readonly i18n = I18nManager.shared;
-  private readonly engine = new ComicPageEngine();
+  private engine: ComicPageSource = new ComicPageEngine();
   private readonly overlay = new ComicBlockOverlay();
   private readonly planner = new ComicPagePrefetchPlanner();
   private readonly processor: ComicPageProcessor;
@@ -71,6 +74,12 @@ export class ComicReaderView extends BaseView {
   private readonly objectArtwork = new ComicObjectArtwork();
   private hitLayer: HTMLElement | null = null;
   private bubbleLayer: HTMLElement | null = null;
+  private preparingLayer: HTMLElement | null = null;
+  /** Per page, how far its own conversion has got, from 0 to 1. */
+  private readonly pagePreparation = new Map<number, number>();
+  /** Pages that just reached a hundred: the badge stays a moment so the reader sees it
+   *  land, and then the page is simply interactive. */
+  private readonly preparationSettling = new Map<number, number>();
   private bubble: ComicBubbleView | null = null;
   private hints: ComicHintAnimator | null = null;
   private hitMapKey = "";
@@ -99,10 +108,12 @@ export class ComicReaderView extends BaseView {
     this.hitLayer.classList.toggle("comic-hitmap--debug", this.debug);
     this.bubbleLayer = this.createElement("div", "comic-bubble-layer");
     this.bubbleLayer.classList.toggle("comic-bubble-layer--debug", this.debug);
-    this.stage.append(this.canvas, this.hitLayer, this.overlaySlot, this.bubbleLayer, loading);
+    this.preparingLayer = this.createElement("div", "comic-preparing-layer");
+    this.stage.append(this.canvas, this.hitLayer, this.overlaySlot, this.preparingLayer, this.bubbleLayer, loading);
     this.bubble = new ComicBubbleView(this.bubbleLayer, {
       compact: () => this.geometry?.mode !== "spread" || (this.stage?.clientWidth ?? 0) < 700,
       art: region => this.regionArt(region),
+      obstacles: region => this.otherRegions(region),
       onClose: () => { this.stage?.focus({ preventScroll: true }); this.hints?.schedule(); },
     });
     // The discovery nudge lives under the balloon layer: it is artwork, not furniture.
@@ -124,6 +135,7 @@ export class ComicReaderView extends BaseView {
     // Listening here, and not inside the turn controller, keeps the page-turn untouched:
     // the nudge simply gets out of the way as soon as a finger lands anywhere on the page.
     this.stage.addEventListener("pointerdown", this.handlePointerDown, { capture: true, passive: true });
+    this.bubbleLayer.addEventListener("click", this.handleBubbleClick, { capture: true });
     document.body.classList.add("reader-mode");
     document.addEventListener("keydown", this.handleKeydown);
     window.addEventListener("resize", this.handleResize);
@@ -134,7 +146,10 @@ export class ComicReaderView extends BaseView {
   public override unmount(): void {
     this.disposed = true;
     this.stage?.removeEventListener("pointerdown", this.handlePointerDown, { capture: true });
+    this.bubbleLayer?.removeEventListener("click", this.handleBubbleClick, { capture: true });
     window.clearTimeout(this.resizeTimer); window.clearTimeout(this.labelTimer);
+    for (const timer of this.preparationSettling.values()) window.clearTimeout(timer);
+    this.preparationSettling.clear(); this.pagePreparation.clear();
     document.removeEventListener("keydown", this.handleKeydown);
     window.removeEventListener("resize", this.handleResize);
     document.body.classList.remove("reader-mode");
@@ -170,7 +185,8 @@ export class ComicReaderView extends BaseView {
   private async initialize(): Promise<void> {
     try {
       const source = await this.manager.source(this.bookId);
-      if (source.book.fileType !== "pdf") throw new ReaderFileMissingError(this.i18n.t("reader.comic.pdfOnly"));
+      if (!["pdf", "cbr", "cbz"].includes(source.book.fileType)) throw new ReaderFileMissingError(this.i18n.t("reader.comic.pdfOnly"));
+      if (source.book.fileType === "cbr" || source.book.fileType === "cbz") this.engine = new ComicArchiveSource(source.book.fileType);
       this.book = source.book;
       this.totalPages = await this.engine.open(source.blob);
       // The interaction package is prepared alongside the pages, not instead of them: the
@@ -209,7 +225,9 @@ export class ComicReaderView extends BaseView {
     const status = this.element?.querySelector<HTMLElement>(".comic-progress");
     const announce = (message: string): void => { if (status && !this.disposed) status.textContent = message; };
     try {
-      const outcome = await new ComicConversionService(new ComicPdfConverter()).open({
+      const converter = book.fileType === "cbr" || book.fileType === "cbz"
+        ? new ComicArchiveConverter(book.fileType, this.engine instanceof ComicArchiveSource ? this.engine : undefined) : new ComicPdfConverter();
+      const outcome = await new ComicConversionService(converter).open({
         bookId: this.bookId, blob, title: book.title, fileName: book.fileName,
         // The library marks a book as a comic or not; it has no separate mark for manga
         // yet, so every comic is prepared as one and read left to right. The converter
@@ -229,6 +247,7 @@ export class ComicReaderView extends BaseView {
           if (pageIndex !== this.currentPage - 1) return;
           comicLog("COMIC_CURRENT_PAGE_CONVERSION_STARTED", { bookId: this.bookId, pageIndex });
         },
+        onPageProgress: (pageIndex, share) => this.notePageProgress(pageIndex, share),
         onPageReady: (page, asset) => this.pageReady(page, asset),
       });
       if (this.disposed) return;
@@ -264,6 +283,12 @@ export class ComicReaderView extends BaseView {
     if (this.disposed) return;
     this.interaction.addPage(page);
     this.objectArtwork.add(asset.interactionAssets);
+    this.pagePreparation.set(page.index, 1);
+    window.clearTimeout(this.preparationSettling.get(page.index));
+    this.preparationSettling.set(page.index, window.setTimeout(() => {
+      this.preparationSettling.delete(page.index);
+      if (!this.disposed) this.placePreparing();
+    }, 700));
     comicLog("COMIC_PAGE_READY", { bookId: this.bookId, pageIndex: page.index, regionCount: page.regions.length });
     // Only the pages on screen need their targets rebuilt; the rest are waiting anyway.
     if (this.pageArts().some(art => art.pageIndex === page.index)) { this.hitMapKey = ""; this.drawRest(); }
@@ -365,6 +390,45 @@ export class ComicReaderView extends BaseView {
     return true;
   }
 
+  /** How far the page being prepared has got, kept per page and never going back.
+   *
+   *  The reader is told about the page in front of it, in the corner of that page, while
+   *  the comic it belongs to goes on being prepared behind it. */
+  private notePageProgress(pageIndex: number, share: number): void {
+    const reached = Math.min(1, Math.max(0, share));
+    if (reached <= (this.pagePreparation.get(pageIndex) ?? 0)) return;
+    this.pagePreparation.set(pageIndex, reached);
+    if (this.pageArts().some(art => art.pageIndex === pageIndex)) this.placePreparing();
+  }
+
+  /** The small badge in the corner of a page that is not interactive yet. It belongs to
+   *  that page: nothing is blocked, nothing is covered, and the comic reads as it is. */
+  private placePreparing(): void {
+    const layer = this.preparingLayer; if (!layer) return;
+    const arts = this.pageArts().filter(art => !this.interaction.page(art.pageIndex) || this.preparationSettling.has(art.pageIndex));
+    const marks = new Map(Array.from(layer.children, child => [(child as HTMLElement).dataset.pageIndex, child as HTMLElement]));
+    for (const art of arts) {
+      const key = String(art.pageIndex);
+      const share = this.pagePreparation.get(art.pageIndex) ?? 0;
+      const badge = marks.get(key) ?? this.createElement("div", "comic-preparing");
+      badge.dataset.pageIndex = key;
+      badge.setAttribute("role", "status");
+      badge.textContent = this.i18n.t("reader.comic.preparingPercent", { percent: Math.round(share * 100) });
+      Object.assign(badge.style, { left: `${art.rect.x + art.rect.width - 8}px`, top: `${art.rect.y + 8}px` });
+      if (!badge.isConnected) layer.append(badge);
+      marks.delete(key);
+    }
+    for (const stale of marks.values()) stale.remove();
+  }
+
+  /** Every other balloon of the pages on screen, where it is drawn: what an enlarged
+   *  balloon should try not to sit on, so the reader can still reach for them. */
+  private otherRegions(region: ComicTextRegion): ComicRect[] {
+    return this.pageArts().flatMap(art => this.interaction.regionsForPage(art.pageIndex)
+      .filter(other => other.id !== region.id)
+      .map(other => ComicHitMap.visualRect(art.rect, other)));
+  }
+
   /** The piece of page artwork a region covers, in the decoded page's own pixels: what the
    *  discovery nudge moves, cut to the container's own outline. */
   private async regionArt(region: ComicTextRegion): Promise<ComicHintArt | null> {
@@ -408,6 +472,30 @@ export class ComicReaderView extends BaseView {
 
   private readonly handlePointerDown = (): void => { this.hints?.interrupt(); };
 
+  /** A click that lands on the enlarged balloon itself, over where another balloon is
+   *  drawn on the page.
+   *
+   *  Somewhere on a full page the enlarged balloon ends up over one of its neighbours, and
+   *  the neighbour must not become unreachable because of it: the page underneath is asked
+   *  who is there, and if it is someone else, that balloon takes over. Clicks arriving
+   *  while this balloon is still growing belong to the tap that opened it - Android's
+   *  WebView delivers them that late - and are left alone. */
+  private readonly handleBubbleClick = (event: MouseEvent): void => {
+    const bubble = this.bubble; if (!bubble?.isOpen || !this.stage) return;
+    const now = typeof performance === "object" ? performance.now() : Date.now();
+    if (now - bubble.openedAt < COMIC_BUBBLE_MOTION.openMs) return;
+    const stage = this.stage.getBoundingClientRect();
+    const hit = new ComicHitMap(this.pageArts(), this.interaction).hit({ x: event.clientX - stage.x, y: event.clientY - stage.y });
+    if (hit?.region.id === bubble.activeRegion?.id) return;
+    // The enlarged balloon is a rectangle even where its own artwork is transparent - a
+    // corner the drawn shape never reached. A tap that lands there is a tap on empty page,
+    // not on the balloon, and reads the same as tapping outside it: nothing else is there
+    // to open, so it closes.
+    event.stopPropagation();
+    if (hit) { void bubble.open(hit.region, hit.source); this.hints?.noteOpened(hit.region); }
+    else bubble.close();
+  };
+
   private static debugEnabled(): boolean {
     try { return localStorage.getItem("lumeo.comic.debug") === "1" || new URLSearchParams(location.search).get("comicDebug") === "1"; }
     catch { return false; }
@@ -418,6 +506,7 @@ export class ComicReaderView extends BaseView {
     this.renderer?.drawRest(this.geometry, this.map.rest(this.position), this.bitmapSource, this.theme);
     this.placeOverlay();
     this.placeHitMap();
+    this.placePreparing();
     this.hints?.schedule();
   }
 

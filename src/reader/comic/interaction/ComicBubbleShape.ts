@@ -44,11 +44,19 @@ export function comicBubbleFallbackPath(shape: ComicRegionShape): string {
 /** The same outline as a CSS clip, for cutting a piece of the page to the container's
  *  exact shape - which is how the nudge can move the artist's own balloon without bringing
  *  the corner of a panel, the fire behind it or the balloon next to it along with it. */
-export function comicBubbleClip(contour: readonly ComicContourPoint[], visual: NormalizedBounds): string | null {
+export function comicBubbleClip(contour: readonly ComicContourPoint[], visual: NormalizedBounds, inflate = 0): string | null {
   if (contour.length < 3) return null;
-  const points = contour.map(point => {
-    const x = ((point.x - visual.x) / Math.max(1e-6, visual.width)) * 100;
-    const y = ((point.y - visual.y) / Math.max(1e-6, visual.height)) * 100;
+  const raw = contour.map(point => ({
+    x: ((point.x - visual.x) / Math.max(1e-6, visual.width)) * 100,
+    y: ((point.y - visual.y) / Math.max(1e-6, visual.height)) * 100,
+  }));
+  // The outline is where the mask ended, and the cutout keeps a little ink past it - the
+  // drawn line itself. Pushed out from the middle by that much, the clip lets the balloon
+  // keep its own edge while the empty corners around it stay out of the shape.
+  const centreX = raw.reduce((total, point) => total + point.x, 0) / raw.length;
+  const centreY = raw.reduce((total, point) => total + point.y, 0) / raw.length;
+  const points = raw.map(point => {
+    const x = centreX + (point.x - centreX) * (1 + inflate), y = centreY + (point.y - centreY) * (1 + inflate);
     return `${round(Math.min(100, Math.max(0, x)))}% ${round(Math.min(100, Math.max(0, y)))}%`;
   });
   return `polygon(${points.join(", ")})`;

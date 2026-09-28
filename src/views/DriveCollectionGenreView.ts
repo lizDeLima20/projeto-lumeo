@@ -127,7 +127,7 @@ export class DriveCollectionGenreView extends BaseView {
 
   private card(entry: DriveFolderEntry, listing: DriveFolderListing): HTMLElement {
     const card = this.createElement("article", "drive-comic-card"); card.setAttribute("role", "listitem");
-    const supported = entry.supported && (entry.format === "pdf" || entry.format === "epub");
+    const supported = entry.supported && (entry.format === "pdf" || entry.format === "cbr" || entry.format === "cbz");
     if (supported) { card.tabIndex = 0; card.addEventListener("click", () => this.onAdd(entry, listing)); card.addEventListener("keydown", event => { if (event.key === "Enter") this.onAdd(entry, listing); }); }
     const cover = this.createElement("div", "drive-comic-card__cover");
     const fallback = (): void => cover.replaceChildren(this.createElement("span", "drive-comic-card__fallback", "📚"));

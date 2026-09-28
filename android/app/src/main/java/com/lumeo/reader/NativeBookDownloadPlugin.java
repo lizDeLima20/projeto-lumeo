@@ -81,7 +81,8 @@ public class NativeBookDownloadPlugin extends Plugin {
             pluginCall.reject("Não foi possível preparar o armazenamento local.", "DOWNLOAD_STORAGE_UNAVAILABLE");
             return;
         }
-        final File existing = completedFile(directory, safeBookId);
+        final String expectedFormat = pluginCall.getString("format", "").toLowerCase(Locale.ROOT);
+        final File existing = completedFile(directory, safeBookId, expectedFormat);
         if (existing != null) {
             trace("FINAL_FILE_SAVED", "bookId=" + safeBookId + " reused=true bytes=" + existing.length() + " mimeType=" + mimeTypeFor(existing));
             resolve(pluginCall, bookId, existing, null, mimeTypeFor(existing), true);
@@ -91,7 +92,7 @@ public class NativeBookDownloadPlugin extends Plugin {
         final String expectedSha256 = normalizeHash(pluginCall.getString("sha256"));
         final Request request;
         try {
-            request = new Request.Builder().url(url).get().header("Accept", "application/pdf,application/epub+zip,application/octet-stream;q=0.8").build();
+            request = new Request.Builder().url(url).get().header("Accept", "application/pdf,application/epub+zip,application/x-cbr,application/x-cbz,application/octet-stream;q=0.8").build();
         } catch (IllegalArgumentException failure) {
             trace("DOWNLOAD_FAILED", "bookId=" + safeBookId + " stage=REQUEST_BUILD errorCode=INVALID_DOWNLOAD_URL exceptionClass=IllegalArgumentException safeMessage=malformed_https_url");
             pluginCall.reject("A URL do livro é inválida.", "DOWNLOAD_URL_INVALID");
@@ -103,7 +104,7 @@ public class NativeBookDownloadPlugin extends Plugin {
         trace("PLUGIN_CALLED", "bookId=" + safeBookId);
         trace("DOWNLOAD_STARTED", "bookId=" + safeBookId + " sourceHost=" + request.url().host());
         activeCalls.put(bookId, httpCall);
-        executor.execute(() -> download(pluginCall, bookId, safeBookId, directory, httpCall, expectedSize, expectedSha256));
+        executor.execute(() -> download(pluginCall, bookId, safeBookId, directory, httpCall, expectedSize, expectedSha256, expectedFormat));
     }
 
     @PluginMethod
@@ -138,7 +139,7 @@ public class NativeBookDownloadPlugin extends Plugin {
         pluginCall.resolve();
     }
 
-    private void download(PluginCall pluginCall, String bookId, String safeBookId, File directory, Call httpCall, Long expectedSize, String expectedSha256) {
+    private void download(PluginCall pluginCall, String bookId, String safeBookId, File directory, Call httpCall, Long expectedSize, String expectedSha256, String expectedFormat) {
         final File part = new File(directory, safeBookId + ".part");
         try {
             trace("HTTP_REQUEST_STARTED", "bookId=" + safeBookId);
@@ -191,13 +192,13 @@ public class NativeBookDownloadPlugin extends Plugin {
                 throw new DownloadFailure("FILE_SIZE_INVALID", "O tamanho do arquivo não confere.", status, finalHost);
             }
             trace("FILE_SIZE_VALID", "bookId=" + safeBookId + " expectedSize=" + (expectedSize == null ? "unknown" : expectedSize));
-            final String mimeType = documentMimeType(signature, signatureLength, contentType);
+            final String mimeType = documentMimeType(signature, signatureLength, contentType, expectedFormat);
             final String hash = hex(digest.digest());
             trace("FILE_SIGNATURE_VALID", "bookId=" + safeBookId + " mimeType=" + mimeType);
             if (expectedSha256 != null && !expectedSha256.equals(hash)) {
                 throw new DownloadFailure("FILE_SIZE_INVALID", "A integridade do arquivo não confere.", status, finalHost);
             }
-            final File destination = new File(directory, safeBookId + ("application/pdf".equals(mimeType) ? ".pdf" : ".epub"));
+            final File destination = new File(directory, safeBookId + extensionFor(mimeType));
             try { moveAtomically(part, destination); }
             catch (IOException failure) { throw new DownloadFailure("FILE_MOVE_FAILED", "Não foi possível finalizar o arquivo.", status, finalHost, failure); }
             resolve(pluginCall, bookId, destination, hash, mimeType, false);
@@ -226,7 +227,11 @@ public class NativeBookDownloadPlugin extends Plugin {
     }
 
     private File downloadDirectory() { return new File(getContext().getFilesDir(), DIRECTORY_NAME); }
-    private File completedFile(File directory, String safeBookId) {
+    private File completedFile(File directory, String safeBookId, String expectedFormat) {
+        if ("cbr".equals(expectedFormat) || "cbz".equals(expectedFormat)) {
+            final File archive = new File(directory, safeBookId + "." + expectedFormat);
+            return archive.isFile() && archive.length() > 0 ? archive : null;
+        }
         final File pdf = new File(directory, safeBookId + ".pdf");
         if (pdf.isFile() && pdf.length() > 0) return pdf;
         final File epub = new File(directory, safeBookId + ".epub");
@@ -255,16 +260,28 @@ public class NativeBookDownloadPlugin extends Plugin {
      * File.toURI() yields file:/... on Java, which the WebView cannot fetch. */
     private String privateFileUri(File file) { return Uri.fromFile(file).toString(); }
     private MessageDigest sha256() throws DownloadFailure { try { return MessageDigest.getInstance("SHA-256"); } catch (NoSuchAlgorithmException error) { throw new DownloadFailure("DOWNLOAD_HASH_UNAVAILABLE", "Não foi possível validar o arquivo."); } }
-    private String documentMimeType(byte[] signature, int length, String responseType) throws DownloadFailure {
+    private String documentMimeType(byte[] signature, int length, String responseType, String expectedFormat) throws DownloadFailure {
         final boolean pdf = length >= 5 && signature[0] == '%' && signature[1] == 'P' && signature[2] == 'D' && signature[3] == 'F' && signature[4] == '-';
         final boolean zip = length >= 4 && signature[0] == 'P' && signature[1] == 'K' && signature[2] == 3 && signature[3] == 4;
-        if (pdf) return "application/pdf";
-        if (zip) return "application/epub+zip";
+        final boolean rar = length >= 7 && signature[0] == 'R' && signature[1] == 'a' && signature[2] == 'r' && signature[3] == '!' && signature[4] == 0x1a && signature[5] == 7 && (signature[6] == 0 || signature[6] == 1);
+        if ("cbr".equals(expectedFormat) && rar) return "application/x-cbr";
+        if ("cbz".equals(expectedFormat) && zip) return "application/x-cbz";
+        if ((expectedFormat.isEmpty() || "pdf".equals(expectedFormat)) && pdf) return "application/pdf";
+        if ((expectedFormat.isEmpty() || "epub".equals(expectedFormat)) && zip) return "application/epub+zip";
         if (responseType.contains("text/html")) throw new DownloadFailure("UNEXPECTED_HTML_RESPONSE", "A origem retornou uma página em vez do livro.");
-        if (responseType.length() > 0 && !responseType.contains("pdf") && !responseType.contains("epub") && !responseType.contains("octet-stream")) throw new DownloadFailure("DOWNLOAD_INVALID_MIME", "A origem retornou um tipo de conteúdo inválido.");
-        throw new DownloadFailure("INVALID_PDF", "O arquivo baixado não é um PDF ou EPUB válido.");
+        throw new DownloadFailure("DOWNLOAD_INVALID_FILE", "O arquivo baixado não corresponde ao formato esperado.");
     }
-    private String mimeTypeFor(File file) { return file.getName().endsWith(".epub") ? "application/epub+zip" : "application/pdf"; }
+    private String extensionFor(String mimeType) {
+        if ("application/x-cbr".equals(mimeType)) return ".cbr";
+        if ("application/x-cbz".equals(mimeType)) return ".cbz";
+        return "application/pdf".equals(mimeType) ? ".pdf" : ".epub";
+    }
+    private String mimeTypeFor(File file) {
+        if (file.getName().endsWith(".cbr")) return "application/x-cbr";
+        if (file.getName().endsWith(".cbz")) return "application/x-cbz";
+        if (file.getName().endsWith(".epub")) return "application/epub+zip";
+        return "application/pdf";
+    }
     private String normalizeHash(String value) { return value == null || value.trim().isEmpty() ? null : value.trim().toLowerCase(Locale.ROOT); }
     private String safeBookId(String value) { return value.replaceAll("[^A-Za-z0-9._-]", "_"); }
     private String hex(byte[] bytes) { StringBuilder value = new StringBuilder(bytes.length * 2); for (byte item : bytes) value.append(String.format(Locale.ROOT, "%02x", item)); return value.toString(); }

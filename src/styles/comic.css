@@ -118,6 +118,21 @@
 .comic-hitmap--debug .comic-hitmap__target { outline: 1.5px solid rgba(0, 140, 105, .9); background: rgba(0, 140, 105, .08); }
 .comic-hitmap--debug .comic-hitmap__target[data-review="needs-review"] { outline-color: rgba(222, 101, 26, .95); background: rgba(222, 101, 26, .1); }
 
+/* One page's own preparation, in its corner: never a modal, never over the artwork the
+   reader is looking at, and gone as soon as that page answers to a touch. */
+.comic-preparing-layer { position: absolute; inset: 0; z-index: 28; pointer-events: none; }
+.comic-preparing {
+  position: absolute; transform: translateX(-100%); display: flex; align-items: center; gap: .32rem;
+  padding: .14rem .48rem; border-radius: 999px; background: color-mix(in srgb, var(--comic-ink) 62%, transparent);
+  color: var(--comic-paper, #fff); font-size: .68rem; letter-spacing: .03em; white-space: nowrap; opacity: .9;
+}
+.comic-preparing::before {
+  content: ""; width: .5rem; height: .5rem; border-radius: 50%; border: 1.5px solid currentColor;
+  border-top-color: transparent; animation: comic-preparing-spin 900ms linear infinite;
+}
+@keyframes comic-preparing-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .comic-preparing::before { animation: none; } }
+
 .comic-bubble-layer { position: absolute; inset: 0; z-index: 30; pointer-events: none; overflow: hidden; }
 
 /* Enlargement displays the original masked pixels stored in the .lima. */

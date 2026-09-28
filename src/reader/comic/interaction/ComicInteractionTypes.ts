@@ -35,9 +35,17 @@ export interface ComicTypography {
 /** A point of a container's outline, normalized to the page. */
 export interface ComicContourPoint { x: number; y: number }
 
+/** One connected original container with several lettering lobes, not nearby boxes. */
+export interface ComicBubbleGroup {
+  id: string;
+  members: { id: string; bounds: NormalizedBounds }[];
+  unionBounds: NormalizedBounds;
+  unionMaskPath?: string;
+}
 export interface ComicTextRegion extends NormalizedBounds {
   id: string;
   pageIndex: number;
+  bubbleGroup?: ComicBubbleGroup;
   text: string;
   shape: ComicRegionShape;
   tailDirection: ComicTailDirection;
@@ -93,7 +101,7 @@ export interface ComicMetadata {
   author?: string;
   language?: string;
   sourceFileName?: string;
-  sourceFormat?: "pdf" | "cbz" | "image-sequence" | "lima" | "unknown";
+  sourceFormat?: "pdf" | "cbr" | "cbz" | "image-sequence" | "lima" | "unknown";
   createdAt: string;
   conversionKey?: string;
 }

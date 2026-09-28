@@ -114,7 +114,7 @@ export function detectComicContainers(image: ImageData, options: ComicContainerO
   }
 
   const owner = new Int32Array(cells).fill(-1), queue = new Int32Array(cells), found: ComicVisualContainer[] = [];
-  const minWidth = 16, minHeight = 8;
+  const minWidth = Math.max(4, Math.ceil(width * .008)), minHeight = Math.max(3, Math.ceil(height * .002));
   for (let seed = 0; seed < cells; seed++) {
     if (owner[seed] !== -1 || wall[seed]) continue;
     const seedR = red[seed]!, seedG = green[seed]!, seedB = blue[seed]!;
@@ -133,7 +133,7 @@ export function detectComicContainers(image: ImageData, options: ComicContainerO
       if (x > 0) visit(position - 1); if (x + 1 < width) visit(position + 1);
       if (y > 0) visit(position - width); if (y + 1 < height) visit(position + width);
     }
-    if (tail < 48) continue;
+    if (tail < Math.max(12, Math.ceil(cells * .000025))) continue;
     // A fill rarely stops at the balloon: a highlight of the same colour in the artwork
     // next to it, or the thread of a tail, drags the bounding box across the panel and
     // makes a perfectly good balloon look sparse. Rows and columns that hold almost
@@ -147,7 +147,7 @@ export function detectComicContainers(image: ImageData, options: ComicContainerO
     if (minX === 0 || minY === 0 || maxX === width - 1 || maxY === height - 1) continue;
     // A whole panel is not a balloon: above an eighth of the page this is the drawing.
     if (boxWidth < minWidth || boxHeight < minHeight || boxWidth > width * .78 || boxHeight > height * .5
-      || area > cells * .12 || area < cells * .0004) continue;
+      || area > cells * .12 || area < cells * .00008) continue;
     // A ring of drawn line, not a body: cheap reject before the enclosure is computed.
     if (body.count / area < .22) continue;
 

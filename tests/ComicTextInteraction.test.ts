@@ -302,3 +302,184 @@ describe("HQ: a ordem provável de leitura da página", () => {
     assert.deepEqual(comicReadingSequence(manual).map(value => value.id), ["primeiro", "segundo", "sem-ordem"]);
   });
 });
+
+/** The case from the page the reader reported: a balloon drawn as two lobes that really do
+ *  run into each other, and a third, separate balloon lying inside the rectangle around
+ *  them. Proximity is not belonging, and the outline is what says so. */
+const lobes = (): ComicTextRegion => region("grupo", 0, [.30, .30, .40, .30], {
+  visualBounds: { x: .30, y: .30, width: .40, height: .30 },
+  hitBounds: { x: .30, y: .30, width: .40, height: .30 },
+  segmentationMethod: "component-mask",
+  // Two lobes joined at the waist, with nothing of the corner where the third balloon is.
+  contour: [{ x: .30, y: .30 }, { x: .52, y: .30 }, { x: .52, y: .40 }, { x: .70, y: .40 },
+    { x: .70, y: .60 }, { x: .48, y: .60 }, { x: .48, y: .46 }, { x: .30, y: .46 }],
+});
+
+const neighbour = (): ComicTextRegion => region("vizinho", 0, [.56, .30, .12, .08], {
+  visualBounds: { x: .56, y: .30, width: .12, height: .08 },
+  hitBounds: { x: .56, y: .30, width: .12, height: .08 },
+  segmentationMethod: "component-mask",
+  contour: [{ x: .56, y: .30 }, { x: .68, y: .30 }, { x: .68, y: .38 }, { x: .56, y: .38 }],
+});
+
+describe("HQ: o toque pertence à silhueta, não ao retângulo", () => {
+  const art = { x: 0, y: 0, width: 1000, height: 1000 };
+  const pages: ComicPageArt[] = [{ pageIndex: 0, rect: art }];
+  const map = (): ComicHitMap => new ComicHitMap(pages, engineWith(lobes(), neighbour()));
+
+  it("o balão independente dentro do retângulo do grupo recebe o próprio toque", () => {
+    // (620, 340) is inside the group's bounding box and inside the neighbour's outline.
+    assert.equal(map().hit({ x: 620, y: 340 })?.region.id, "vizinho");
+  });
+
+  it("cada lóbulo do grupo abre o grupo", () => {
+    assert.equal(map().hit({ x: 400, y: 380 })?.region.id, "grupo");
+    assert.equal(map().hit({ x: 600, y: 500 })?.region.id, "grupo");
+  });
+
+  it("o vão entre os lóbulos, dentro do retângulo mas fora da silhueta, não é do grupo", () => {
+    // (340, 560) is inside the group's bounding box and outside its outline: the empty
+    // page under the upper lobe. Nothing opens there, and an open balloon closes.
+    assert.equal(map().hit({ x: 340, y: 560 }), null);
+  });
+
+  it("a tolerância é de poucos pixels, não de uma auréola", () => {
+    assert.ok(COMIC_HIT_SLOP_PX <= 8);
+    // Just outside the neighbour's outline, and outside the group's box: still nothing.
+    assert.equal(map().hit({ x: 690, y: 290 }), null);
+  });
+
+  it("sem contorno, o menor retângulo que contém o ponto ganha", () => {
+    const big = region("grande", 0, [.2, .2, .6, .6], { hitBounds: { x: .2, y: .2, width: .6, height: .6 } });
+    const small = region("pequeno", 0, [.45, .45, .1, .1], { hitBounds: { x: .45, y: .45, width: .1, height: .1 } });
+    const overlapping = new ComicHitMap(pages, engineWith(big, small));
+    assert.equal(overlapping.hit({ x: 500, y: 500 })?.region.id, "pequeno");
+    assert.equal(overlapping.hit({ x: 300, y: 300 })?.region.id, "grande");
+  });
+
+  it("a silhueta vence o retângulo de outro, mesmo o do balão já aberto", () => {
+    // Order matters only if the rule is "first wins": the group is written first here.
+    const swapped = new ComicHitMap(pages, engineWith(neighbour(), lobes()));
+    assert.equal(swapped.hit({ x: 620, y: 340 })?.region.id, "vizinho");
+    assert.equal(map().hit({ x: 620, y: 340 })?.region.id, "vizinho");
+  });
+});
+
+describe("HQ: o balão ampliado não esconde os outros", () => {
+  const viewport = { width: 1400, height: 900 };
+  const source = { x: 500, y: 300, width: 200, height: 120 };
+
+  it("sem obstáculos, ele cresce onde está", () => {
+    const target = comicBubbleTarget({ source, viewport, compact: false });
+    const free = comicBubbleTarget({ source, viewport, compact: false, obstacles: [] });
+    assert.deepEqual([target.x, target.y], [free.x, free.y]);
+  });
+
+  it("um balão clicável logo abaixo não é coberto por inteiro", () => {
+    const obstacle = { x: 540, y: 470, width: 120, height: 90 };
+    const target = comicBubbleTarget({ source, viewport, compact: false, obstacles: [obstacle] });
+    const overlapWidth = Math.max(0, Math.min(target.x + target.width, obstacle.x + obstacle.width) - Math.max(target.x, obstacle.x));
+    const overlapHeight = Math.max(0, Math.min(target.y + target.height, obstacle.y + obstacle.height) - Math.max(target.y, obstacle.y));
+    const covered = (overlapWidth * overlapHeight) / (obstacle.width * obstacle.height);
+    assert.ok(covered < .9, `o vizinho ficou ${Math.round(covered * 100)}% coberto`);
+  });
+
+  it("nenhum lado é preferido: o obstáculo muda de lado e a escolha acompanha", () => {
+    // Obstacles that really are in the way of the natural placement, one on each side.
+    const left = comicBubbleTarget({ source, viewport, compact: false, obstacles: [{ x: 380, y: 280, width: 200, height: 200 }] });
+    const right = comicBubbleTarget({ source, viewport, compact: false, obstacles: [{ x: 620, y: 280, width: 200, height: 200 }] });
+    assert.ok(left.x > right.x, "fugiu do obstáculo à esquerda para a direita, e vice-versa");
+  });
+
+  it("o resultado continua dentro da tela", () => {
+    const target = comicBubbleTarget({ source, viewport, compact: false, obstacles: [{ x: 0, y: 0, width: 1400, height: 900 }] });
+    assert.ok(target.x >= 0 && target.y >= 0);
+    assert.ok(target.x + target.width <= viewport.width && target.y + target.height <= viewport.height);
+  });
+});
+
+describe("HQ: leitura no desktop", () => {
+  it("a letra no desktop é cerca do dobro da de antes, e o celular não muda", () => {
+    assert.equal(COMIC_BUBBLE_ZOOM.capHeightPx.compact, 15, "o tamanho validado no celular fica como está");
+    assert.ok(COMIC_BUBBLE_ZOOM.capHeightPx.wide >= 32, "o desktop dobrou os dezessete pixels de antes");
+    const source = { x: 400, y: 300, width: 180, height: 110 };
+    const viewport = { width: 1600, height: 1000 };
+    const small = region("r", 0, [.3, .3, .12, .05], { typography: { capHeight: .006, lines: 2 } as ComicTextRegion["typography"],
+      visualBounds: { x: .3, y: .3, width: .12, height: .05 }, text: "UMA FALA\nCURTA" });
+    const zoom = comicBubbleZoom(source, viewport, false, small);
+    assert.ok(zoom > 2, `o balão pequeno cresce de verdade no desktop (${zoom.toFixed(2)}x)`);
+  });
+
+  it("o teto da tela ainda manda: nada sai da janela", () => {
+    const source = { x: 40, y: 40, width: 900, height: 600 };
+    const viewport = { width: 1000, height: 700 };
+    const target = comicBubbleTarget({ source, viewport, compact: false, region: region("r", 0, [.05, .05, .9, .8]) });
+    assert.ok(target.width <= viewport.width && target.height <= viewport.height);
+  });
+});
+
+describe("HQ: mesmo coberto, o vizinho continua clicável", () => {
+  it("a arte original usa sua máscara completa sem um segundo recorte simplificado", () => {
+    const view = source("reader/comic/interaction/ComicBubbleView.ts");
+    assert.match(view, /comicArtworkCanvas\(art\)/);
+    assert.doesNotMatch(view, /element\.style\.clipPath\s*=/);
+  });
+
+  it("um clique sobre o ampliado é respondido pela página embaixo dele, e um canto transparente fecha", () => {
+    const reader = source("views/ComicReaderView.ts");
+    assert.match(reader, /handleBubbleClick/);
+    assert.match(reader, /if \(now - bubble\.openedAt < COMIC_BUBBLE_MOTION\.openMs\) return;/,
+      "o clique tardio do próprio toque que abriu não troca de balão");
+    assert.match(reader, /if \(hit\?\.region\.id === bubble\.activeRegion\?\.id\) return;/,
+      "um clique no próprio balão aberto não faz nada");
+    assert.match(reader, /if \(hit\) \{ void bubble\.open\(hit\.region, hit\.source\); this\.hints\?\.noteOpened\(hit\.region\); \}\s*\n\s*else bubble\.close\(\);/,
+      "sem nada por baixo - o canto transparente do recorte - o balão fecha em vez de ficar mudo");
+  });
+
+  it("o vizinho colado pesa mais que um balão distante na escolha do lugar", () => {
+    const viewport = { width: 900, height: 900 };
+    const source2 = { x: 300, y: 300, width: 160, height: 120 };
+    const perto = { x: 470, y: 300, width: 90, height: 70 };
+    const longe = { x: 60, y: 780, width: 90, height: 70 };
+    const target = comicBubbleTarget({ source: source2, viewport, compact: false, obstacles: [perto, longe] });
+    const overlap = (rect: { x: number; y: number; width: number; height: number }): number => {
+      const w = Math.max(0, Math.min(target.x + target.width, rect.x + rect.width) - Math.max(target.x, rect.x));
+      const h = Math.max(0, Math.min(target.y + target.height, rect.y + rect.height) - Math.max(target.y, rect.y));
+      return (w * h) / (rect.width * rect.height);
+    };
+    assert.ok(overlap(perto) < .9, "o balão ao lado não desaparece embaixo do ampliado");
+  });
+});
+
+describe("HQ: preparação da página e o que ela não muda", () => {
+  it("um toque fora fecha, e um toque em outro balão troca sem fechar antes", () => {
+    const view = source("views/ComicReaderView.ts");
+    assert.match(view, /if \(hit && hit\.region\.id !== bubble\.activeRegion\?\.id\) \{ bubble\.open\(hit\.region, hit\.source\); this\.hints\?\.noteOpened\(hit\.region\); \}\s*\n\s*else bubble\.close\(\);/);
+  });
+
+  it("o indicador é da página, pequeno e sem bloquear nada", () => {
+    const view = source("views/ComicReaderView.ts");
+    assert.match(view, /private placePreparing\(\)/);
+    assert.match(view, /reader\.comic\.preparingPercent/);
+    // The badge only exists while that page has no interaction of its own.
+    assert.match(view, /!this\.interaction\.page\(art\.pageIndex\) \|\| this\.preparationSettling\.has\(art\.pageIndex\)/);
+    const css = readFileSync(new URL("../src/styles/comic.css", import.meta.url), "utf8");
+    assert.match(css, /\.comic-preparing-layer \{[^}]*pointer-events: none/);
+    assert.doesNotMatch(css, /\.comic-preparing \{[^}]*inset: 0/, "não é um modal por cima da página");
+  });
+
+  it("o número de páginas continua vindo do documento, nunca de um valor fixo", () => {
+    for (const file of ["views/ComicReaderView.ts", "reader/comic/interaction/ComicConverter.ts"]) {
+      assert.doesNotMatch(source(file), /\b(?:totalPages|pageCount)\s*=\s*36\b/, file);
+    }
+  });
+
+  it("o motor de virada e o de livros seguem fora do caminho", () => {
+    const controller = source("reader/comic/ComicTurnController.ts");
+    assert.match(controller, /threshold: \.32/); assert.match(controller, /flick: \.35/);
+    for (const file of ["reader/comic/interaction/ComicHitMap.ts", "reader/comic/interaction/ComicBubbleLayout.ts",
+      "reader/comic/interaction/ComicBubbleView.ts", "reader/comic/interaction/ComicSilhouette.ts"]) {
+      assert.doesNotMatch(source(file), /page-turn\/|reader\/desktop\/|reflow\/|PageTurnEngine/, file);
+    }
+  });
+});

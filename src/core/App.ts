@@ -578,11 +578,11 @@ export class App {
   private remoteBook(item: RemoteLibraryBook): Book | null {
     const data = item.metadata; const text = (key: string): string | null => typeof data[key] === "string" && (data[key] as string).trim() ? (data[key] as string).trim() : null;
     const title = text("title"), author = text("author"), genreId = text("genreId"), fileType = text("fileType");
-    if (!title || !author || !genreId || (fileType !== "pdf" && fileType !== "epub")) return null;
+    if (!title || (!author && data.contentType !== "comic") || !genreId || (fileType !== "pdf" && fileType !== "epub" && fileType !== "cbr" && fileType !== "cbz")) return null;
     const number = (key: string): number => typeof data[key] === "number" && Number.isFinite(data[key]) ? data[key] as number : 0;
     const cover = text("cover")?.startsWith("https://") ? text("cover")! : this.covers.placeholder(title, fileType);
-    return new Book({ id: item.bookId, title, author, genreId, cover, fileType, fileName: text("fileName") ?? `${title}.${fileType}`,
-      fileSize: number("fileSize"), mimeType: text("mimeType") ?? (fileType === "pdf" ? "application/pdf" : "application/epub+zip"),
+    return new Book({ id: item.bookId, title, author: author ?? "", genreId, cover, fileType, fileName: text("fileName") ?? `${title}.${fileType}`,
+      fileSize: number("fileSize"), mimeType: text("mimeType") ?? ({ pdf: "application/pdf", epub: "application/epub+zip", cbr: "application/x-cbr", cbz: "application/x-cbz" })[fileType],
       readingStatus: data.readingStatus === "finished" ? "finished" : data.readingStatus === "reading" ? "reading" : "unread",
       progressPercent: number("progressPercent"), currentLocation: text("currentLocation") ?? undefined, collectionId: text("collectionId") ?? undefined,
       volume: text("volume") ?? undefined, series: text("series") ?? undefined, description: text("description") ?? undefined,

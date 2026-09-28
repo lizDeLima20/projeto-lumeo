@@ -40,7 +40,7 @@ export class DriveEntryClassifier {
 
   /** What Lumeo can actually open today. CBR and CBZ are recognized so the reader sees the
    *  file and knows what it is, but there is no comic-archive reader yet. */
-  public isSupported(format: DriveEntryFormat): boolean { return format === "pdf" || format === "epub"; }
+  public isSupported(format: DriveEntryFormat): boolean { return format === "pdf" || format === "epub" || format === "cbr" || format === "cbz"; }
 
   private extension(name: string): DriveEntryFormat | null {
     const match = /\.([A-Za-z0-9]{1,5})$/.exec(name.trim());

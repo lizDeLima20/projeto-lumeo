@@ -41,9 +41,9 @@ it("unconfiguredGoogleErrorsOnlyWhenOpeningNotWhenSaving", async () => {
   await new GoogleDriveLibraryRepository(new Memory(), "u").save("Works", url);
   await assert.rejects(new GoogleDriveLibraryService("").prepare(), /Google Drive ainda não está configurado/);
 });
-it("mainImportHasOnlyTwoSourcesAndNoPermanentLinkInput", async () => {
+it("mainImportHasDeviceComicAndDriveSourcesAndNoPermanentLinkInput", async () => {
   const source = await readFile("src/views/BookImportView.ts", "utf8");
-  assert.match(source, /sourceChoices.append\(device, drive\)/);
+  assert.match(source, /sourceChoices.append\(device, comic, drive\)/);
   for (const text of ["Por link", "Cole o link do arquivo", "Importar link", "selectDrive("]) assert.equal(source.includes(text), false);
 });
 it("listTargetsSavedFolderAndDownloadIsDirectWithoutBackend", async () => {
@@ -128,11 +128,11 @@ it("startupFallbackIsReservedForAppStartAndLogsTechnicalFailure", async () => {
   assert.equal(source.includes("unhandledrejection\", () => this.showFallback"), false);
 });
 
-it("a tela Adicionar livro oferece so dispositivo e Google Drive", async () => {
+it("a tela Adicionar livro oferece dispositivo, HQ local e Google Drive", async () => {
   const view = await readFile("src/views/BookImportView.ts", "utf8");
   const row = /sourceChoices\.append\(([^)]*)\)/.exec(view);
   assert.ok(row, "nao achei a linha das origens");
-  assert.deepEqual(row[1]!.split(",").map(part => part.trim()), ["device", "drive"]);
+  assert.deepEqual(row[1]!.split(",").map(part => part.trim()), ["device", "comic", "drive"]);
   // "Por link" foi removido: nem card, nem input permanente, nem botao de importar link
   for (const file of ["src/views/BookImportView.ts", "src/views/ExternalLibrariesPanel.ts"]) {
     const source = await readFile(file, "utf8");

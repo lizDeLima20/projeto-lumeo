@@ -57,8 +57,9 @@ export class BookImportView extends BaseView {
       this.createElement("p", "page-subtitle", "Escolha de onde deseja importar. O arquivo será salvo somente neste dispositivo."));
     const sourceChoices = this.createElement("div", "import-sources");
     const device = this.sourceButton("▣", I18nManager.shared.t("google.device"), I18nManager.shared.t("google.deviceHelp"));
+    const comic = this.sourceButton("▧", "HQ local", "Importar uma HQ CBR ou CBZ deste dispositivo");
     const drive = this.sourceButton("◆", I18nManager.shared.t("google.title"), I18nManager.shared.t("google.subtitle"));
-    sourceChoices.append(device, drive);
+    sourceChoices.append(device, comic, drive);
     const file = this.input("Arquivo PDF ou EPUB", "file"); file.wrapper.classList.add("import-source-panel", "is-hidden"); file.input.required = false; file.input.accept = ".pdf,.epub,application/pdf,application/epub+zip";
     const download = this.createElement("p", "download-status"); download.setAttribute("role", "status");
     const metadataNote = this.createElement("p", "metadata-note"); metadataNote.setAttribute("role", "status"); this.metadataNote = metadataNote;
@@ -84,7 +85,16 @@ export class BookImportView extends BaseView {
     const cancel = this.createElement("button", "button button--secondary", "Cancelar"); cancel.type = "button";
     cancel.addEventListener("click", () => { this.oneDrive?.coordinator.cancel(); this.onCancel(); }); actions.append(save, cancel);
     file.input.addEventListener("change", () => void this.selectFile(file.input, title.input, error, download, coverPreview, coverImage));
-    device.addEventListener("click", () => { file.wrapper.classList.remove("is-hidden"); file.input.click(); });
+    device.addEventListener("click", () => {
+      file.input.accept = ".pdf,.epub,application/pdf,application/epub+zip";
+      file.wrapper.querySelector(".field__label")!.textContent = "Arquivo PDF ou EPUB";
+      file.wrapper.classList.remove("is-hidden"); file.input.click();
+    });
+    comic.addEventListener("click", () => {
+      file.input.accept = ".cbr,.cbz,application/x-cbr,application/x-cbz";
+      file.wrapper.querySelector(".field__label")!.textContent = "Arquivo CBR ou CBZ";
+      file.wrapper.classList.remove("is-hidden"); file.input.click();
+    });
     drive.addEventListener("click", () => {
       this.googleModal ??= new GoogleDriveLibrariesModal(new GoogleDriveLibraryRepository(
         new ExternalLibraryStorage(new IndexedDbService(`lumeo-library-${this.state.currentUser?.id ?? ""}`)), this.state.currentUser?.id ?? ""), new GoogleDriveLibraryService(),
@@ -150,7 +160,7 @@ export class BookImportView extends BaseView {
     this.imported = imported; if (!title.value) title.value = imported.suggestedTitle; status.textContent = "Preparando capa…";
     this.automaticCover = await this.covers.fromBookFile(imported.file, imported.fileType, imported.suggestedTitle);
     image.src = this.automaticCover; preview.classList.remove("is-hidden");
-    status.textContent = "Identificando título, autor e organização…"; await this.analyzeMetadata(imported, title);
+    status.textContent = "Identificando título, autor e organização…"; if (imported.fileType === "pdf" || imported.fileType === "epub") await this.analyzeMetadata(imported, title);
   }
   private async selectFile(input: HTMLInputElement, title: HTMLInputElement, error: HTMLElement, status: HTMLElement, preview: HTMLElement, image: HTMLImageElement): Promise<void> {
     if (this.remoteBusy) return;
@@ -166,6 +176,7 @@ export class BookImportView extends BaseView {
     fields.save.disabled = true;
     try {
       const metadata = { title: fields.title.value.trim(), author: fields.author.value.trim(),
+        contentType: this.imported.fileType === "cbr" || this.imported.fileType === "cbz" ? "comic" as const : "book" as const,
         genreId: fields.genre.value, collectionId: fields.collection.value || undefined, readingStatus: fields.status.value as ReadingStatus, cover: this.automaticCover };
       const options = await this.resolveVersionConflict(this.imported, metadata);
       if(options.cancelled){fields.progress.textContent="";return;}

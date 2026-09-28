@@ -3,6 +3,8 @@ import type { ComicTextRegion, ComicTypography, NormalizedBounds } from "./Comic
 import { comicContainerIsConvincing, type ComicStencil, type ComicVisualContainer } from "./ComicContainerDetector";
 import { comicCropPlans, type ComicCropPlan } from "./ComicRegionCrop";
 import type { ComicStageRecorder } from "./ComicStageTimer";
+import { comicRegionsDuplicate } from "./ComicRegionDedup";
+import { comicDistanceToContour } from "./ComicSilhouette";
 
 export interface ComicTextCandidate { bbox: Bbox; lines: Line[]; }
 
@@ -97,7 +99,7 @@ export function comicTextLooksReadable(text: string): boolean {
 }
 
 interface Attempt { text: string; confidence: number; words: number[]; plan?: ComicCropPlan; }
-interface Entry { container?: ComicVisualContainer; lines: Line[]; text?: Bbox; }
+interface Entry { container?: ComicVisualContainer; lines: Line[]; text?: Bbox; members?: Bbox[]; }
 
 const letterCount = (text: string): number => text.replace(/[^\p{L}\p{N}]/gu, "").length;
 const union = (boxes: readonly Bbox[]): Bbox | undefined => boxes.length === 0 ? undefined : boxes.reduce((a, b) => ({
@@ -156,7 +158,9 @@ export class ComicRegionOcr {
       if (!comicContainerIsWorthReading(container)) { timer?.count("ocrSkipped"); continue; }
       const inside = seeds.filter(seed => {
         const b = seed.bbox, centerX = (b.x0 + b.x1) / 2, centerY = (b.y0 + b.y1) / 2;
-        return centerX >= container.bbox.x0 && centerX <= container.bbox.x1 && centerY >= container.bbox.y0 && centerY <= container.bbox.y1;
+        if (centerX < container.bbox.x0 || centerX > container.bbox.x1 || centerY < container.bbox.y0 || centerY > container.bbox.y1) return false;
+        // A separate balloon between two lobes is inside the BOX, not this artwork.
+        return container.contour.length < 3 || comicDistanceToContour(container.contour, { x: centerX, y: centerY }) === 0;
       });
       inside.forEach(seed => taken.add(seed));
       const groups = groupComicTextLines(inside);
@@ -164,27 +168,30 @@ export class ComicRegionOcr {
       // A wide flat background can hold two speakers at once. A balloon, however large,
       // holds one - and splitting it would throw away its outline, which is exactly what
       // the enlarged balloon is made of. Only a fill bigger than any balloon is divided.
-      if (groups.length <= 1 || area < .05) entries.push({ container, lines: groups[0]?.lines ?? [], text: groups[0]?.bbox });
+      const connectedSpeech = container.type === "speech" || container.type === "thought";
+      if (groups.length <= 1 || area < .05 || connectedSpeech) entries.push({ container,
+        lines: groups.flatMap(group => group.lines), text: union(groups.map(group => group.bbox)),
+        // All members are inside ONE fill stopped by the artist's original outline.
+        members: connectedSpeech && groups.length > 1 ? groups.map(group => group.bbox) : undefined });
       else for (const group of groups) entries.push({ container: { ...container, bbox: group.bbox, type: "other", shape: "unknown" }, lines: group.lines, text: group.bbox });
     }
     for (const group of groupComicTextLines(seeds.filter(seed => !taken.has(seed)))) entries.push({ lines: group.lines, text: group.bbox });
 
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
     const regions: ComicTextRegion[] = [];
-    for (const entry of entries) {
+    for (const [index, entry] of entries.entries()) {
       signal?.throwIfAborted();
       const region = await this.read(entry, { worker, image, crop, width, height, pageIndex, signal, order: regions.length + 1, timer });
       if (region) regions.push(region);
+      // Reading the regions of a page is most of its minute: it says how far along it is
+      // rather than leaving the reader in front of a number that does not move.
+      timer?.note("OCR", (index + 1) / Math.max(1, entries.length));
     }
     // Disjoint fills can still have overlapping rectangles. Keep the better recognized
     // target so a touch cannot be swallowed by a noisy duplicate of the same balloon.
     const selected: ComicTextRegion[] = [];
     for (const region of [...regions].sort((a, b) => (b.ocrConfidence ?? 0) - (a.ocrConfidence ?? 0))) {
-      const duplicate = selected.some(other => {
-        const intersection = Math.max(0, Math.min(region.x + region.width, other.x + other.width) - Math.max(region.x, other.x))
-          * Math.max(0, Math.min(region.y + region.height, other.y + other.height) - Math.max(region.y, other.y));
-        return intersection > Math.min(region.width * region.height, other.width * other.height) * .25;
-      });
+      const duplicate = selected.some(other => comicRegionsDuplicate(region, other));
       if (!duplicate) selected.push(region);
     }
     return selected.sort((a, b) => a.y - b.y || a.x - b.x).map((region, index) => ({ ...region, id: `p${pageIndex + 1}-r${index + 1}` }));
@@ -262,6 +269,10 @@ export class ComicRegionOcr {
     return {
       id: `p${pageIndex + 1}-r${context.order}`, pageIndex, text,
       ...hit, hitBounds: hit, visualBounds: normalize(visualBox), textBounds: normalize(clampBox(textBox, width, height)),
+      bubbleGroup: entry.members ? {
+        id: `p${pageIndex + 1}-g${context.order}`, unionBounds: normalize(visualBox),
+        members: entry.members.map((box, index) => ({ id: `p${pageIndex + 1}-g${context.order}-m${index + 1}`, bounds: normalize(box) })),
+      } : undefined,
       type: entry.container?.type ?? "free-text", shape: entry.container?.shape ?? "unknown",
       tailDirection: entry.container?.tail ?? "none", tail: entry.container?.tail ?? "none",
       ocrConfidence: confidence, recognitionStatus: reviewReasons.length ? "needs-review" : "recognized", reviewReasons,

@@ -10,7 +10,18 @@ export interface ComicStageRecorder {
   add(stage: ComicStage, milliseconds: number): void;
   /** Counts something worth counting next to the times, such as recognition calls. */
   count(name: string, amount?: number): void;
+  /** How far through a long stage this page is, from 0 to 1. Recognition reads one region
+   *  at a time and takes most of the page's minute, so it says where it is as it goes. */
+  note(stage: ComicStage, share: number): void;
 }
+
+/** What each stage is worth of a page, measured on the phone: the shares add up to one,
+ *  so the reader is told about real work rather than watched by a timer counting to a
+ *  hundred on its own. */
+const STAGE_SHARE: Record<ComicStage, number> = {
+  PDF_RENDER: .18, ASSET_ENCODING: .05, BITMAP_CREATE: .04, CONTAINER_DETECTION: .13,
+  TEXT_DETECTION: .07, REGION_CROP: .06, OCR: .38, MASK_GENERATION: .06, INDEXEDDB_WRITE: .03,
+};
 
 const now = (): number => (typeof performance === "object" ? performance.now() : Date.now());
 
@@ -23,12 +34,29 @@ const now = (): number => (typeof performance === "object" ? performance.now() :
 export class ComicStageTimer implements ComicStageRecorder {
   private readonly stages = new Map<ComicStage, number>();
   private readonly counters = new Map<string, number>();
+  private readonly shares = new Map<ComicStage, number>();
   private readonly begun = now();
+  private announced = 0;
+
+  /** `onProgress` receives this page's own progress, from 0 to 1, and never goes back. */
+  public constructor(private readonly onProgress?: (share: number) => void) {}
 
   public async step<T>(stage: ComicStage, work: () => T | Promise<T>): Promise<T> {
     const started = now();
     try { return await work(); }
-    finally { this.add(stage, now() - started); }
+    finally { this.add(stage, now() - started); this.note(stage, 1); }
+  }
+
+  public note(stage: ComicStage, share: number): void {
+    const reached = Number.isFinite(share) ? Math.min(1, Math.max(0, share)) : 1;
+    if (reached <= (this.shares.get(stage) ?? 0)) return;
+    this.shares.set(stage, reached);
+    let total = 0;
+    for (const [name, value] of this.shares) total += STAGE_SHARE[name] * value;
+    // Monotonic by construction: a page that reached sixty-five per cent never says forty.
+    if (total <= this.announced) return;
+    this.announced = total;
+    this.onProgress?.(total);
   }
 
   public add(stage: ComicStage, milliseconds: number): void {

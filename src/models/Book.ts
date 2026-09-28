@@ -1,4 +1,4 @@
-export type BookFileType = "pdf" | "epub";
+export type BookFileType = "pdf" | "epub" | "cbr" | "cbz";
 export type ReadingStatus = "unread" | "reading" | "finished";
 export type LimaConversionStatus="notConverted"|"converting"|"ready"|"limited"|"failed";
 export type BookAvailability="AVAILABLE"|"MISSING_FILE"|"INVALID_FILE";

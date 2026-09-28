@@ -68,7 +68,7 @@ export class ComicDetailsView extends BaseView {
     const back = this.createElement("button", "link-button catalog-detail__back", this.i18n.t("ui.common.back"));
     back.type = "button"; back.addEventListener("click", this.onBack);
     const collection = listing.breadcrumb.slice(1).map(step => step.name.trim()).filter(Boolean);
-    const readable = entry.supported && entry.format === "pdf";
+    const readable = entry.supported && (entry.format === "pdf" || entry.format === "cbr" || entry.format === "cbz");
     const title = readable ? importer.title(entry, listing) : entry.name.trim();
     copy.append(back, this.createElement("h1", "page-title", title),
       this.createElement("p", "page-subtitle", listing.breadcrumb[0]?.name ?? ""));

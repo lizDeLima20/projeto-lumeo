@@ -57,7 +57,7 @@ export class ImportManager {
       book.offlineAvailability = "AVAILABLE";
       await this.books.save(book);
       await this.checksums?.save({ bookId: book.id, source: await this.checksum(imported.file) });
-      if (this.limaDocuments) {
+      if (this.limaDocuments && (book.fileType === "pdf" || book.fileType === "epub")) {
         const conversion = new LimaConversionManager(this.limaDocuments, this.books);
         const cancel = (): void => conversion.cancel();
         options.signal?.addEventListener("abort", cancel, { once: true });

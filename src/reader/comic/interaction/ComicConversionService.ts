@@ -27,6 +27,8 @@ export interface ComicConversionOptions {
   /** A page finished and was stored: its regions can answer to a touch right away. */
   onPageReady?: (page: ComicPage, asset: ComicPageAsset) => void | Promise<void>;
   onPageStarted?: (pageIndex: number) => void;
+  /** The page being converted, and how far along it is, from 0 to 1. */
+  onPageProgress?: (pageIndex: number, share: number) => void;
   signal?: AbortSignal;
 }
 
@@ -111,7 +113,7 @@ export class ComicConversionService {
       contentType: request.contentType, blob: request.blob, title: request.title,
       fileName: request.fileName, coverPages: request.coverPages ?? [0],
     }, { cache: this.cache, signal: options.signal, onProgress: options.onProgress,
-      priority: options.priority, onPageStarted: options.onPageStarted, onPageProcessed: options.onPageReady })
+      priority: options.priority, onPageStarted: options.onPageStarted, onPageProgress: options.onPageProgress, onPageProcessed: options.onPageReady })
       .then(result => {
         comicLog("COMIC_CONVERSION_COMPLETED", { bookId: request.bookId, conversionKey: key,
           manifestVersion: result.document.manifest.version, pageCount: result.document.pages.length, regionCount: regionCount(result) });
