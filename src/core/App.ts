@@ -171,7 +171,8 @@ export class App {
     this.router.register("library", () => new LibraryView(this.state,
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.openLibraryBook(bookId), (bookId) => void this.deleteBook(bookId, false)));
     this.router.register("explore", (params) => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }), () => this.router.navigate("catalog-admin"),
-      { collections: this.driveCollections, open: (id) => this.router.navigate("collection-genre", { id }) }, params.get("genre") ?? ""));
+      { collections: this.driveCollections, open: (id) => this.router.navigate("collection-genre", { id }),
+        openEntry: (id, entry, listing) => this.openComicDetails(id, entry, listing) }, params.get("genre") ?? ""));
     /* A published Drive folder browsed live. The folder id travels in the URL, so a
      * breadcrumb step and the browser's own Back button land on the same screen. */
     this.router.register("catalog-book", (params) => new CatalogBookView(this.catalog, this.state, params.get("id") ?? "",

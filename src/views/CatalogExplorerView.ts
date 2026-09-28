@@ -1,7 +1,8 @@
 import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
-import type { DriveCollectionService } from "../services/DriveCollectionService";
+import { ComicCoverSource, LazyCoverLoader } from "../services/ComicCoverSource";
+import type { DriveCollectionService, DriveCollectionSearchResult, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 import { BaseView } from "./BaseView";
 
 export class CatalogExplorerView extends BaseView {
@@ -12,11 +13,17 @@ export class CatalogExplorerView extends BaseView {
   private loadVersion = 0;
   private readonly loaded = new Set<string>();
   private readonly classified: HTMLElement = document.createElement("div");
+  private readonly comicCovers = new ComicCoverSource();
+  private readonly comicCoverLoader = new LazyCoverLoader(this.comicCovers);
+  private readonly publishedResults: HTMLElement = document.createElement("div");
+  private publishedSection: HTMLElement | null = null;
   private status: HTMLElement | null = null;
   /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
   private addCatalogGenre: (id: string, label: string) => void = () => undefined;
   public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void,
-    private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void }, private readonly initialGenreId = "") { super(); this.catalog = api; }
+    private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void;
+      openEntry?: (collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing) => void }, private readonly initialGenreId = "") { super(); this.catalog = api; }
+  public override unmount(): void { this.comicCoverLoader.destroy(); super.unmount(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog page-shell");
     const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
@@ -35,7 +42,10 @@ export class CatalogExplorerView extends BaseView {
     const list = this.createElement("div", "catalog__sections");
     this.classified.className = "catalog__grid";
     const classifiedSection = this.createElement("section", "catalog__section"); classifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.allGenres")), this.classified);
-    list.append(classifiedSection);
+    this.publishedResults.className = "drive-comic-carousel__track"; this.publishedResults.setAttribute("role", "list");
+    this.publishedSection = this.createElement("section", "catalog__section"); this.publishedSection.hidden = true;
+    this.publishedSection.append(this.createElement("h2", "catalog__section-title", "HQs da Marvel e DC"), this.publishedResults);
+    list.append(classifiedSection, this.publishedSection);
     const status = this.createElement("p", "catalog__status"); status.setAttribute("role", "status"); this.status = status;
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
     let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
@@ -63,21 +73,27 @@ export class CatalogExplorerView extends BaseView {
       link.addEventListener("click", () => this.onManageSources?.()); heading.append(link);
     } catch { /* No admin link when the status cannot be read. */ }
   }
-  private reset(): void { this.loadVersion += 1; this.pendingLoad = null; this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); }
+  private reset(): void { this.loadVersion += 1; this.pendingLoad = null; this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); this.publishedResults.replaceChildren(); if (this.publishedSection) this.publishedSection.hidden = true; }
   private async load(query: string, genreId: string, more: HTMLButtonElement): Promise<void> {
     if (this.loading) { this.pendingLoad = { query, genreId, more }; return; }
     if (this.cursor === "end") return;
     const version = this.loadVersion;
     this.loading = true; more.disabled = true; this.status!.textContent = this.t("ui.common.loading");
     try {
-      const page = await this.catalog.list({ cursor: this.cursor ?? undefined, query: query.trim() || undefined, genreId: genreId || undefined });
+      const normalizedQuery = query.trim(); const firstPage = this.cursor === null;
+      const [page, comics] = await Promise.all([
+        this.catalog.list({ cursor: this.cursor ?? undefined, query: normalizedQuery || undefined, genreId: genreId || undefined }),
+        firstPage && normalizedQuery && !genreId && this.published ? this.published.collections.search(normalizedQuery) : Promise.resolve([]),
+      ]);
       if (version !== this.loadVersion) return;
       page.genres?.forEach((genre) => this.addCatalogGenre(genre.id, genre.name));
       page.items.filter((book) => !this.loaded.has(book.bookId)).forEach((book) => {
         this.loaded.add(book.bookId);
         this.classified.append(this.card(book));
       });
-      this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end"; this.status!.textContent = this.loaded.size ? "" : this.t("ui.catalog.empty");
+      comics.forEach(result => this.publishedResults.append(this.comicCard(result)));
+      if (this.publishedSection) this.publishedSection.hidden = this.publishedResults.childElementCount === 0;
+      this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end"; this.status!.textContent = this.loaded.size || this.publishedResults.childElementCount ? "" : this.t("ui.catalog.empty");
       this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
     } catch (error) {
       if (version === this.loadVersion) this.status!.textContent = error instanceof Error ? error.message : this.t("ui.catalog.offline");
@@ -87,6 +103,22 @@ export class CatalogExplorerView extends BaseView {
       this.pendingLoad = null;
       if (pending) void this.load(pending.query, pending.genreId, pending.more);
     }
+  }
+  private comicCard(result: DriveCollectionSearchResult): HTMLElement {
+    const { collection, entry, listing } = result;
+    const card = this.createElement("article", "drive-comic-card"); card.setAttribute("role", "listitem"); card.tabIndex = 0;
+    const open = (): void => { if (this.published?.openEntry) this.published.openEntry(collection.id, entry, listing); else this.published?.open(collection.id); };
+    card.addEventListener("click", open); card.addEventListener("keydown", event => { if (event.key === "Enter") open(); });
+    const cover = this.createElement("div", "drive-comic-card__cover");
+    const fallback = (): void => cover.replaceChildren(this.createElement("span", "drive-comic-card__fallback", "📚"));
+    if (this.comicCovers.hasCover(entry)) {
+      const image = this.createElement("img", "") as HTMLImageElement;
+      image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
+      image.addEventListener("error", fallback, { once: true }); this.comicCoverLoader.observe(image, entry); cover.append(image);
+    } else fallback();
+    const path = listing.breadcrumb.slice(1).map(step => step.name).join(" · ") || collection.name;
+    card.append(cover, this.createElement("h3", "drive-comic-card__title", entry.name.trim()), this.createElement("small", "drive-comic-card__format", path));
+    return card;
   }
   private enableGenreDrag(container: HTMLElement): void {
     let pointerId: number | null = null;

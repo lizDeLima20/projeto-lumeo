@@ -67,6 +67,26 @@ describe("coleções publicadas no cliente", () => {
     const { api } = fakeApi({});
     assert.deepEqual(await new DriveCollectionService(api).list(), []);
   });
+  it("busca Marvel e DC pelas primeiras letras do título e da trilha", async () => {
+    const dcRoot = "dc-root";
+    const file = (id: string, name: string) => ({ id, name, kind: "file", mimeType: "application/pdf", format: "pdf", supported: true, size: 10, modifiedAt: null });
+    const folder = (id: string, name: string) => ({ id, name, kind: "folder", mimeType: "application/vnd.google-apps.folder", format: null, supported: false, size: null, modifiedAt: null });
+    const { api } = fakeApi({
+      "/collections": { items: [
+        { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT },
+        { id: "dc-hqs", name: "HQs da DC", rootFolderId: dcRoot },
+      ] },
+      "/collections/marvel-hqs/folders": listing(ROOT, [folder("fenix", "A Canção da Fênix")], [{ id: ROOT, name: "HQs da Marvel" }]),
+      "/collections/marvel-hqs/folders/fenix?path=1wXs64lZ0nOBAAWwGutDHfjO-TnfYO6Ee%2Cfenix": listing("fenix", [file("m1", "Edição 01.pdf")], [{ id: ROOT, name: "HQs da Marvel" }, { id: "fenix", name: "A Canção da Fênix" }]),
+      "/collections/dc-hqs/folders": { ...listing(dcRoot, [folder("batman", "Batman")], [{ id: dcRoot, name: "HQs da DC" }]), collectionId: "dc-hqs" },
+      "/collections/dc-hqs/folders/batman?path=dc-root%2Cbatman": { ...listing("batman", [file("d1", "Ano Um 01.cbz")], [{ id: dcRoot, name: "HQs da DC" }, { id: "batman", name: "Batman" }]), collectionId: "dc-hqs" },
+    });
+    const service = new DriveCollectionService(api);
+    assert.deepEqual((await service.search("canc fen")).map(item => item.entry.id), ["m1"]);
+    assert.deepEqual((await service.search("bat ano")).map(item => item.entry.id), ["d1"]);
+    assert.deepEqual((await service.search("marvel")).map(item => item.entry.id), ["m1"]);
+    assert.deepEqual((await service.search("dc")).map(item => item.entry.id), ["d1"]);
+  });
 });
 
 describe("coleções: integração e limites", () => {
@@ -105,6 +125,7 @@ describe("coleções: integração e limites", () => {
     assert.match(explorer, /addGenre\("", this\.t\("ui\.catalog\.allGenres"\)\)/);
     assert.match(explorer, /addGenre\(`collection:\$\{collection\.id\}`/);
     assert.doesNotMatch(explorer, /catalog__collection/);
+    assert.match(explorer, /published\.collections\.search\(normalizedQuery\)/);
     // The reader, the comic reader and the library were not touched by this feature.
     assert.doesNotMatch(source("src/views/ReaderView.ts"), /collection[A-Z]|DriveCollection/);
     assert.doesNotMatch(source("src/views/ComicReaderView.ts"), /DriveCollection/);

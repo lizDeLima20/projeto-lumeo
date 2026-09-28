@@ -1,4 +1,5 @@
 import type { ApiClient } from "./ApiClient";
+import { matchesCatalogText } from "../../shared/CatalogTextSearch";
 
 export interface DriveCollection { id: string; name: string; rootFolderId: string; contentType: "comic" | "book"; }
 /** Decided by the BFF from Drive metadata, never from the filename. */
@@ -17,6 +18,11 @@ export interface DriveFolderListing {
   breadcrumb: readonly { id: string; name: string }[];
   entries: readonly DriveFolderEntry[];
   warnings?: readonly { code: string; entryId: string; name: string }[];
+}
+export interface DriveCollectionSearchResult {
+  collection: DriveCollection;
+  listing: DriveFolderListing;
+  entry: DriveFolderEntry;
 }
 
 /** Browses a published Drive folder through the BFF. The reader never signs in to Google:
@@ -54,6 +60,36 @@ export class DriveCollectionService {
 
   public isCached(collectionId: string, folderId?: string): boolean {
     return this.folders.has(`${collectionId}:${folderId ?? ""}`);
+  }
+  /** Searches published comic trees by filename, description and folder trail. */
+  public async search(query: string, collectionId?: string): Promise<readonly DriveCollectionSearchResult[]> {
+    const collections = (await this.list()).filter(collection => !collectionId || collection.id === collectionId);
+    const results: DriveCollectionSearchResult[] = [];
+    for (const collection of collections) {
+      try {
+        const queue: DriveFolderListing[] = [await this.open(collection.id)];
+        const visited = new Set<string>();
+        const files = new Set<string>();
+        while (queue.length) {
+          const listing = queue.shift()!;
+          if (visited.has(listing.folderId)) continue;
+          visited.add(listing.folderId);
+          for (const entry of listing.entries) {
+            if (entry.kind === "file") {
+              if (files.has(entry.id)) continue;
+              if (matchesCatalogText(query, [entry.name, entry.description, collection.name, ...listing.breadcrumb.map(step => step.name)])) {
+                files.add(entry.id); results.push({ collection, listing, entry });
+              }
+              continue;
+            }
+            const path = [...listing.breadcrumb.map(step => step.id), entry.id];
+            try { if (!visited.has(entry.id)) queue.push(await this.open(collection.id, entry.id, path)); }
+            catch { /* An inaccessible subfolder does not invalidate the collection. */ }
+          }
+        }
+      } catch { /* An unavailable collection does not hide results from the others. */ }
+    }
+    return results;
   }
   public forget(): void { this.folders.clear(); this.collections = null; }
 }
