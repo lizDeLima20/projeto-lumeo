@@ -107,7 +107,7 @@ export class HybridCatalogSourceProvider {
     if (query.author && !book.author.toLocaleLowerCase().includes(query.author.toLocaleLowerCase())) return false;
     if (query.collection && !(book.collection ?? "").toLocaleLowerCase().includes(query.collection.toLocaleLowerCase())) return false;
     if (!query.query) return true;
-    return matchesCatalogText(query.query, [book.title, book.author, book.collection, ...(!query.genreId ? [book.genreName] : [])]);
+    return matchesCatalogText(query.query, [book.title, book.author, book.collection, book.volume, ...(!query.genreId ? [book.genreName] : [])]);
   }
   private static errorCode(error: unknown): string { return error instanceof Error ? error.message.slice(0, 80) : "UNKNOWN"; }
 }

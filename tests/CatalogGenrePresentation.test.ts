@@ -23,7 +23,7 @@ describe("controles sempre acessíveis no catálogo", () => {
   it("mantém busca e gêneros no fluxo existente de filtro remoto", () => {
     const source = readFileSync("src/views/CatalogExplorerView.ts", "utf8");
     assert.match(source, /genreNavigation\.append\(previousGenres, genres, nextGenres\); controls\.append\(search, genreNavigation\)/);
-    assert.match(source, /this\.load\(search\.value, selectedGenre, more\)/);
+    assert.match(source, /this\.load\(search\.value, this\.selectedGenre, more\)/);
     assert.match(source, /this\.enableGenreDrag\(genres\)/);
     assert.match(source, /container\.scrollLeft = startScroll - delta/);
     assert.match(source, /container\.scrollBy\(\{/);

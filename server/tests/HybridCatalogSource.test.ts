@@ -77,6 +77,43 @@ describe("hybrid catalog sources", () => {
     assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, genreId: "ciencias", query: "guer" })).items, []);
   });
 
+  it("also searches by volume, alone or combined with title/collection", async () => {
+    const hqs = new MemoryProvider(source("comics"), [
+      { ...book("hulk-2", "file-hulk-2"), title: "Hulk", collection: "HQs da Marvel", volume: "Volume 2" },
+      { ...book("hulk-3", "file-hulk-3"), title: "Hulk", collection: "HQs da Marvel", volume: "Volume 3" },
+      { ...book("batman-2", "file-batman-2"), title: "Batman", collection: "HQs da DC", volume: "2" },
+    ]);
+    const hybrid = new HybridCatalogSourceProvider(async () => [hqs]);
+
+    // 1. busca somente pelo volume encontra o registro.
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, query: "volume 2" })).items.map((item) => item.bookId), ["hulk-2"]);
+    // 2. título + volume encontra o registro.
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, query: "Hulk Volume 2" })).items.map((item) => item.bookId), ["hulk-2"]);
+    // 3. coleção + volume encontra o registro.
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, query: "Marvel Volume 2" })).items.map((item) => item.bookId), ["hulk-2"]);
+    // 4. volume diferente não encontra.
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, query: "Hulk Volume 9" })).items, []);
+    // 6. busca existente por título/coleção não sofre regressão (autor/gênero já cobertos no teste acima).
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, query: "batman" })).items.map((item) => item.bookId), ["batman-2"]);
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, query: "dc" })).items.map((item) => item.bookId), ["batman-2"]);
+  });
+
+  it("5. livros sem volume continuam funcionando normalmente", async () => {
+    const plain = new MemoryProvider(source("plain"), [{ ...book("plain-1", "file-plain"), title: "Livro Simples", volume: null }]);
+    const hybrid = new HybridCatalogSourceProvider(async () => [plain]);
+    assert.deepEqual((await hybrid.list({ offset: 0, limit: 24, query: "simples" })).items.map((item) => item.bookId), ["plain-1"]);
+  });
+
+  it("7. busca por volume também filtra antes da paginação, não só na primeira página", async () => {
+    const values = Array.from({ length: 50 }, (_, index) => ({ ...book(`comic-${index}`, `drive-${index}`), title: "Aventura", volume: String(index) }));
+    const provider = new MemoryProvider(source("volumes"), values);
+    const hybrid = new HybridCatalogSourceProvider(async () => [provider]);
+    // O registro com volume "42" está muito além do limite de página (5); se a busca
+    // rodasse só sobre a primeira página já paginada, ele nunca seria encontrado.
+    const result = await hybrid.list({ offset: 0, limit: 5, query: "42" });
+    assert.deepEqual(result.items.map((item) => item.bookId), ["comic-42"]);
+  });
+
   it("searches and paginates beyond the former 500-record source cap", async () => {
     const values = Array.from({ length: 1_501 }, (_, index) => book(`catalog-${index}`, `drive-${index}`));
     const provider = new PagedMemoryProvider(source("large"), values);

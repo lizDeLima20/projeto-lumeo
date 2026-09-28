@@ -5,6 +5,29 @@ import { ComicCoverSource, LazyCoverLoader } from "../services/ComicCoverSource"
 import type { DriveCollectionService, DriveCollectionSearchResult, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 import { BaseView } from "./BaseView";
 
+/** Folds text the same way search already does, so cosmetic differences - case, accent,
+ *  punctuation - collapse into the same key. */
+function foldCatalogText(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+/** The same title alone is not the same book - "O Segredo" can be two unrelated novels -
+ *  so identity also asks who wrote it, and, when the catalogue records them, which volume
+ *  and which collection: two entries that agree on title and author but name different
+ *  volumes are two real books, not one imported twice. A record with no author at all
+ *  carries too little to safely fold into anything else, so its own bookId keeps it
+ *  standing on its own rather than risking a different, unrelated book silently
+ *  disappearing behind it. Exported so the exact rule can be exercised directly in tests,
+ *  without instantiating a view that needs a live DOM. */
+export function catalogIdentityKey(book: Pick<CatalogBookData, "bookId" | "title" | "author" | "volume" | "collection">): string {
+  const title = foldCatalogText(book.title);
+  const author = foldCatalogText(book.author);
+  if (!author) return `title:${title}:id:${book.bookId}`;
+  const volume = foldCatalogText(book.volume ?? "");
+  const collection = foldCatalogText(book.collection ?? "");
+  return `title:${title}:author:${author}:volume:${volume}:collection:${collection}`;
+}
+
 export class CatalogExplorerView extends BaseView {
   private readonly catalog: CatalogService;
   private cursor: string | null = null;
@@ -15,15 +38,22 @@ export class CatalogExplorerView extends BaseView {
   private readonly classified: HTMLElement = document.createElement("div");
   private readonly comicCovers = new ComicCoverSource();
   private readonly comicCoverLoader = new LazyCoverLoader(this.comicCovers);
-  private readonly publishedResults: HTMLElement = document.createElement("div");
-  private publishedSection: HTMLElement | null = null;
+  private searchQuery = "";
+  private selectedGenre: string;
+  private searchResults: Array<CatalogBookData | DriveCollectionSearchResult> = [];
+  private isSearching = false;
   private genreCarouselCleanup: (() => void) | null = null;
   private status: HTMLElement | null = null;
   /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
   private addCatalogGenre: (id: string, label: string) => void = () => undefined;
+  /** The label behind every chip offered so far, so the title above the results can be
+   *  rebuilt for a genre whose own chip arrived after the page did - a genre opened
+   *  straight from a link, restored on reload, still without its name at first paint. */
+  private readonly genreLabels = new Map<string, string>();
+  private sectionTitle: HTMLElement | null = null;
   public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void,
     private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void;
-      openEntry?: (collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing) => void }, private readonly initialGenreId = "") { super(); this.catalog = api; }
+      openEntry?: (collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing) => void }, initialGenreId = "") { super(); this.catalog = api; this.selectedGenre = initialGenreId; }
   public override unmount(): void { this.genreCarouselCleanup?.(); this.genreCarouselCleanup = null; this.comicCoverLoader.destroy(); super.unmount(); }
   public render(): HTMLElement {
     const section = this.createElement("section", "catalog catalog--explore page-shell");
@@ -32,10 +62,25 @@ export class CatalogExplorerView extends BaseView {
     const search = this.createElement("input", "input") as HTMLInputElement; search.type = "search"; search.placeholder = this.t("ui.catalog.search"); search.setAttribute("aria-label", this.t("ui.catalog.search"));
     const genreNavigation = this.createElement("div", "catalog__genre-navigation");
     const previousGenres = this.createElement("button", "catalog__genre-arrow catalog__genre-arrow--previous", "‹"); previousGenres.type = "button"; previousGenres.setAttribute("aria-label", "Gêneros anteriores");
-    const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = this.initialGenreId; const availableGenres = new Set<string>(); const genreActions = new Map<string, () => void>();
+    const genres = this.createElement("div", "catalog__genre-carousel"); const availableGenres = new Set<string>(); const genreActions = new Map<string, () => void>();
     const nextGenres = this.createElement("button", "catalog__genre-arrow catalog__genre-arrow--next", "›"); nextGenres.type = "button"; nextGenres.setAttribute("aria-label", "Próximos gêneros");
-    const selectGenre = (id: string): void => { const action = genreActions.get(id); if (action) { action(); return; } selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
-    const addGenre = (id: string, label: string, action?: () => void): void => { if (availableGenres.has(id)) return; availableGenres.add(id); if (action) genreActions.set(id, action); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
+    // Selecting a genre is what the section title answers to - never the results that
+    // happen to have loaded, which can still be settling from the previous one.
+    const selectGenre = (id: string, label: string): void => {
+      this.selectedGenre = id; this.sectionTitle!.textContent = this.genreTitle(id, label);
+      const action = genreActions.get(id); if (action) { action(); return; }
+      genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id));
+      this.reset(); void this.load(search.value, this.selectedGenre, more);
+    };
+    const addGenre = (id: string, label: string, action?: () => void): void => {
+      if (availableGenres.has(id)) return; availableGenres.add(id); if (action) genreActions.set(id, action);
+      this.genreLabels.set(id, label);
+      // The chip for the genre a reload restored can arrive after the first paint - its
+      // name was unknown then, and the title is redrawn now that it isn't.
+      if (id === this.selectedGenre && this.sectionTitle) this.sectionTitle.textContent = this.genreTitle(id, label);
+      const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id;
+      button.setAttribute("aria-pressed", String(id === this.selectedGenre)); button.addEventListener("click", () => selectGenre(id, label)); genres.append(button);
+    };
     // Explore is the public catalogue: its filters are supplied only by the
     // active remote sources. Personal library categories belong in Biblioteca
     // and must never masquerade as catalogue genres here.
@@ -46,17 +91,16 @@ export class CatalogExplorerView extends BaseView {
     genreNavigation.append(previousGenres, genres, nextGenres); controls.append(search, genreNavigation);
     const list = this.createElement("div", "catalog__sections");
     this.classified.className = "catalog__grid";
-    const classifiedSection = this.createElement("section", "catalog__section"); classifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.allGenres")), this.classified);
-    this.publishedResults.className = "drive-comic-carousel__track"; this.publishedResults.setAttribute("role", "list");
-    this.publishedSection = this.createElement("section", "catalog__section"); this.publishedSection.hidden = true;
-    this.publishedSection.append(this.createElement("h2", "catalog__section-title", "HQs da Marvel e DC"), this.publishedResults);
-    list.append(classifiedSection, this.publishedSection);
+    const sectionTitle = this.createElement("h2", "catalog__section-title", this.genreTitle(this.selectedGenre, this.genreLabels.get(this.selectedGenre) ?? ""));
+    this.sectionTitle = sectionTitle;
+    const classifiedSection = this.createElement("section", "catalog__section"); classifiedSection.append(sectionTitle, this.classified);
+    list.append(classifiedSection);
     const status = this.createElement("p", "catalog__status"); status.setAttribute("role", "status"); this.status = status;
     const more = this.createElement("button", "button button--secondary catalog__more", this.t("ui.catalog.loadMore")); more.type = "button";
-    let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.reset(); void this.load(search.value, selectedGenre, more); }, 250); };
-    search.addEventListener("input", reload); more.addEventListener("click", () => void this.load(search.value, selectedGenre, more));
+    let timer: number | undefined; const reload = (): void => { window.clearTimeout(timer); timer = window.setTimeout(() => { this.searchQuery = search.value; this.reset(); void this.load(this.searchQuery, this.selectedGenre, more); }, 250); };
+    search.addEventListener("input", reload); more.addEventListener("click", () => void this.load(search.value, this.selectedGenre, more));
     section.append(heading, controls, list, status, more);
-    void this.load("", selectedGenre, more); void this.offerSourceManagement(heading); void this.offerCollections(addGenre); return section;
+    void this.load("", this.selectedGenre, more); void this.offerSourceManagement(heading); void this.offerCollections(addGenre); return section;
   }
   /** A published Drive collection participates in the very same genre strip as the
    * catalogue sources. Its own page can then resolve its nested Drive folders lazily. */
@@ -78,7 +122,10 @@ export class CatalogExplorerView extends BaseView {
       link.addEventListener("click", () => this.onManageSources?.()); heading.append(link);
     } catch { /* No admin link when the status cannot be read. */ }
   }
-  private reset(): void { this.loadVersion += 1; this.pendingLoad = null; this.cursor = null; this.loaded.clear(); this.classified.replaceChildren(); this.publishedResults.replaceChildren(); if (this.publishedSection) this.publishedSection.hidden = true; }
+  /** Universal search only: the best card shown so far for each identity, so a later,
+   *  better-classified copy of a book already on the page can take its place. */
+  private readonly bestByIdentity = new Map<string, { rank: number; element: HTMLElement }>();
+  private reset(): void { this.loadVersion += 1; this.pendingLoad = null; this.cursor = null; this.loaded.clear(); this.bestByIdentity.clear(); this.searchResults = []; this.classified.replaceChildren(); }
   private async load(query: string, genreId: string, more: HTMLButtonElement): Promise<void> {
     if (this.loading) { this.pendingLoad = { query, genreId, more }; return; }
     if (this.cursor === "end") return;
@@ -86,19 +133,35 @@ export class CatalogExplorerView extends BaseView {
     this.loading = true; more.disabled = true; this.status!.textContent = this.t("ui.common.loading");
     try {
       const normalizedQuery = query.trim(); const firstPage = this.cursor === null;
+      this.searchQuery = query; this.isSearching = Boolean(normalizedQuery);
       const [page, comics] = await Promise.all([
         this.catalog.list({ cursor: this.cursor ?? undefined, query: normalizedQuery || undefined, genreId: genreId || undefined }),
         firstPage && normalizedQuery && !genreId && this.published ? this.published.collections.search(normalizedQuery) : Promise.resolve([]),
       ]);
       if (version !== this.loadVersion) return;
       page.genres?.forEach((genre) => this.addCatalogGenre(genre.id, genre.name));
+      // "Todos os gêneros" reaches every genre's own catalogue at once, so the same title
+      // can arrive twice - once filed under its real genre, once from an unclassified
+      // import. The reader sees one card, and it is the classified one.
+      const universal = !genreId && this.isSearching;
       page.items.filter((book) => !this.loaded.has(book.bookId)).forEach((book) => {
         this.loaded.add(book.bookId);
-        this.classified.append(this.card(book));
+        if (!universal) { this.classified.append(this.card(book)); return; }
+        const key = this.identityKey(book), rank = this.genreRank(book), current = this.bestByIdentity.get(key);
+        if (current && current.rank >= rank) return;
+        current?.element.remove();
+        const element = this.card(book);
+        this.bestByIdentity.set(key, { rank, element });
+        this.classified.append(element);
       });
-      comics.forEach(result => this.publishedResults.append(this.comicCard(result)));
-      if (this.publishedSection) this.publishedSection.hidden = this.publishedResults.childElementCount === 0;
-      this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end"; this.status!.textContent = this.loaded.size || this.publishedResults.childElementCount ? "" : this.t("ui.catalog.empty");
+      comics.filter(result => !this.loaded.has("comic:" + result.collection.id + ":" + result.entry.id)).forEach(result => {
+        this.loaded.add("comic:" + result.collection.id + ":" + result.entry.id);
+        this.classified.append(this.comicCard(result));
+      });
+      if (firstPage && normalizedQuery) this.searchResults = [...page.items, ...comics];
+      this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end";
+      const empty = this.isSearching ? this.searchResults.length === 0 : this.loaded.size === 0;
+      this.status!.textContent = empty ? this.t("ui.catalog.empty") : "";
       this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
     } catch (error) {
       if (version === this.loadVersion) this.status!.textContent = error instanceof Error ? error.message : this.t("ui.catalog.offline");
@@ -193,4 +256,23 @@ export class CatalogExplorerView extends BaseView {
     image.addEventListener("error", fallback, { once: true }); root.append(image);
   }
   private isUnclassified(book: CatalogBookData): boolean { return !book.genreId || book.genreId === "sem-genero" || /^sem gênero$/i.test(book.genreName.trim()); }
+
+  /** The title above the results, computed only from `selectedGenre` - never from what
+   *  happened to load, which settles a moment later and must never be what decides what
+   *  the reader thinks they are looking at. A Drive collection keeps its own name; every
+   *  other genre is announced, so "Autoajuda" reads as the shelf it is, not a book. */
+  private genreTitle(id: string, label: string): string {
+    if (!id) return this.t("ui.catalog.allGenres");
+    if (id.startsWith("collection:")) return label;
+    return `${this.t("ui.catalog.genre")}: ${label}`;
+  }
+
+  /** See {@link catalogIdentityKey} - kept as a thin method so `load()` reads the same as
+   *  before, with the actual rule defined once, outside the class, where it can be tested
+   *  without a DOM. */
+  private identityKey(book: CatalogBookData): string { return catalogIdentityKey(book); }
+  /** A record with its own genre outranks the very same title sitting in the unclassified
+   *  pile - the pile is a fallback for the reader to still find it, never the copy to show
+   *  once the real one is also on the page. */
+  private genreRank(book: CatalogBookData): number { return this.isUnclassified(book) ? 0 : 1; }
 }
