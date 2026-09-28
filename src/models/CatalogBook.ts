@@ -1,4 +1,7 @@
-import type { BookFileType } from "./Book";
+/** The public catalogue only ever serves these two formats. CBR/CBZ remain valid for
+ *  local import, the library and the comic reader (BookFileType) - never here, since
+ *  nothing upstream (Drive sources, the server) can produce a catalogue entry for them. */
+export type CatalogBookFormat = "pdf" | "epub";
 
 /** Metadata available remotely. It never contains the book file itself. */
 export interface CatalogBookData {
@@ -9,7 +12,7 @@ export interface CatalogBookData {
   genreName: string;
   coverUrl?: string;
   description?: string;
-  format: BookFileType;
+  format: CatalogBookFormat;
   fileSize?: number;
   driveFileId: string;
   storageAccountId: string;

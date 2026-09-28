@@ -370,7 +370,7 @@ export class App {
   private async prepareCatalogDownload(catalogBook: CatalogBookData, link: CatalogDownloadLink): Promise<void> {
     const folders = new FileSystemFolderManager(this.database);
     await folders.savePending({ bookId: catalogBook.bookId, driveFileId: link.driveFileId, title: link.title, author: link.author,
-      format: link.format, expectedFilename: link.expectedFilename, coverUrl: link.coverUrl ?? null, catalogGenre: link.genreName, sha256: link.sha256 ?? null });
+      format: catalogBook.format, expectedFilename: link.expectedFilename, coverUrl: link.coverUrl ?? null, catalogGenre: link.genreName, sha256: link.sha256 ?? null });
   }
 
   private async addCatalogBook(catalogBook: CatalogBookData, link: CatalogDownloadLink, progress: (stage: CatalogImportStage, percent?: number | null) => void, signal?: AbortSignal, downloadedFile?: File): Promise<string | null> {

@@ -3,6 +3,9 @@ import type { CatalogBookData, CatalogPage } from "../models/CatalogBook";
 import type { BookFileType } from "../models/Book";
 import { I18nManager } from "../i18n/I18nManager";
 
+/** Shared with the Drive collections import flow (CollectionImportService), whose comics
+ *  genuinely are "cbr"/"cbz" - only the public catalogue itself is limited to "pdf"/"epub"
+ *  (CatalogBookData.format), so this link's own format stays the wider BookFileType. */
 export interface CatalogDownloadLink {
   bookId: string;
   driveFileId: string;
