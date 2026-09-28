@@ -17,19 +17,23 @@ export class CatalogExplorerView extends BaseView {
   private readonly comicCoverLoader = new LazyCoverLoader(this.comicCovers);
   private readonly publishedResults: HTMLElement = document.createElement("div");
   private publishedSection: HTMLElement | null = null;
+  private genreCarouselCleanup: (() => void) | null = null;
   private status: HTMLElement | null = null;
   /** Genre folders of the remote catalogue become filters as soon as the API reports them. */
   private addCatalogGenre: (id: string, label: string) => void = () => undefined;
   public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void,
     private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void;
       openEntry?: (collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing) => void }, private readonly initialGenreId = "") { super(); this.catalog = api; }
-  public override unmount(): void { this.comicCoverLoader.destroy(); super.unmount(); }
+  public override unmount(): void { this.genreCarouselCleanup?.(); this.genreCarouselCleanup = null; this.comicCoverLoader.destroy(); super.unmount(); }
   public render(): HTMLElement {
-    const section = this.createElement("section", "catalog page-shell");
+    const section = this.createElement("section", "catalog catalog--explore page-shell");
     const heading = this.createElement("div", "page-heading"); heading.append(this.createElement("span", "eyebrow", this.t("ui.catalog.eyebrow")), this.createElement("h1", "page-title", this.t("ui.catalog.chooseBook")), this.createElement("p", "page-subtitle", this.t("ui.catalog.subtitle")));
     const controls = this.createElement("div", "catalog__controls");
     const search = this.createElement("input", "input") as HTMLInputElement; search.type = "search"; search.placeholder = this.t("ui.catalog.search"); search.setAttribute("aria-label", this.t("ui.catalog.search"));
+    const genreNavigation = this.createElement("div", "catalog__genre-navigation");
+    const previousGenres = this.createElement("button", "catalog__genre-arrow catalog__genre-arrow--previous", "‹"); previousGenres.type = "button"; previousGenres.setAttribute("aria-label", "Gêneros anteriores");
     const genres = this.createElement("div", "catalog__genre-carousel"); let selectedGenre = this.initialGenreId; const availableGenres = new Set<string>(); const genreActions = new Map<string, () => void>();
+    const nextGenres = this.createElement("button", "catalog__genre-arrow catalog__genre-arrow--next", "›"); nextGenres.type = "button"; nextGenres.setAttribute("aria-label", "Próximos gêneros");
     const selectGenre = (id: string): void => { const action = genreActions.get(id); if (action) { action(); return; } selectedGenre = id; genres.querySelectorAll("button").forEach((button) => button.toggleAttribute("aria-pressed", button.dataset.genre === id)); this.reset(); void this.load(search.value, selectedGenre, more); };
     const addGenre = (id: string, label: string, action?: () => void): void => { if (availableGenres.has(id)) return; availableGenres.add(id); if (action) genreActions.set(id, action); const button = this.createElement("button", "catalog__genre-chip", label); button.type = "button"; button.dataset.genre = id; button.setAttribute("aria-pressed", String(id === selectedGenre)); button.addEventListener("click", () => selectGenre(id)); genres.append(button); };
     // Explore is the public catalogue: its filters are supplied only by the
@@ -38,7 +42,8 @@ export class CatalogExplorerView extends BaseView {
     addGenre("", this.t("ui.catalog.allGenres"));
     this.addCatalogGenre = addGenre;
     this.enableGenreDrag(genres);
-    controls.append(search, genres);
+    this.enableDesktopGenreNavigation(genres, previousGenres, nextGenres);
+    genreNavigation.append(previousGenres, genres, nextGenres); controls.append(search, genreNavigation);
     const list = this.createElement("div", "catalog__sections");
     this.classified.className = "catalog__grid";
     const classifiedSection = this.createElement("section", "catalog__section"); classifiedSection.append(this.createElement("h2", "catalog__section-title", this.t("ui.catalog.allGenres")), this.classified);
@@ -151,6 +156,23 @@ export class CatalogExplorerView extends BaseView {
       if (!suppressClick) return;
       event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false;
     }, true);
+  }
+  private enableDesktopGenreNavigation(container: HTMLElement, previous: HTMLButtonElement, next: HTMLButtonElement): void {
+    const update = (): void => {
+      const limit = Math.max(0, container.scrollWidth - container.clientWidth);
+      previous.disabled = container.scrollLeft <= 1;
+      next.disabled = limit <= 1 || container.scrollLeft >= limit - 1;
+    };
+    const scroll = (direction: -1 | 1): void => container.scrollBy({
+      left: direction * Math.max(280, container.clientWidth * .78),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+    previous.addEventListener("click", () => scroll(-1)); next.addEventListener("click", () => scroll(1));
+    container.addEventListener("scroll", update, { passive: true });
+    const mutation = new MutationObserver(() => window.requestAnimationFrame(update)); mutation.observe(container, { childList: true });
+    const resize = typeof ResizeObserver === "function" ? new ResizeObserver(update) : null; resize?.observe(container);
+    window.requestAnimationFrame(update);
+    this.genreCarouselCleanup = () => { mutation.disconnect(); resize?.disconnect(); container.removeEventListener("scroll", update); };
   }
   private card(book: CatalogBookData): HTMLElement {
     const card = this.createElement("article", "catalog-card"); card.tabIndex = 0; card.addEventListener("click", () => this.onOpen(book.bookId)); card.addEventListener("keydown", (event) => { if (event.key === "Enter") this.onOpen(book.bookId); }); const cover = this.createElement("div", "catalog-card__cover");

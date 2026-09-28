@@ -22,10 +22,12 @@ describe("separação entre catálogo oficial e categorias pessoais", () => {
 describe("controles sempre acessíveis no catálogo", () => {
   it("mantém busca e gêneros no fluxo existente de filtro remoto", () => {
     const source = readFileSync("src/views/CatalogExplorerView.ts", "utf8");
-    assert.match(source, /controls\.append\(search, genres\)/);
+    assert.match(source, /genreNavigation\.append\(previousGenres, genres, nextGenres\); controls\.append\(search, genreNavigation\)/);
     assert.match(source, /this\.load\(search\.value, selectedGenre, more\)/);
     assert.match(source, /this\.enableGenreDrag\(genres\)/);
     assert.match(source, /container\.scrollLeft = startScroll - delta/);
+    assert.match(source, /container\.scrollBy\(\{/);
+    assert.match(source, /previous\.disabled = container\.scrollLeft <= 1/);
   });
 
   it("fixa apenas os controles abaixo da header e mantém swipe horizontal touch", () => {
@@ -33,6 +35,16 @@ describe("controles sempre acessíveis no catálogo", () => {
     assert.match(styles, /\.catalog__controls\{position:sticky;top:4\.25rem/);
     assert.match(styles, /@media\(max-width:63\.99rem\)\{\.catalog__controls\{top:5\.35rem\}\}/);
     assert.match(styles, /\.catalog__genre-carousel\{[^}]*touch-action:pan-x/);
+  });
+  it("amplia apenas Explorar no desktop e mantém o layout móvel intacto", () => {
+    const source = readFileSync("src/views/CatalogExplorerView.ts", "utf8");
+    const styles = readFileSync("src/styles/catalog.css", "utf8");
+    assert.match(source, /catalog catalog--explore page-shell/);
+    assert.match(styles, /\.catalog__genre-navigation\{display:contents\}\.catalog__genre-arrow\{display:none\}/);
+    assert.match(styles, /@media\(min-width:64rem\)/);
+    assert.match(styles, /\.catalog--explore\.page-shell\{width:min\(calc\(100% - 3rem\),112rem\)\}/);
+    assert.match(styles, /grid-template-columns:repeat\(auto-fill,minmax\(10\.25rem,1fr\)\)/);
+    assert.match(styles, /\.catalog--explore \.catalog__genre-arrow:disabled\{visibility:hidden;pointer-events:none\}/);
   });
   it("inclui busca e seletor horizontal de gêneros na página de HQs, sem botão Voltar", () => {
     const source = readFileSync("src/views/DriveCollectionGenreView.ts", "utf8");
