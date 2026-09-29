@@ -219,6 +219,80 @@ describe("coleções do Drive: cache e limites", () => {
   });
 });
 
+describe("coleções do Drive: múltiplas raízes físicas (sourceRootFolderIds)", () => {
+  const SOURCE_A = "source-a-root-id";
+  const SOURCE_B = "source-b-root-id";
+  const multiRoot = [{ id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT, contentType: "comic" as const,
+    sourceRootFolderIds: [SOURCE_A, SOURCE_B] }];
+  const nodes: FakeNode[] = [
+    { id: ROOT, name: "HQs da Marvel", mimeType: FOLDER, parent: null },
+    { id: "sw", name: "STAR WARS", mimeType: FOLDER, parent: ROOT },
+    { id: "sw-c1", name: "Capítulo 01.pdf", mimeType: "application/pdf", parent: "sw" },
+    // A source root's own folders sit directly under a DIFFERENT physical parent than
+    // collection.rootFolderId - the exact shape that broke path reconstruction.
+    { id: SOURCE_A, name: "(fonte pública A)", mimeType: FOLDER, parent: null },
+    { id: "vingadores", name: "Os Vingadores", mimeType: FOLDER, parent: SOURCE_A },
+    { id: "vingadores-v1", name: "Volume 1", mimeType: FOLDER, parent: "vingadores" },
+    { id: "vingadores-v1-c1", name: "001.cbr", mimeType: "application/x-cbr", parent: "vingadores-v1" },
+    { id: SOURCE_B, name: "(fonte pública B)", mimeType: FOLDER, parent: null },
+    { id: "direto", name: "Direto.pdf", mimeType: "application/pdf", parent: SOURCE_B },
+  ];
+  const multiService = () => { const drive = fakeDrive(nodes); return { drive, service: new DriveCollectionService(multiRoot, new DriveFolderBrowser(drive.request)) }; };
+
+  it("a raiz combina arquivos/pastas da raiz principal e de toda sourceRootFolderIds", async () => {
+    const { service: value } = multiService();
+    const root = await value.open("marvel-hqs");
+    assert.deepEqual(root.entries.map(entry => entry.name).sort(), ["Direto.pdf", "Os Vingadores", "STAR WARS"].sort());
+  });
+
+  it("uma pasta da raiz principal abre normalmente", async () => {
+    const { service: value } = multiService();
+    const root = await value.open("marvel-hqs");
+    const sw = root.entries.find(entry => entry.name === "STAR WARS")!;
+    const listing = await value.open("marvel-hqs", sw.id, sw.collectionPath);
+    assert.deepEqual(listing.entries.map(entry => entry.name), ["Capítulo 01.pdf"]);
+  });
+
+  it("uma pasta de sourceRootFolderIds abre usando o collectionPath que a raiz devolveu - não collection.rootFolderId", async () => {
+    const { service: value } = multiService();
+    const root = await value.open("marvel-hqs");
+    const vingadores = root.entries.find(entry => entry.name === "Os Vingadores")!;
+    // The bug this guards against: reconstructing the path as [collection.rootFolderId,
+    // vingadores.id] instead of using the entry's own collectionPath (which starts at
+    // SOURCE_A, the folder's real physical parent) used to 404.
+    assert.deepEqual(vingadores.collectionPath, [SOURCE_A, "vingadores"]);
+    const listing = await value.open("marvel-hqs", vingadores.id, vingadores.collectionPath);
+    assert.deepEqual(listing.entries.map(entry => entry.name), ["Volume 1"]);
+  });
+
+  it("uma subpasta dentro dessa source root também abre, e o collectionPath continua real a cada nível", async () => {
+    const { service: value } = multiService();
+    const vingadores = (await value.open("marvel-hqs")).entries.find(entry => entry.name === "Os Vingadores")!;
+    const volume1Listing = await value.open("marvel-hqs", vingadores.id, vingadores.collectionPath);
+    const volume1 = volume1Listing.entries[0]!;
+    assert.deepEqual(volume1.collectionPath, [SOURCE_A, "vingadores", "vingadores-v1"]);
+    const files = await value.open("marvel-hqs", volume1.id, volume1.collectionPath);
+    assert.deepEqual(files.entries.map(entry => entry.name), ["001.cbr"]);
+    assert.deepEqual(files.entries[0]!.collectionPath, [SOURCE_A, "vingadores", "vingadores-v1", "vingadores-v1-c1"]);
+    // Still shows "HQs da Marvel" at the top for the reader - the real chain is a separate,
+    // purely-for-navigation concern from what the breadcrumb displays.
+    assert.equal(files.breadcrumb[0]!.name, "HQs da Marvel");
+  });
+
+  it("um arquivo direto sob uma segunda sourceRootFolderIds também abre - múltiplas source roots ao mesmo tempo", async () => {
+    const { service: value } = multiService();
+    const root = await value.open("marvel-hqs");
+    const direto = root.entries.find(entry => entry.name === "Direto.pdf")!;
+    assert.deepEqual(direto.collectionPath, [SOURCE_B, "direto"]);
+  });
+
+  it("uma raiz que não pertence à coleção (nem a principal, nem nenhuma sourceRootFolderIds) continua recusada", async () => {
+    const { service: value } = multiService();
+    await assert.rejects(() => value.open("marvel-hqs", "vingadores", ["outra-raiz-qualquer", "vingadores"]),
+      (error: unknown) => error instanceof ApiError && error.code === "COLLECTION_FOLDER_NOT_FOUND");
+  });
+});
+
 describe("coleções do Drive: geração do índice (rebuildIndex)", () => {
   it("1. percorre subpastas, achatando o índice inteiro num só resultado", async () => {
     const { drive, service: value } = service();
@@ -274,6 +348,45 @@ describe("coleções do Drive: geração do índice (rebuildIndex)", () => {
     const { service: value } = service();
     await assert.rejects(() => value.rebuildIndex("nao-existe"), (error: unknown) =>
       error instanceof ApiError && error.code === "COLLECTION_NOT_FOUND");
+  });
+
+  it("o índice preserva o collectionPath real de cada entrada, mesmo vinda de uma sourceRootFolderIds", async () => {
+    const SOURCE = "source-root-for-index";
+    const multiRoot = [{ id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT, contentType: "comic" as const, sourceRootFolderIds: [SOURCE] }];
+    const nodes: FakeNode[] = [
+      { id: ROOT, name: "HQs da Marvel", mimeType: FOLDER, parent: null },
+      { id: SOURCE, name: "(fonte pública)", mimeType: FOLDER, parent: null },
+      { id: "wolverine", name: "Wolverine", mimeType: FOLDER, parent: SOURCE },
+      { id: "wolverine-c1", name: "001.cbz", mimeType: "application/x-cbz", parent: "wolverine" },
+    ];
+    const drive = fakeDrive(nodes);
+    const value = new DriveCollectionService(multiRoot, new DriveFolderBrowser(drive.request));
+    const index = await value.rebuildIndex("marvel-hqs");
+    const wolverine = index.entries.find(item => item.entry.name === "001.cbz")!;
+    // Real, walkable chain: starts at the physical source root, not collection.rootFolderId.
+    assert.deepEqual(wolverine.entry.collectionPath, [SOURCE, "wolverine", "wolverine-c1"]);
+    // Display breadcrumb still opens on the collection's own name - unrelated concern.
+    assert.equal(wolverine.breadcrumb[0]!.name, "HQs da Marvel");
+    // And the path the index handed out is actually usable to open() that same folder again.
+    const reopened = await value.open("marvel-hqs", "wolverine", wolverine.entry.collectionPath!.slice(0, -1));
+    assert.deepEqual(reopened.entries.map(entry => entry.name), ["001.cbz"]);
+  });
+
+  it("CBR e CBZ participam do índice de busca como HQ válida, não são descartados", async () => {
+    const nodes: FakeNode[] = [
+      { id: ROOT, name: "HQs da Marvel", mimeType: FOLDER, parent: null },
+      { id: "f-cbr", name: "Guerras Secretas 01.cbr", mimeType: "application/x-cbr", parent: ROOT },
+      { id: "f-cbz", name: "Guerras Secretas 02.cbz", mimeType: "application/x-cbz", parent: ROOT },
+      { id: "f-cbr-generico", name: "Capítulo 03", mimeType: "application/x-rar", parent: ROOT },
+    ];
+    const drive = fakeDrive(nodes);
+    const value = new DriveCollectionService(collections, new DriveFolderBrowser(drive.request));
+    const index = await value.rebuildIndex("marvel-hqs");
+    const byName = new Map(index.entries.map(item => [item.entry.name, item.entry]));
+    assert.equal(byName.get("Guerras Secretas 01.cbr")?.format, "cbr");
+    assert.equal(byName.get("Guerras Secretas 02.cbz")?.format, "cbz");
+    assert.equal(byName.get("Capítulo 03")?.format, "cbr");
+    assert.ok([...byName.values()].every(entry => entry.supported), "todo CBR/CBZ reconhecido deve estar marcado como suportado");
   });
 });
 

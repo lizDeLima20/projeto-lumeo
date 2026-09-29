@@ -1,10 +1,9 @@
 import { I18nManager } from "../i18n/I18nManager";
 import { ComicCoverSource, LazyCoverLoader } from "../services/ComicCoverSource";
 import type { CatalogService } from "../services/CatalogService";
-import type { DriveCollectionService, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
+import type { DriveCollectionService, DriveCollectionSearchResult, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 import { BaseView } from "./BaseView";
 
-import { matchesCatalogText } from "../../shared/CatalogTextSearch";
 /**
  * Presents a published Drive collection as a catalogue genre. Drive folders remain the
  * source of truth, but are resolved behind the scenes into named comic sections rather
@@ -17,7 +16,9 @@ export class DriveCollectionGenreView extends BaseView {
   private observer: IntersectionObserver | null = null;
   private readonly loadingFolders = new Set<string>();
   private searchVersion = 0;
-  private rootListing: DriveFolderListing | null = null;
+  private searchQuery = "";
+  private searchResults: readonly DriveCollectionSearchResult[] = [];
+  private isSearching = false;
   private readonly genreActions = new Map<string, () => void>();
   private readonly genreIds = new Set<string>();
   private results: HTMLElement | null = null;
@@ -64,7 +65,6 @@ export class DriveCollectionGenreView extends BaseView {
   private async loadRoot(heading: HTMLElement, status: HTMLElement, sections: HTMLElement): Promise<void> {
     try {
       const root = await this.collections.open(this.collectionId);
-      this.rootListing = root;
       const name = root.breadcrumb[0]?.name ?? "";
       heading.append(this.createElement("span", "eyebrow", this.i18n.t("ui.catalog.genre")), this.createElement("h1", "page-title", name));
       const files = root.entries.filter(entry => entry.kind === "file");
@@ -85,7 +85,11 @@ export class DriveCollectionGenreView extends BaseView {
     const body = this.createElement("div", "drive-collection-section__body");
     const loading = this.createElement("p", "drive-collection-section__loading", this.i18n.t("ui.common.loading"));
     body.append(loading); section.append(title, body); parent.append(section);
-    const path = [...parentListing.breadcrumb.map(step => step.id), folder.id];
+    // folder.collectionPath is the real, walkable id chain the BFF computed for this exact
+    // entry. Rebuilding it from parentListing.breadcrumb instead would be wrong for any
+    // collection with more than one physical Drive root: the breadcrumb always opens on the
+    // collection's own display name, never the actual root a folder came from.
+    const path = folder.collectionPath ?? [...parentListing.breadcrumb.map(step => step.id), folder.id];
     const load = (): void => void this.loadFolder(folder, path, body, loading);
     if (eager || typeof IntersectionObserver !== "function") { load(); return; }
     this.observer ??= new IntersectionObserver(entries => entries.forEach(entry => {
@@ -181,38 +185,40 @@ export class DriveCollectionGenreView extends BaseView {
     container.addEventListener("click", event => { if (!suppressClick) return; event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }, true);
   }
   private async search(raw: string): Promise<void> {
-    const query = raw.trim();
+    this.searchQuery = raw;
+    const query = this.searchQuery.trim();
     const version = ++this.searchVersion;
-    if (!query) { this.results?.replaceChildren(); this.sections?.removeAttribute("hidden"); if (this.status) this.status.textContent = ""; return; }
-    this.sections?.setAttribute("hidden", ""); this.results?.replaceChildren();
+    this.isSearching = Boolean(query);
+    this.results?.toggleAttribute("aria-busy", this.isSearching);
+    if (!query) {
+      this.searchResults = [];
+      this.results?.replaceChildren();
+      this.sections?.removeAttribute("hidden");
+      if (this.status) this.status.textContent = "";
+      return;
+    }
+    this.sections?.setAttribute("hidden", "");
+    this.results?.replaceChildren();
     if (this.status) this.status.textContent = this.i18n.t("ui.common.loading");
     try {
-      const root = this.rootListing ?? await this.collections.open(this.collectionId);
-      const queue: DriveFolderListing[] = [root]; const visited = new Set<string>(); const seenFiles = new Set<string>();
-      const groups: Array<{ listing: DriveFolderListing; entries: DriveFolderEntry[]; label: string }> = [];
-      while (queue.length) {
-        if (version !== this.searchVersion) return;
-        const listing = queue.shift()!;
-        if (visited.has(listing.folderId)) continue;
-        visited.add(listing.folderId);
-        const entries = listing.entries.filter(entry => {
-          if (entry.kind !== "file" || seenFiles.has(entry.id)) return false;
-          const searchable = [entry.name, entry.description, ...listing.breadcrumb.slice(1).map(step => step.name)];
-          if (!matchesCatalogText(query, searchable)) return false;
-          seenFiles.add(entry.id); return true;
-        });
-        if (entries.length) groups.push({ listing, entries, label: listing.breadcrumb[listing.breadcrumb.length - 1]?.name ?? "" });
-        for (const folder of listing.entries.filter(entry => entry.kind === "folder")) {
-          if (visited.has(folder.id)) continue;
-          const path = [...listing.breadcrumb.map(step => step.id), folder.id];
-          try { queue.push(await this.collections.open(this.collectionId, folder.id, path)); } catch { /* Continue in reachable folders. */ }
-        }
-      }
+      const matches = await this.collections.search(query, this.collectionId);
       if (version !== this.searchVersion) return;
+      this.searchResults = matches;
+      const groups = new Map<string, { listing: DriveFolderListing; entries: DriveFolderEntry[]; label: string }>();
+      this.searchResults.forEach(({ listing, entry }) => {
+        const existing = groups.get(listing.folderId);
+        if (existing) { existing.entries.push(entry); return; }
+        groups.set(listing.folderId, {
+          listing, entries: [entry],
+          label: listing.breadcrumb[listing.breadcrumb.length - 1]?.name ?? "",
+        });
+      });
       groups.forEach(group => this.appendCarousel(this.results!, group.listing, group.entries, group.label));
-      if (this.status) this.status.textContent = groups.length ? "" : this.i18n.t("ui.catalog.empty");
+      if (this.status) this.status.textContent = matches.length ? "" : this.i18n.t("ui.collections.noResults");
     } catch {
       if (version === this.searchVersion && this.status) this.status.textContent = this.i18n.t("ui.collections.failed");
+    } finally {
+      if (version === this.searchVersion) { this.isSearching = false; this.results?.removeAttribute("aria-busy"); }
     }
   }
 }

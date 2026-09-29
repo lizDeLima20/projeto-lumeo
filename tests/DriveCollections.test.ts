@@ -26,7 +26,8 @@ const listing = (folderId: string, entries: unknown[], breadcrumb: unknown[]) =>
  *  them - one request per collection, not one per folder. */
 function marvelAndDcIndexes(): Record<string, unknown> {
   const dcRoot = "dc-root";
-  const file = (id: string, name: string) => ({ id, name, kind: "file", mimeType: "application/pdf", format: "pdf", supported: true, size: 10, modifiedAt: null });
+  const file = (id: string, name: string, format: "pdf" | "cbr" | "cbz" = "pdf") =>
+    ({ id, name, kind: "file", mimeType: "application/pdf", format, supported: true, size: 10, modifiedAt: null });
   const indexed = (entry: unknown, breadcrumb: unknown[]) => ({ entry, breadcrumb });
   return {
     "/collections": { items: [
@@ -35,13 +36,14 @@ function marvelAndDcIndexes(): Record<string, unknown> {
     ] },
     "/collections/marvel-hqs/search-index": { collectionId: "marvel-hqs", entries: [
       indexed(file("h1", "Hulk 001.pdf"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "hulk", name: "Hulk" }]),
-      indexed(file("h2", "O Incrível Hulk 002.cbz"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "hulk", name: "Hulk" }]),
+      indexed(file("h2", "O Incrível Hulk 002.cbz", "cbz"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "hulk", name: "Hulk" }]),
       indexed(file("v1", "Os Vingadores 001.pdf"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "vingadores", name: "Os Vingadores" }]),
-      indexed(file("v2", "Vingadores Ultimato.cbz"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "vingadores", name: "Os Vingadores" }]),
+      indexed(file("v2", "Vingadores Ultimato.cbz", "cbz"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "vingadores", name: "Os Vingadores" }]),
       indexed(file("e1", "Doutor_Estranho-001.pdf"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "estranho", name: "Doutor Estranho" }]),
+      indexed(file("w1", "Wolverine 001.cbr", "cbr"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "wolverine", name: "Wolverine" }]),
     ] },
     "/collections/dc-hqs/search-index": { collectionId: "dc-hqs", entries: [
-      indexed(file("d1", "Ano Um 01.cbz"), [{ id: dcRoot, name: "HQs da DC" }, { id: "batman", name: "Batman" }]),
+      indexed(file("d1", "Ano Um 01.cbz", "cbz"), [{ id: dcRoot, name: "HQs da DC" }, { id: "batman", name: "Batman" }]),
     ] },
   };
 }
@@ -104,6 +106,26 @@ describe("coleções publicadas no cliente", () => {
     const requestsAfterIndex = calls.length;
     await service.search("vingadores");
     assert.equal(calls.length, requestsAfterIndex, "a pesquisa seguinte deve reutilizar o catálogo completo indexado");
+  });
+
+  it("Wolverine dentro de HQs da Marvel encontra a HQ, e não vaza para a DC", async () => {
+    const { api } = fakeApi(marvelAndDcIndexes());
+    const service = new DriveCollectionService(api);
+    const marvel = await service.search("wolverine", "marvel-hqs");
+    assert.equal(marvel.length, 1);
+    assert.equal(marvel[0]!.entry.format, "cbr");
+    assert.equal((await service.search("wolverine", "dc-hqs")).length, 0);
+  });
+
+  it("CBR e CBZ aparecem na busca como qualquer outra HQ, com o formato preservado", async () => {
+    const { api } = fakeApi(marvelAndDcIndexes());
+    const service = new DriveCollectionService(api);
+    const [cbz] = await service.search("incrível hulk", "marvel-hqs");
+    assert.equal(cbz!.entry.format, "cbz");
+    const [cbr] = await service.search("wolverine 001", "marvel-hqs");
+    assert.equal(cbr!.entry.format, "cbr");
+    const [dcCbz] = await service.search("batman", "dc-hqs");
+    assert.equal(dcCbz!.entry.format, "cbz");
   });
 
   it("5. a primeira busca faz exatamente uma chamada de índice por coleção necessária", async () => {
@@ -181,6 +203,8 @@ describe("coleções: integração e limites", () => {
     assert.match(explorer, /addGenre\(`collection:\$\{collection\.id\}`/);
     assert.doesNotMatch(explorer, /catalog__collection/);
     assert.match(explorer, /published\.collections\.search\(normalizedQuery\)/);
+    assert.doesNotMatch(explorer, /HQs da Marvel e DC|publishedSection|publishedResults/);
+    assert.match(explorer, /this\.classified\.append\(this\.comicCard\(result\)\)/);
     // The reader, the comic reader and the library were not touched by this feature.
     assert.doesNotMatch(source("src/views/ReaderView.ts"), /collection[A-Z]|DriveCollection/);
     assert.doesNotMatch(source("src/views/ComicReaderView.ts"), /DriveCollection/);

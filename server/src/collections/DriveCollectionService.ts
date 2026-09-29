@@ -68,12 +68,18 @@ export class DriveCollectionService {
     return index;
   }
 
+  /** `breadcrumb` is the display trail - it always opens on the collection's own name, the
+   *  same way open() shows it, whichever physical root an entry actually came from.
+   *  `path` is the real, walkable id chain (starting at the actual root - the main one or
+   *  one of sourceRootFolderIds) that the client must send back to open() or download a
+   *  file. The two are tracked separately during the walk so every entry's collectionPath
+   *  stays genuinely navigable, no matter how many physical roots the collection has. */
   private async buildIndex(collection: DriveCollection): Promise<CollectionIndex> {
     const results: CollectionIndexEntry[] = [];
     const visitedFolders = new Set<string>();
     const seenFiles = new Set<string>();
     const root = [{ id: collection.rootFolderId, name: collection.name }];
-    const walk = async (folderId: string, breadcrumb: readonly { id: string; name: string }[]): Promise<void> => {
+    const walk = async (folderId: string, breadcrumb: readonly { id: string; name: string }[], path: readonly string[]): Promise<void> => {
       if (visitedFolders.has(folderId) || visitedFolders.size >= DriveCollectionService.maxIndexedFolders) return;
       visitedFolders.add(folderId);
       const children = await this.entries(folderId, collection);
@@ -82,11 +88,11 @@ export class DriveCollectionService {
         if (child.kind === "folder") { subfolders.push({ id: child.id, name: child.name }); continue; }
         if (seenFiles.has(child.id)) continue;
         seenFiles.add(child.id);
-        results.push({ entry: { ...child, parentId: folderId, collectionPath: [...breadcrumb.map(step => step.id), child.id] }, breadcrumb });
+        results.push({ entry: { ...child, parentId: folderId, collectionPath: [...path, child.id] }, breadcrumb });
       }
-      await Promise.all(subfolders.map(sub => walk(sub.id, [...breadcrumb, sub])));
+      await Promise.all(subfolders.map(sub => walk(sub.id, [...breadcrumb, sub], [...path, sub.id])));
     };
-    await Promise.all(this.rootIds(collection).map(rootId => walk(rootId, root)));
+    await Promise.all(this.rootIds(collection).map(rootId => walk(rootId, root, [rootId])));
     return { collectionId: collection.id, entries: results };
   }
 

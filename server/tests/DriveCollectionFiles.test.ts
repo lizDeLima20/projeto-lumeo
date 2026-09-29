@@ -64,6 +64,33 @@ describe("tipos de arquivo vêm da metadata do Drive", () => {
     assert.equal(classifier.format("application/octet-stream", "notas"), "unknown");
     assert.equal(classifier.format("", "qualquer coisa"), "unknown");
   });
+  it("CBZ é reconhecido, com extensão e sem", () => {
+    assert.equal(classifier.format("application/x-cbz", "Capítulo 01.cbz"), "cbz");
+    assert.equal(classifier.format("application/vnd.comicbook+zip", "x"), "cbz");
+    assert.equal(classifier.format("application/octet-stream", "Capítulo 02.cbz"), "cbz");
+    assert.equal(classifier.isSupported("cbz"), true);
+  });
+  it("maiúsculo/minúsculo não muda o resultado: .CBR e .CBZ são reconhecidos", () => {
+    assert.equal(classifier.format("application/octet-stream", "Capítulo 01.CBR"), "cbr");
+    assert.equal(classifier.format("application/octet-stream", "Capítulo 02.CBZ"), "cbz");
+    assert.equal(classifier.format("APPLICATION/X-CBR", "x"), "cbr");
+  });
+  it("Drive rotula RAR/ZIP reais sem o mimeType 'oficial' de CBR/CBZ - ainda são HQ", () => {
+    // application/x-rar (sem o "-compressed") e application/rar aparecem em uploads reais,
+    // inclusive sem nenhuma extensão no nome.
+    assert.equal(classifier.format("application/x-rar", "Capítulo 421"), "cbr");
+    assert.equal(classifier.format("application/rar", "Capítulo 421"), "cbr");
+    // application/zip é como o Drive descreve um CBZ genuíno - a coleção é só de HQs, então
+    // um zip aqui é uma HQ, mesmo com nome "Capítulo 12.cbz.zip" ou sem extensão nenhuma.
+    assert.equal(classifier.format("application/zip", "Viuva Negra 1 de 3.zip"), "cbz");
+    assert.equal(classifier.format("application/zip", "Capítulo 12.cbz.zip"), "cbz");
+  });
+  it("um arquivo genuinamente arbitrário continua fora: imagem solta, texto, tipo desconhecido", () => {
+    assert.equal(classifier.format("image/jpeg", "21.jpg"), "unknown");
+    assert.equal(classifier.format("text/plain", "Info for Comic Collectors.txt"), "unknown");
+    assert.equal(classifier.format("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "relatorio.docx"), "unknown");
+    assert.equal(classifier.isSupported("unknown"), false);
+  });
 });
 
 describe("listagem da pasta com os tipos reais", () => {

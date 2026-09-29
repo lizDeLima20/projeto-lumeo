@@ -12,8 +12,14 @@ const BY_MIME = new Map<string, DriveEntryFormat>([
   ["application/vnd.comicbook-rar", "cbr"],
   ["application/x-rar-compressed", "cbr"],
   ["application/vnd.rar", "cbr"],
+  // Drive content-sniffs a lot of real CBR/CBZ uploads down to the bare archive type,
+  // extension or not - a "Capítulo 12" with no extension at all is still a CBR when Drive
+  // says it is RAR data.
+  ["application/x-rar", "cbr"],
+  ["application/rar", "cbr"],
   ["application/x-cbz", "cbz"],
   ["application/vnd.comicbook+zip", "cbz"],
+  ["application/zip", "cbz"],
 ]);
 
 /** Types Drive uses when it simply does not know. Only for these does the filename get a
@@ -38,8 +44,7 @@ export class DriveEntryClassifier {
     return this.extension(name) ?? "unknown";
   }
 
-  /** What Lumeo can actually open today. CBR and CBZ are recognized so the reader sees the
-   *  file and knows what it is, but there is no comic-archive reader yet. */
+  /** What Lumeo can actually open: PDF and EPUB for books, PDF/CBR/CBZ for comics. */
   public isSupported(format: DriveEntryFormat): boolean { return format === "pdf" || format === "epub" || format === "cbr" || format === "cbz"; }
 
   private extension(name: string): DriveEntryFormat | null {

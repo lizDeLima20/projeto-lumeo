@@ -453,9 +453,16 @@ export class App {
   }
   private async locateBookFile(id:string):Promise<void>{const book=this.findBook(id);if(!book)return;const input=document.createElement("input");input.type="file";input.accept=book.fileType==="pdf"?"application/pdf,.pdf":"application/epub+zip,.epub";input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{const imported=await new LocalFileImporter().import(file);if(imported.fileType!==book.fileType)throw new Error("Selecione o mesmo formato do livro.");await this.localFileStore().save(book.id,file);await new LimaConversionManager(this.limaDocuments,this.books).convert(book,file);book.availability=book.conversionStatus==="failed"?"INVALID_FILE":"AVAILABLE";await this.books.save(book);this.syncBook(book);this.router.navigate("book",{id});this.showToast("Arquivo local restaurado.");}catch(error){this.showToast(error instanceof Error?error.message:"Não foi possível localizar o arquivo.");}});input.click();}
 
+  /** `entry.collectionPath` is the real, walkable id chain the BFF computed for this exact
+   *  entry - the only thing safe to send back to open() when the collection has more than
+   *  one physical Drive root, because `listing.breadcrumb` always opens on the collection's
+   *  own display name (never the real root an entry came from). Falls back to the listing's
+   *  own trail only for entries some older caller built without collectionPath. */
   private openComicDetails(collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing): void {
-    this.router.navigate("comic", { id: collectionId, file: entry.id, folder: listing.folderId,
-      path: listing.breadcrumb.map(step => step.id).join(",") });
+    const trail = entry.collectionPath?.slice(0, -1)
+      ?? [listing.sourceRootId ?? listing.breadcrumb[0]?.id ?? "", ...listing.breadcrumb.slice(1).map(step => step.id)];
+    this.router.navigate("comic", { id: collectionId, file: entry.id, folder: trail[trail.length - 1] ?? listing.folderId,
+      path: trail.join(",") });
   }
 
   private collectionImporter(): CollectionImportService {
