@@ -108,11 +108,28 @@ describe("adicionar a HQ à biblioteca", () => {
     assert.equal(reopened.availability, "AVAILABLE");
     assert.equal(new ComicContentTypeResolver().isComic(reopened), true);
   });
-  it("CBR não entra e nem é baixado", async () => {
+  it("um formato genuinamente não suportado não entra e nem é baixado", async () => {
     const { add, downloaded } = environment();
     await assert.rejects(() => add(comic("cbr", { format: "cbr", supported: false, contentType: undefined }), listing(["x", "X"])),
       (error: unknown) => error instanceof CollectionFormatUnsupportedError && error.format === "cbr");
     assert.deepEqual(downloaded, []);
+  });
+
+  it("o mimeType que o Drive realmente devolve para CBR/CBZ reais não é rejeitado como conteúdo errado", () => {
+    // ComicArchiveSource needs a real RAR/ZIP worker (libarchive.js/WASM) to actually open an
+    // archive, which this suite has no fixture for - so this pins the narrower, fully unit-
+    // testable rule LocalFileImporter.import() checks first: the downloaded file's mimeType
+    // must be in its own per-extension whitelist, or the file is rejected before the archive
+    // is even opened. A real Marvel .cbr comes back from Drive as "application/x-rar" (not
+    // "application/x-rar-compressed"), and a real .cbz as "application/zip" - both of which
+    // this whitelist must include, the same way DriveEntryClassifier already recognizes them
+    // server-side as cbr/cbz.
+    const importer = source("importers/LocalFileImporter.ts");
+    const cbrLine = /cbr: \[([^\]]+)\]/.exec(importer)![1]!;
+    const cbzLine = /cbz: \[([^\]]+)\]/.exec(importer)![1]!;
+    assert.match(cbrLine, /"application\/x-rar"/);
+    assert.match(cbrLine, /"application\/rar"/);
+    assert.match(cbzLine, /"application\/zip"/);
   });
 });
 

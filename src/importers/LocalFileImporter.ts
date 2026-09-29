@@ -11,7 +11,11 @@ export class LocalFileImporter implements BookImporter {
   private readonly mimeTypes: Record<BookFileType, readonly string[]> = {
     pdf: ["application/pdf", "application/octet-stream"],
     epub: ["application/epub+zip", "application/octet-stream"],
-    cbr: ["application/x-cbr", "application/vnd.comicbook-rar", "application/x-rar-compressed", "application/vnd.rar", "application/octet-stream"],
+    // Drive content-sniffs a lot of real CBR/CBZ uploads down to the bare archive type - the
+    // same application/x-rar and application/rar DriveEntryClassifier already recognizes as
+    // CBR server-side. A downloaded file keeps that mimeType, so the import check needs to
+    // accept it too, or a real CBR from Drive gets rejected here as "wrong content".
+    cbr: ["application/x-cbr", "application/vnd.comicbook-rar", "application/x-rar-compressed", "application/x-rar", "application/rar", "application/vnd.rar", "application/octet-stream"],
     cbz: ["application/x-cbz", "application/vnd.comicbook+zip", "application/zip", "application/x-zip-compressed", "application/octet-stream"],
   };
   public async import(file: File, source: ImportedFile["source"] = "device"): Promise<ImportedFile> {
