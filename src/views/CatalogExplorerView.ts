@@ -134,10 +134,16 @@ export class CatalogExplorerView extends BaseView {
     try {
       const normalizedQuery = query.trim(); const firstPage = this.cursor === null;
       this.searchQuery = query; this.isSearching = Boolean(normalizedQuery);
-      const [page, comics] = await Promise.all([
-        this.catalog.list({ cursor: this.cursor ?? undefined, query: normalizedQuery || undefined, genreId: genreId || undefined }),
-        firstPage && normalizedQuery && !genreId && this.published ? this.published.collections.search(normalizedQuery) : Promise.resolve([]),
-      ]);
+      // Comics live behind a far slower search of their own - a full, live walk of every
+      // Drive collection folder - that can take much longer than the catalogue's own,
+      // already-indexed lookup. Firing it apart from the catalogue fetch, rather than
+      // Promise.all-ing the two together, keeps a comic-inclusive search from making
+      // "Carregando..." sit for as long as the slower of the two, when the reader's book
+      // results are ready far sooner; appendComics() slots comics in once they do arrive.
+      if (firstPage && normalizedQuery && !genreId && this.published) {
+        void this.published.collections.search(normalizedQuery).catch(() => []).then(comics => this.appendComics(comics, version));
+      }
+      const page = await this.catalog.list({ cursor: this.cursor ?? undefined, query: normalizedQuery || undefined, genreId: genreId || undefined });
       if (version !== this.loadVersion) return;
       page.genres?.forEach((genre) => this.addCatalogGenre(genre.id, genre.name));
       // "Todos os gêneros" reaches every genre's own catalogue at once, so the same title
@@ -154,14 +160,9 @@ export class CatalogExplorerView extends BaseView {
         this.bestByIdentity.set(key, { rank, element });
         this.classified.append(element);
       });
-      comics.filter(result => !this.loaded.has("comic:" + result.collection.id + ":" + result.entry.id)).forEach(result => {
-        this.loaded.add("comic:" + result.collection.id + ":" + result.entry.id);
-        this.classified.append(this.comicCard(result));
-      });
-      if (firstPage && normalizedQuery) this.searchResults = [...page.items, ...comics];
+      if (firstPage && normalizedQuery) this.searchResults = [...page.items];
       this.cursor = page.nextCursor ?? "end"; more.hidden = this.cursor === "end";
-      const empty = this.isSearching ? this.searchResults.length === 0 : this.loaded.size === 0;
-      this.status!.textContent = empty ? this.t("ui.catalog.empty") : "";
+      this.refreshStatus();
       this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
     } catch (error) {
       if (version === this.loadVersion) this.status!.textContent = error instanceof Error ? error.message : this.t("ui.catalog.offline");
@@ -171,6 +172,23 @@ export class CatalogExplorerView extends BaseView {
       this.pendingLoad = null;
       if (pending) void this.load(pending.query, pending.genreId, pending.more);
     }
+  }
+  /** Slots comics into an already-rendered search once their much slower fetch resolves.
+   *  `version` guards against a comic search left over from a query the reader has since
+   *  changed - `this.loadVersion` has moved on by then, and the stale batch is dropped. */
+  private appendComics(comics: readonly DriveCollectionSearchResult[], version: number): void {
+    if (version !== this.loadVersion) return;
+    comics.filter(result => !this.loaded.has("comic:" + result.collection.id + ":" + result.entry.id)).forEach(result => {
+      this.loaded.add("comic:" + result.collection.id + ":" + result.entry.id);
+      this.classified.append(this.comicCard(result));
+    });
+    this.searchResults = [...this.searchResults, ...comics];
+    this.refreshStatus();
+    this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
+  }
+  private refreshStatus(): void {
+    const empty = this.isSearching ? this.searchResults.length === 0 : this.loaded.size === 0;
+    this.status!.textContent = empty ? this.t("ui.catalog.empty") : "";
   }
   private comicCard(result: DriveCollectionSearchResult): HTMLElement {
     const { collection, entry, listing } = result;
