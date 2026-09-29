@@ -28,6 +28,7 @@ import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalog
 import { StructuredDriveCatalogProvider } from "./catalog/StructuredDriveCatalogProvider.js";
 import { PublicDriveFolderReader } from "./catalog/PublicDriveFolderReader.js";
 import { DriveCollectionService } from "./collections/DriveCollectionService.js";
+import { SupabaseCollectionIndexStore } from "./collections/SupabaseCollectionIndexStore.js";
 import { DriveFolderBrowser } from "./collections/DriveFolderBrowser.js";
 import { DriveRequestLimiter } from "./collections/DriveRequestLimiter.js";
 import { UserPersistenceRepository } from "./repositories/UserPersistenceRepository.js";
@@ -38,9 +39,12 @@ export const isPublicCatalogRequest = (method: string | undefined, path: string)
   method === "GET" && /^\/api\/catalog\/books(?:\/[^/]+(?:\/download)?)?$/.test(path);
 
 /** Published collections are public reading material, exactly like the catalogue: browsing
- * a folder must never ask the reader to sign in to Lumeo, let alone to Google. */
+ * a folder must never ask the reader to sign in to Lumeo, let alone to Google. Reindex is
+ * the one write here, and it is never a Lumeo account: it is public in the same sense
+ * (no Bearer token expected), gated instead by its own shared secret inside the handler. */
 export const isPublicCollectionRequest = (method: string | undefined, path: string): boolean =>
-  method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/(?:folders(?:\/[A-Za-z0-9_-]+)?|search-index))?$/i.test(path);
+  (method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/(?:folders(?:\/[A-Za-z0-9_-]+)?|search-index))?$/i.test(path))
+  || (method === "POST" && /^\/api\/collections\/[a-z0-9-]+\/reindex$/i.test(path));
 
 export class ServerApp {
   public static create(config: ServerConfig = Config.fromEnvironment()): RequestHandler {
@@ -83,7 +87,11 @@ export class ServerApp {
         new UserPersistenceRepository(supabase.admin),
         new CatalogSourceAdminService(sourceStore, configuredSources, catalogSources, (userId) => catalogStore.isAdmin(userId)),
         // The Drive tree is the navigation: this only ever lists the folder that was asked for.
-        new DriveCollectionService(config.driveCollections, new DriveFolderBrowser((url) => createDrive().request(url), new DriveRequestLimiter())),
+        // The materialized search index lives in Supabase Storage, not the database - no
+        // migration needed, and it is metadata only, never a comic's own bytes.
+        new DriveCollectionService(config.driveCollections, new DriveFolderBrowser((url) => createDrive().request(url), new DriveRequestLimiter()),
+          {}, new SupabaseCollectionIndexStore(supabase.admin)),
+        config.collectionReindexSecret,
       );
       return controller;
     };

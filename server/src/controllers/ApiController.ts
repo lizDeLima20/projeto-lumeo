@@ -23,6 +23,7 @@ export class ApiController {
     private readonly persistence?: UserPersistenceStore,
     private readonly catalogSources?: CatalogSourceAdminService,
     private readonly collections?: DriveCollectionService,
+    private readonly collectionReindexSecret?: string,
   ) {}
 
   public async handle(request: AuthenticatedRequest, response: ApiResponse, path: string): Promise<void> {
@@ -66,6 +67,17 @@ export class ApiController {
       if (request.method === "GET" && searchIndex) {
         if (!this.collections) throw new ApiError(503, "COLLECTIONS_UNAVAILABLE", "As coleções não estão disponíveis.");
         return this.json(response, 200, await this.collections.searchIndex(searchIndex[1]!));
+      }
+      // The one route allowed to pay for the full Drive crawl. Never a user's search:
+      // gated by its own shared secret instead of Lumeo account auth, so it can run as a
+      // plain maintenance call. An unconfigured secret refuses every request.
+      const reindex = /^\/api\/collections\/([a-z0-9-]+)\/reindex$/i.exec(path);
+      if (request.method === "POST" && reindex) {
+        if (!this.collections) throw new ApiError(503, "COLLECTIONS_UNAVAILABLE", "As coleções não estão disponíveis.");
+        if (!this.collectionReindexSecret || request.headers["x-reindex-secret"] !== this.collectionReindexSecret) {
+          throw new ApiError(403, "REINDEX_FORBIDDEN", "Segredo de reindexação ausente ou incorreto.");
+        }
+        return this.json(response, 200, await this.collections.rebuildIndex(reindex[1]!));
       }
       await this.authMiddleware.requireAuth(request);
       const user = request.user;

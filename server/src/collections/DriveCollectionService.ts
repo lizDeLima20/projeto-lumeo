@@ -1,4 +1,5 @@
 import { ApiError } from "../errors/ApiError.js";
+import type { CollectionIndexStore } from "./CollectionIndexStore.js";
 import { DriveFolderBrowser, DriveFolderUnavailableError } from "./DriveFolderBrowser.js";
 import { DriveFolderCache } from "./DriveFolderCache.js";
 import { sortEntries } from "./NaturalOrder.js";
@@ -25,6 +26,7 @@ export class DriveCollectionService {
     private readonly collections: readonly DriveCollection[],
     private readonly browser: DriveFolderBrowser,
     caches: { entries?: DriveFolderCache<readonly DriveFolderEntry[]>; index?: DriveFolderCache<Promise<CollectionIndex>> } = {},
+    private readonly store?: CollectionIndexStore,
   ) {
     this.entryCache = caches.entries ?? new DriveFolderCache<readonly DriveFolderEntry[]>();
     this.indexCache = caches.index ?? new DriveFolderCache<Promise<CollectionIndex>>(300_000, 20);
@@ -32,20 +34,38 @@ export class DriveCollectionService {
 
   public list(): readonly DriveCollection[] { return this.collections; }
 
-  /** The whole collection, flattened to its files, for search: every screen the reader
-   *  never opened still gets crawled once, here, on the server - never per keystroke, and
-   *  never from the phone one folder at a time. Only a registered collection can be
-   *  indexed; the id is looked up in the same registry `open()` uses, never trusted as a
-   *  raw Drive id. */
+  /** A user's search: reads the index the separate rebuild already materialized. Never
+   *  crawls Drive itself - a large collection's crawl can take well over a minute, and
+   *  nobody's search should ever pay for that. Missing or unreadable index fails fast
+   *  (COLLECTION_INDEX_UNAVAILABLE) instead of silently falling back to a live crawl. */
   public async searchIndex(collectionId: string): Promise<CollectionIndex> {
     const collection = this.collections.find(item => item.id === collectionId);
     if (!collection) throw new ApiError(404, "COLLECTION_NOT_FOUND", "Esta coleção não existe.");
     const cached = this.indexCache.get(collectionId);
     if (cached) return cached;
-    const pending = this.buildIndex(collection);
+    const pending = this.loadIndex(collection);
     this.indexCache.set(collectionId, pending);
     pending.catch(() => this.indexCache.delete(collectionId));
     return pending;
+  }
+
+  private async loadIndex(collection: DriveCollection): Promise<CollectionIndex> {
+    const stored = this.store ? await this.store.get(collection.id) : null;
+    if (!stored) throw new ApiError(503, "COLLECTION_INDEX_UNAVAILABLE", "O índice de busca desta coleção ainda não está pronto.");
+    return stored;
+  }
+
+  /** The expensive crawl - only ever run by the separate reindex endpoint, never by a
+   *  user's search. Persists the result to the store (when one is configured) so the next
+   *  cold instance can read it instead of crawling again, and warms this instance's own
+   *  cache immediately. */
+  public async rebuildIndex(collectionId: string): Promise<CollectionIndex> {
+    const collection = this.collections.find(item => item.id === collectionId);
+    if (!collection) throw new ApiError(404, "COLLECTION_NOT_FOUND", "Esta coleção não existe.");
+    const index = await this.buildIndex(collection);
+    if (this.store) await this.store.put(index);
+    this.indexCache.set(collectionId, Promise.resolve(index));
+    return index;
   }
 
   private async buildIndex(collection: DriveCollection): Promise<CollectionIndex> {

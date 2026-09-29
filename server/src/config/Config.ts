@@ -25,6 +25,10 @@ export interface ServerConfig {
   catalogSyncMaxFileBytes: number;
   /** Published Drive folders browsed live, folder by folder. */
   driveCollections: readonly DriveCollection[];
+  /** Gates POST /collections/:id/reindex - the one route allowed to pay for the full
+   *  crawl, deliberately outside normal Lumeo account auth so it can run as a plain
+   *  maintenance call. Empty means the route refuses every request, never falls open. */
+  collectionReindexSecret: string;
 }
 
 export class Config {
@@ -71,6 +75,7 @@ export class Config {
       googleCatalogServiceAccountJson: environment.GOOGLE_CATALOG_SERVICE_ACCOUNT_JSON ?? "",
       catalogSyncMaxFileBytes: Number(environment.CATALOG_SYNC_MAX_FILE_BYTES ?? 104_857_600),
       driveCollections: driveCollectionsFromEnvironment(environment.DRIVE_COLLECTIONS_JSON),
+      collectionReindexSecret: environment.COLLECTION_REINDEX_SECRET ?? "",
     };
   }
 
