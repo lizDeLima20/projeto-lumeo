@@ -25,6 +25,9 @@ export class DriveFolderCache<T> {
     }
   }
 
+  /** Evicts one key outright - used when what was cached turned out to fail, so the next
+   *  caller retries instead of waiting out the rest of the TTL on a dead entry. */
+  public delete(key: string): void { this.values.delete(key); }
   public clear(): void { this.values.clear(); }
   public get size(): number { return this.values.size; }
 }

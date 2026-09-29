@@ -40,7 +40,7 @@ export const isPublicCatalogRequest = (method: string | undefined, path: string)
 /** Published collections are public reading material, exactly like the catalogue: browsing
  * a folder must never ask the reader to sign in to Lumeo, let alone to Google. */
 export const isPublicCollectionRequest = (method: string | undefined, path: string): boolean =>
-  method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/folders(?:\/[A-Za-z0-9_-]+)?)?$/i.test(path);
+  method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/(?:folders(?:\/[A-Za-z0-9_-]+)?|search-index))?$/i.test(path);
 
 export class ServerApp {
   public static create(config: ServerConfig = Config.fromEnvironment()): RequestHandler {

@@ -51,3 +51,19 @@ export interface DriveFolderListing {
   warnings: readonly { code: string; entryId: string; name: string }[];
   sourceRootId?: string;
 }
+
+/** One file found anywhere in a collection's tree, with the breadcrumb of the folder it
+ *  actually sits in (root first, immediate parent last) - everything the client needs to
+ *  filter by matchesCatalogText() and to render/open it, without another round trip. */
+export interface CollectionIndexEntry {
+  entry: DriveFolderEntry;
+  breadcrumb: readonly { id: string; name: string }[];
+}
+
+/** The full, flattened, files-only listing of one published collection - what
+ *  DriveCollectionService.search() used to reconstruct itself, one folder request at a
+ *  time, from the client. */
+export interface CollectionIndex {
+  collectionId: string;
+  entries: readonly CollectionIndexEntry[];
+}

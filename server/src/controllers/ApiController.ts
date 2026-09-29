@@ -60,6 +60,13 @@ export class ApiController {
         return this.json(response, 200, await this.collections.open(folders[1]!, folders[2],
           trail ? trail.split(",").map(step => step.trim()).filter(Boolean) : undefined));
       }
+      // The whole collection, flattened for search, crawled once here instead of one
+      // folder request per screen from the phone.
+      const searchIndex = /^\/api\/collections\/([a-z0-9-]+)\/search-index$/i.exec(path);
+      if (request.method === "GET" && searchIndex) {
+        if (!this.collections) throw new ApiError(503, "COLLECTIONS_UNAVAILABLE", "As coleções não estão disponíveis.");
+        return this.json(response, 200, await this.collections.searchIndex(searchIndex[1]!));
+      }
       await this.authMiddleware.requireAuth(request);
       const user = request.user;
       if (!user) throw new ApiError(401, "AUTH_REQUIRED", "Autenticação necessária.");

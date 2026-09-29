@@ -198,6 +198,125 @@ describe("coleções do Drive: cache e limites", () => {
   });
 });
 
+describe("coleções do Drive: índice de busca (server-side)", () => {
+  it("1. percorre subpastas, achatando o índice inteiro num só resultado", async () => {
+    const { drive, service: value } = service();
+    const index = await value.searchIndex("marvel-hqs");
+    assert.deepEqual(index.entries.map(item => item.entry.name).sort(), [
+      "Arte.pdf", "Capítulo 01.pdf", "Capítulo 02.pdf", "Capítulo 10.pdf", "Especial.pdf", "Leia-me.pdf",
+    ]);
+    // Toda a árvore foi lida no servidor - o cliente nunca vê essas chamadas.
+    assert.ok(drive.calls.length >= 6, "deveria ter percorrido pastas suficientes para achar todos os arquivos");
+  });
+
+  it("2. o breadcrumb de um arquivo em profundidade reflete o caminho real até ele", async () => {
+    const { service: value } = service();
+    const index = await value.searchIndex("marvel-hqs");
+    const arte = index.entries.find(item => item.entry.name === "Arte.pdf")!;
+    assert.deepEqual(arte.breadcrumb.map(step => step.name), ["HQs da Marvel", "STAR WARS", "Volume 01", "Extras"]);
+    const leiaMe = index.entries.find(item => item.entry.name === "Leia-me.pdf")!;
+    assert.deepEqual(leiaMe.breadcrumb.map(step => step.name), ["HQs da Marvel"]);
+  });
+
+  it("3. Marvel: encontra arquivos da árvore real de Marvel", async () => {
+    const { service: value } = service();
+    const index = await value.searchIndex("marvel-hqs");
+    assert.ok(index.entries.some(item => item.entry.name === "Capítulo 01.pdf"));
+    assert.equal(index.collectionId, "marvel-hqs");
+  });
+
+  it("4. DC: encontra arquivos da árvore real de DC", async () => {
+    const dc = DEFAULT_DRIVE_COLLECTIONS.find(item => item.id === "dc-hqs")!;
+    const batman = "1XeniEgdVAXn_BFYV81LHEN2_GGJlzyWw";
+    const nodes: FakeNode[] = [
+      { id: dc.rootFolderId, name: dc.name, mimeType: FOLDER, parent: null },
+      { id: batman, name: "Batman", mimeType: FOLDER, parent: dc.rootFolderId },
+      { id: "dc-issue-01", name: "Batman 01.pdf", mimeType: "application/pdf", parent: batman },
+    ];
+    const drive = fakeDrive(nodes);
+    const dcService = new DriveCollectionService(DEFAULT_DRIVE_COLLECTIONS, new DriveFolderBrowser(drive.request));
+    const index = await dcService.searchIndex("dc-hqs");
+    assert.deepEqual(index.entries.map(item => item.entry.name), ["Batman 01.pdf"]);
+    assert.deepEqual(index.entries[0]!.breadcrumb.map(step => step.name), ["HQs da DC", "Batman"]);
+  });
+
+  it("7. duas requisições simultâneas compartilham a mesma construção em andamento", async () => {
+    const { drive, service: value } = service();
+    const [first, second] = await Promise.all([value.searchIndex("marvel-hqs"), value.searchIndex("marvel-hqs")]);
+    assert.equal(first, second, "as duas chamadas devem resolver com o mesmo resultado (mesma promise cacheada)");
+    const listCalls = drive.calls.filter(call => call.startsWith("list:")).length;
+    // Se tivesse rodado dois crawls, cada pasta teria sido listada duas vezes.
+    const uniqueFolders = new Set(drive.calls.filter(call => call.startsWith("list:"))).size;
+    assert.equal(listCalls, uniqueFolders, "cada pasta só pode ter sido listada uma vez, mesmo com duas chamadas simultâneas");
+  });
+
+  it("8. TTL expirado permite reconstruir o índice", async () => {
+    let now = 0;
+    const clock = () => now;
+    const indexCache = new DriveFolderCache<Promise<{ collectionId: string; entries: readonly unknown[] }>>(1000, 10, clock);
+    const entryCache = new DriveFolderCache<never>(1000, 200, clock);
+    const drive2 = fakeDrive(marvel);
+    const withClock = new DriveCollectionService(collections, new DriveFolderBrowser(drive2.request),
+      { index: indexCache as never, entries: entryCache as never });
+    const firstResult = await withClock.searchIndex("marvel-hqs");
+    const callsAfterFirst = drive2.calls.length;
+    const secondResult = await withClock.searchIndex("marvel-hqs");
+    assert.equal(firstResult, secondResult, "dentro do TTL, a mesma promise cacheada deve ser reaproveitada");
+    assert.equal(drive2.calls.length, callsAfterFirst, "dentro do TTL não deve haver nova varredura");
+    now = 1001;
+    const thirdResult = await withClock.searchIndex("marvel-hqs");
+    assert.notEqual(thirdResult, secondResult, "depois do TTL, uma nova construção deve substituir a anterior no cache");
+    assert.ok(drive2.calls.length > callsAfterFirst, "depois do TTL expirado (índice e pastas), uma nova varredura real deve acontecer");
+  });
+
+  it("9. uma falha na construção não deixa o cache permanentemente quebrado", async () => {
+    let fail = true;
+    const flakyRequest = async (url: URL): Promise<Response> => {
+      if (fail) { fail = false; return new Response("{}", { status: 503 }); }
+      return fakeDrive(marvel).request(url);
+    };
+    const flaky = new DriveCollectionService(collections, new DriveFolderBrowser(flakyRequest));
+    await assert.rejects(() => flaky.searchIndex("marvel-hqs"));
+    // A segunda tentativa, logo em seguida, não deve continuar presa ao erro anterior.
+    const index = await flaky.searchIndex("marvel-hqs");
+    assert.ok(index.entries.length > 0);
+  });
+
+  it("12. um collectionId inválido é recusado, como em open()", async () => {
+    const { service: value } = service();
+    await assert.rejects(() => value.searchIndex("nao-existe"), (error: unknown) =>
+      error instanceof ApiError && error.code === "COLLECTION_NOT_FOUND");
+  });
+
+  it("o endpoint /search-index é público, como /folders", async () => {
+    const { isPublicCollectionRequest } = await import("../src/app.js");
+    assert.equal(isPublicCollectionRequest("GET", "/api/collections/marvel-hqs/search-index"), true);
+    assert.equal(isPublicCollectionRequest("POST", "/api/collections/marvel-hqs/search-index"), false);
+  });
+
+  it("o controlador responde o índice achatado", async () => {
+    const { ApiController } = await import("../src/controllers/ApiController.js");
+    const { AuthMiddleware } = await import("../src/middleware/requireAuth.js");
+    const { DeviceService } = await import("../src/services/DeviceService.js");
+    const { LicenseService } = await import("../src/services/LicenseService.js");
+    const { MemoryDeviceRepository, MemoryLicenseRepository, MemoryProfileRepository } = await import("../src/repositories/MemoryRepositories.js");
+    const { service: collectionsService } = service();
+    const config = { autoActivateDevLicense: true } as never;
+    const controller = new ApiController({} as never, new AuthMiddleware({} as never),
+      new DeviceService(new MemoryDeviceRepository(), "secret"), new LicenseService(new MemoryLicenseRepository(), config),
+      new MemoryProfileRepository(), undefined, undefined, undefined, collectionsService);
+    const capture = () => { const sent: { status?: number; body?: unknown } = {};
+      return { sent, response: { statusCode: 0, setHeader: () => undefined, getHeader: () => undefined,
+        end(body: string) { sent.status = (this as { statusCode: number }).statusCode; sent.body = JSON.parse(body); } } as never }; };
+    const result = capture();
+    await controller.handle({ method: "GET", headers: {} } as never, result.response, "/api/collections/marvel-hqs/search-index");
+    assert.equal(result.sent.status, 200);
+    const body = result.sent.body as { collectionId: string; entries: { entry: { name: string } }[] };
+    assert.equal(body.collectionId, "marvel-hqs");
+    assert.ok(body.entries.some(item => item.entry.name === "Leia-me.pdf"));
+  });
+});
+
 describe("coleções do Drive: rotas do BFF", () => {
   it("as rotas de leitura são públicas, as demais não", async () => {
     const { isPublicCollectionRequest } = await import("../src/app.js");

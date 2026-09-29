@@ -26,6 +26,10 @@ export interface DriveCollectionSearchResult {
   listing: DriveFolderListing;
   entry: DriveFolderEntry;
 }
+/** One file anywhere in a collection's tree, as the server's flattened /search-index
+ *  answers it: the entry itself, and the breadcrumb of the folder it actually sits in. */
+interface CollectionIndexEntry { entry: DriveFolderEntry; breadcrumb: readonly { id: string; name: string }[]; }
+interface CollectionIndex { collectionId: string; entries: readonly CollectionIndexEntry[]; }
 
 /** Browses a published Drive folder through the BFF. The reader never signs in to Google:
  *  the credential lives on the server and only folder metadata ever crosses the wire.
@@ -35,6 +39,7 @@ export interface DriveCollectionSearchResult {
 export class DriveCollectionService {
   private collections: Promise<readonly DriveCollection[]> | null = null;
   private readonly folders = new Map<string, DriveFolderListing>();
+  private readonly indexes = new Map<string, Promise<readonly DriveCollectionSearchResult[]>>();
 
   public constructor(private readonly api: ApiClient) {}
 
@@ -63,35 +68,40 @@ export class DriveCollectionService {
   public isCached(collectionId: string, folderId?: string): boolean {
     return this.folders.has(`${collectionId}:${folderId ?? ""}`);
   }
-  /** Searches published comic trees by filename, description and folder trail. */
+  /** Searches the complete published tree, not only folders/cards already rendered. */
   public async search(query: string, collectionId?: string): Promise<readonly DriveCollectionSearchResult[]> {
     const collections = (await this.list()).filter(collection => !collectionId || collection.id === collectionId);
-    const results: DriveCollectionSearchResult[] = [];
-    for (const collection of collections) {
-      try {
-        const queue: DriveFolderListing[] = [await this.open(collection.id)];
-        const visited = new Set<string>();
-        const files = new Set<string>();
-        while (queue.length) {
-          const listing = queue.shift()!;
-          if (visited.has(listing.folderId)) continue;
-          visited.add(listing.folderId);
-          for (const entry of listing.entries) {
-            if (entry.kind === "file") {
-              if (files.has(entry.id)) continue;
-              if (matchesCatalogText(query, [entry.name, entry.description, collection.name, ...listing.breadcrumb.map(step => step.name)])) {
-                files.add(entry.id); results.push({ collection, listing, entry });
-              }
-              continue;
-            }
-            const path = [...listing.breadcrumb.map(step => step.id), entry.id];
-            try { if (!visited.has(entry.id)) queue.push(await this.open(collection.id, entry.id, path)); }
-            catch { /* An inaccessible subfolder does not invalidate the collection. */ }
-          }
-        }
-      } catch { /* An unavailable collection does not hide results from the others. */ }
-    }
-    return results;
+    const indexed = await Promise.all(collections.map(collection => this.indexCollection(collection).catch(() => [])));
+    return indexed.flat().filter(({ collection, listing, entry }) => matchesCatalogText(query, [
+      entry.name,
+      entry.description,
+      collection.name,
+      ...listing.breadcrumb.map(step => step.name),
+    ]));
   }
-  public forget(): void { this.folders.clear(); this.collections = null; }
+
+  private indexCollection(collection: DriveCollection): Promise<readonly DriveCollectionSearchResult[]> {
+    const cached = this.indexes.get(collection.id);
+    if (cached) return cached;
+    const pending = this.fetchIndex(collection).catch(error => {
+      this.indexes.delete(collection.id);
+      throw error;
+    });
+    this.indexes.set(collection.id, pending);
+    return pending;
+  }
+
+  /** One request for the collection's whole flattened tree - built once, on the server,
+   *  from GET /collections/:id/search-index - instead of one request per folder walked
+   *  from here. `indexes` still keeps the result (and in-flight promise) for the rest of
+   *  the session, so a second search costs nothing further. */
+  private async fetchIndex(collection: DriveCollection): Promise<readonly DriveCollectionSearchResult[]> {
+    const index = await this.api.get<CollectionIndex>(`/collections/${encodeURIComponent(collection.id)}/search-index`, false);
+    return index.entries.map(({ entry, breadcrumb }): DriveCollectionSearchResult => ({
+      collection, entry,
+      listing: { collectionId: collection.id, folderId: breadcrumb[breadcrumb.length - 1]?.id ?? collection.rootFolderId, breadcrumb, entries: [] },
+    }));
+  }
+
+  public forget(): void { this.folders.clear(); this.indexes.clear(); this.collections = null; }
 }

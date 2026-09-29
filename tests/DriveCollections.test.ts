@@ -22,6 +22,30 @@ function fakeApi(responses: Record<string, unknown>) {
 const listing = (folderId: string, entries: unknown[], breadcrumb: unknown[]) =>
   ({ collectionId: "marvel-hqs", folderId, breadcrumb, entries });
 
+/** The flattened /search-index responses for Marvel and DC, as the server would build
+ *  them - one request per collection, not one per folder. */
+function marvelAndDcIndexes(): Record<string, unknown> {
+  const dcRoot = "dc-root";
+  const file = (id: string, name: string) => ({ id, name, kind: "file", mimeType: "application/pdf", format: "pdf", supported: true, size: 10, modifiedAt: null });
+  const indexed = (entry: unknown, breadcrumb: unknown[]) => ({ entry, breadcrumb });
+  return {
+    "/collections": { items: [
+      { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT },
+      { id: "dc-hqs", name: "HQs da DC", rootFolderId: dcRoot },
+    ] },
+    "/collections/marvel-hqs/search-index": { collectionId: "marvel-hqs", entries: [
+      indexed(file("h1", "Hulk 001.pdf"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "hulk", name: "Hulk" }]),
+      indexed(file("h2", "O Incrível Hulk 002.cbz"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "hulk", name: "Hulk" }]),
+      indexed(file("v1", "Os Vingadores 001.pdf"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "vingadores", name: "Os Vingadores" }]),
+      indexed(file("v2", "Vingadores Ultimato.cbz"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "vingadores", name: "Os Vingadores" }]),
+      indexed(file("e1", "Doutor_Estranho-001.pdf"), [{ id: ROOT, name: "HQs da Marvel" }, { id: "estranho", name: "Doutor Estranho" }]),
+    ] },
+    "/collections/dc-hqs/search-index": { collectionId: "dc-hqs", entries: [
+      indexed(file("d1", "Ano Um 01.cbz"), [{ id: dcRoot, name: "HQs da DC" }, { id: "batman", name: "Batman" }]),
+    ] },
+  };
+}
+
 describe("coleções publicadas no cliente", () => {
   it("1. lista as coleções sem exigir autenticação do usuário", async () => {
     const { api, calls } = fakeApi({ "/collections": { items: [{ id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT }] } });
@@ -67,25 +91,56 @@ describe("coleções publicadas no cliente", () => {
     const { api } = fakeApi({});
     assert.deepEqual(await new DriveCollectionService(api).list(), []);
   });
-  it("busca Marvel e DC pelas primeiras letras do título e da trilha", async () => {
-    const dcRoot = "dc-root";
-    const file = (id: string, name: string) => ({ id, name, kind: "file", mimeType: "application/pdf", format: "pdf", supported: true, size: 10, modifiedAt: null });
-    const folder = (id: string, name: string) => ({ id, name, kind: "folder", mimeType: "application/vnd.google-apps.folder", format: null, supported: false, size: null, modifiedAt: null });
-    const { api } = fakeApi({
-      "/collections": { items: [
-        { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT },
-        { id: "dc-hqs", name: "HQs da DC", rootFolderId: dcRoot },
-      ] },
-      "/collections/marvel-hqs/folders": listing(ROOT, [folder("fenix", "A Canção da Fênix")], [{ id: ROOT, name: "HQs da Marvel" }]),
-      "/collections/marvel-hqs/folders/fenix?path=1wXs64lZ0nOBAAWwGutDHfjO-TnfYO6Ee%2Cfenix": listing("fenix", [file("m1", "Edição 01.pdf")], [{ id: ROOT, name: "HQs da Marvel" }, { id: "fenix", name: "A Canção da Fênix" }]),
-      "/collections/dc-hqs/folders": { ...listing(dcRoot, [folder("batman", "Batman")], [{ id: dcRoot, name: "HQs da DC" }]), collectionId: "dc-hqs" },
-      "/collections/dc-hqs/folders/batman?path=dc-root%2Cbatman": { ...listing("batman", [file("d1", "Ano Um 01.cbz")], [{ id: dcRoot, name: "HQs da DC" }, { id: "batman", name: "Batman" }]), collectionId: "dc-hqs" },
-    });
+  it("busca Marvel e DC no catálogo completo, normalizada e isolada por coleção", async () => {
+    const { api, calls } = fakeApi(marvelAndDcIndexes());
     const service = new DriveCollectionService(api);
-    assert.deepEqual((await service.search("canc fen")).map(item => item.entry.id), ["m1"]);
-    assert.deepEqual((await service.search("bat ano")).map(item => item.entry.id), ["d1"]);
-    assert.deepEqual((await service.search("marvel")).map(item => item.entry.id), ["m1"]);
-    assert.deepEqual((await service.search("dc")).map(item => item.entry.id), ["d1"]);
+    assert.equal((await service.search("hulk")).length, 2);
+    assert.equal((await service.search("vingadores", "marvel-hqs")).length, 2);
+    assert.equal((await service.search("Doutor Estranho", "marvel-hqs")).length, 1);
+    assert.equal((await service.search("doutor-estranho", "marvel-hqs")).length, 1);
+    assert.equal((await service.search("bat ano", "dc-hqs")).length, 1);
+    assert.equal((await service.search("batman", "marvel-hqs")).length, 0);
+    assert.equal((await service.search("hulk", "dc-hqs")).length, 0);
+    const requestsAfterIndex = calls.length;
+    await service.search("vingadores");
+    assert.equal(calls.length, requestsAfterIndex, "a pesquisa seguinte deve reutilizar o catálogo completo indexado");
+  });
+
+  it("5. a primeira busca faz exatamente uma chamada de índice por coleção necessária", async () => {
+    const { api, calls } = fakeApi(marvelAndDcIndexes());
+    const service = new DriveCollectionService(api);
+    await service.search("hulk", "marvel-hqs");
+    assert.deepEqual(calls, ["/collections", "/collections/marvel-hqs/search-index"], "não pode existir mais nenhuma chamada por pasta - só a lista de coleções e o índice inteiro, de uma vez");
+  });
+
+  it("6. a segunda busca na mesma coleção não gera nenhuma chamada adicional", async () => {
+    const { api, calls } = fakeApi(marvelAndDcIndexes());
+    const service = new DriveCollectionService(api);
+    await service.search("hulk", "marvel-hqs");
+    const afterFirst = calls.length;
+    await service.search("vingadores", "marvel-hqs");
+    await service.search("estranho", "marvel-hqs");
+    assert.equal(calls.length, afterFirst, "indexes local já resolvido não deve gerar requisição nova");
+  });
+
+  it("11. o resultado preserva a identidade necessária para o card/abertura da HQ", async () => {
+    const { api } = fakeApi(marvelAndDcIndexes());
+    const service = new DriveCollectionService(api);
+    const [hulk] = await service.search("hulk 001", "marvel-hqs");
+    assert.equal(hulk!.entry.id, "h1");
+    assert.equal(hulk!.collection.id, "marvel-hqs");
+    assert.equal(hulk!.listing.folderId, "hulk", "folderId deve ser a pasta imediata onde o arquivo está, não a raiz");
+    assert.deepEqual(hulk!.listing.breadcrumb.map(step => step.name), ["HQs da Marvel", "Hulk"]);
+  });
+
+  it("forget() continua limpando o índice local, forçando nova busca de índice", async () => {
+    const { api, calls } = fakeApi(marvelAndDcIndexes());
+    const service = new DriveCollectionService(api);
+    await service.search("hulk", "marvel-hqs");
+    const afterFirst = calls.length;
+    service.forget();
+    await service.search("hulk", "marvel-hqs");
+    assert.ok(calls.length > afterFirst, "depois de forget(), a coleção teve que ser reindexada");
   });
 });
 

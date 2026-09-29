@@ -2,24 +2,73 @@ import { ApiError } from "../errors/ApiError.js";
 import { DriveFolderBrowser, DriveFolderUnavailableError } from "./DriveFolderBrowser.js";
 import { DriveFolderCache } from "./DriveFolderCache.js";
 import { sortEntries } from "./NaturalOrder.js";
-import type { DriveCollection, DriveFolderEntry, DriveFolderListing } from "./types.js";
+import type { CollectionIndex, CollectionIndexEntry, DriveCollection, DriveFolderEntry, DriveFolderListing } from "./types.js";
 
 /** Serves one folder of one published collection. The Drive tree is the navigation, so
  *  nothing here knows a folder name, a depth or a saga: it only ever answers "what is
  *  inside this folder". */
 export class DriveCollectionService {
   private readonly entryCache: DriveFolderCache<readonly DriveFolderEntry[]>;
+  /** Caches the *promise*, not just the result: two searches arriving together for the
+   *  same collection share the one crawl in flight instead of starting two. A failed
+   *  build evicts itself immediately, so the next request retries rather than waiting out
+   *  the rest of the TTL on a dead entry. This is an optimization only - serverless
+   *  instances do not share memory, so a cold instance still pays for its own first
+   *  crawl - never a guarantee of a warm index. */
+  private readonly indexCache: DriveFolderCache<Promise<CollectionIndex>>;
   private static readonly maxDepth = 32;
+  /** Bounds a pathological tree (a cycle the visited-set already guards against, or simply
+   *  an unexpectedly huge folder) so one bad collection cannot hang the request forever. */
+  private static readonly maxIndexedFolders = 20_000;
 
   public constructor(
     private readonly collections: readonly DriveCollection[],
     private readonly browser: DriveFolderBrowser,
-    caches: { entries?: DriveFolderCache<readonly DriveFolderEntry[]> } = {},
+    caches: { entries?: DriveFolderCache<readonly DriveFolderEntry[]>; index?: DriveFolderCache<Promise<CollectionIndex>> } = {},
   ) {
     this.entryCache = caches.entries ?? new DriveFolderCache<readonly DriveFolderEntry[]>();
+    this.indexCache = caches.index ?? new DriveFolderCache<Promise<CollectionIndex>>(300_000, 20);
   }
 
   public list(): readonly DriveCollection[] { return this.collections; }
+
+  /** The whole collection, flattened to its files, for search: every screen the reader
+   *  never opened still gets crawled once, here, on the server - never per keystroke, and
+   *  never from the phone one folder at a time. Only a registered collection can be
+   *  indexed; the id is looked up in the same registry `open()` uses, never trusted as a
+   *  raw Drive id. */
+  public async searchIndex(collectionId: string): Promise<CollectionIndex> {
+    const collection = this.collections.find(item => item.id === collectionId);
+    if (!collection) throw new ApiError(404, "COLLECTION_NOT_FOUND", "Esta coleção não existe.");
+    const cached = this.indexCache.get(collectionId);
+    if (cached) return cached;
+    const pending = this.buildIndex(collection);
+    this.indexCache.set(collectionId, pending);
+    pending.catch(() => this.indexCache.delete(collectionId));
+    return pending;
+  }
+
+  private async buildIndex(collection: DriveCollection): Promise<CollectionIndex> {
+    const results: CollectionIndexEntry[] = [];
+    const visitedFolders = new Set<string>();
+    const seenFiles = new Set<string>();
+    const root = [{ id: collection.rootFolderId, name: collection.name }];
+    const walk = async (folderId: string, breadcrumb: readonly { id: string; name: string }[]): Promise<void> => {
+      if (visitedFolders.has(folderId) || visitedFolders.size >= DriveCollectionService.maxIndexedFolders) return;
+      visitedFolders.add(folderId);
+      const children = await this.entries(folderId, collection);
+      const subfolders: Array<{ id: string; name: string }> = [];
+      for (const child of children) {
+        if (child.kind === "folder") { subfolders.push({ id: child.id, name: child.name }); continue; }
+        if (seenFiles.has(child.id)) continue;
+        seenFiles.add(child.id);
+        results.push({ entry: { ...child, parentId: folderId, collectionPath: [...breadcrumb.map(step => step.id), child.id] }, breadcrumb });
+      }
+      await Promise.all(subfolders.map(sub => walk(sub.id, [...breadcrumb, sub])));
+    };
+    await Promise.all(this.rootIds(collection).map(rootId => walk(rootId, root)));
+    return { collectionId: collection.id, entries: results };
+  }
 
   public async open(collectionId: string, folderId?: string, path?: readonly string[]): Promise<DriveFolderListing> {
     const collection = this.collections.find(item => item.id === collectionId);
