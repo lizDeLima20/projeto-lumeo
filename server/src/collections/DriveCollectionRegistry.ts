@@ -4,7 +4,7 @@ import type { DriveCollection } from "./types.js";
  *  or one entry in DRIVE_COLLECTIONS_JSON - never a code change anywhere else, and never a
  *  folder name: the tree inside the root folder supplies all of that at runtime. */
 export const DEFAULT_DRIVE_COLLECTIONS: readonly DriveCollection[] = [
-  { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: "1wXs64lZ0nOBAAWwGutDHfjO-TnfYO6Ee", contentType: "comic", navigationMode: "folders",
+  { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: "1wXs64lZ0nOBAAWwGutDHfjO-TnfYO6Ee", contentType: "comic",
     sourceRootFolderIds: ["1zjVQ0K6mWgXcZSTV8gNi-jxY0x2KWjGN"] },
   { id: "dc-hqs", name: "HQs da DC", rootFolderId: "1-9bSxiCfavMPf9g0wzSDFVkzJqS6j2nI", contentType: "comic" },
 ];

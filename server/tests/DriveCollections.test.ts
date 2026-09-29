@@ -80,7 +80,9 @@ const service = (nodes = marvel, store?: CollectionIndexStore) => {
 describe("coleções do Drive: configuração", () => {
   it("1. registra a raiz pública inteira sem alterar Marvel e DC", () => {
     assert.equal(DEFAULT_DRIVE_COLLECTIONS.length, 2);
-    assert.deepEqual({ ...DEFAULT_DRIVE_COLLECTIONS[0]! }, { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT, contentType: "comic", navigationMode: "folders", sourceRootFolderIds: ["1zjVQ0K6mWgXcZSTV8gNi-jxY0x2KWjGN"] });
+    // navigationMode stays unset: Marvel shows the same series/carousel catalogue view as
+    // DC, not the raw folder browser - a collection only opts into that explicitly.
+    assert.deepEqual({ ...DEFAULT_DRIVE_COLLECTIONS[0]! }, { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT, contentType: "comic", sourceRootFolderIds: ["1zjVQ0K6mWgXcZSTV8gNi-jxY0x2KWjGN"] });
     assert.deepEqual({ ...DEFAULT_DRIVE_COLLECTIONS[1]! }, { id: "dc-hqs", name: "HQs da DC", rootFolderId: "1-9bSxiCfavMPf9g0wzSDFVkzJqS6j2nI", contentType: "comic" });
   });
   it("uma coleção nova é configuração, não código", () => {
