@@ -2,7 +2,7 @@ import type { AppState } from "../core/AppState";
 import type { CatalogBookData } from "../models/CatalogBook";
 import { CatalogService } from "../services/CatalogService";
 import { ComicCoverSource, LazyCoverLoader } from "../services/ComicCoverSource";
-import type { DriveCollectionService, DriveCollectionSearchResult, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
+import type { DriveCollection, DriveCollectionService, DriveCollectionSearchResult, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 import { BaseView } from "./BaseView";
 
 /** Folds text the same way search already does, so cosmetic differences - case, accent,
@@ -52,7 +52,7 @@ export class CatalogExplorerView extends BaseView {
   private readonly genreLabels = new Map<string, string>();
   private sectionTitle: HTMLElement | null = null;
   public constructor(api: CatalogService, private readonly state: AppState, private readonly onOpen: (bookId: string) => void, private readonly onManageSources?: () => void,
-    private readonly published?: { collections: DriveCollectionService; open: (collectionId: string) => void;
+    private readonly published?: { collections: DriveCollectionService; open: (collection: DriveCollection) => void;
       openEntry?: (collectionId: string, entry: DriveFolderEntry, listing: DriveFolderListing) => void }, initialGenreId = "") { super(); this.catalog = api; this.selectedGenre = initialGenreId; }
   public override unmount(): void { this.genreCarouselCleanup?.(); this.genreCarouselCleanup = null; this.comicCoverLoader.destroy(); super.unmount(); }
   public render(): HTMLElement {
@@ -109,7 +109,7 @@ export class CatalogExplorerView extends BaseView {
     const collections = await this.published.collections.list();
     if (!collections.length) return;
     collections.forEach((collection) => {
-      addGenre(`collection:${collection.id}`, collection.name, () => this.published!.open(collection.id));
+      addGenre(`collection:${collection.id}`, collection.name, () => this.published!.open(collection));
     });
   }
 
@@ -183,17 +183,17 @@ export class CatalogExplorerView extends BaseView {
       this.classified.append(this.comicCard(result));
     });
     this.searchResults = [...this.searchResults, ...comics];
-    this.refreshStatus();
+    this.refreshStatus(this.selectedGenre);
     this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
   }
-  private refreshStatus(): void {
+  private refreshStatus(genreId: string): void {
     const empty = this.isSearching ? this.searchResults.length === 0 : this.loaded.size === 0;
-    this.status!.textContent = empty ? this.t("ui.catalog.empty") : "";
+    this.status!.textContent = empty ? this.t("ui.catalog.empty") : genreId === "espiritualidade" && this.lastTotal !== undefined ? `${this.loaded.size} de ${this.lastTotal} livros` : "";
   }
   private comicCard(result: DriveCollectionSearchResult): HTMLElement {
     const { collection, entry, listing } = result;
     const card = this.createElement("article", "drive-comic-card"); card.setAttribute("role", "listitem"); card.tabIndex = 0;
-    const open = (): void => { if (this.published?.openEntry) this.published.openEntry(collection.id, entry, listing); else this.published?.open(collection.id); };
+    const open = (): void => { if (this.published?.openEntry) this.published.openEntry(collection.id, entry, listing); else this.published?.open(collection); };
     card.addEventListener("click", open); card.addEventListener("keydown", event => { if (event.key === "Enter") open(); });
     const cover = this.createElement("div", "drive-comic-card__cover");
     const fallback = (): void => cover.replaceChildren(this.createElement("span", "drive-comic-card__fallback", "📚"));

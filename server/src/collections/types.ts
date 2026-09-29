@@ -7,6 +7,8 @@ export interface DriveCollection {
   /** What a readable file in this collection is. It belongs to the collection, not to the
    *  file: the same PDF is a comic here and an ordinary book elsewhere. */
   contentType: "comic" | "book";
+  navigationMode?: "sections" | "folders";
+  sourceRootFolderIds?: readonly string[];
 }
 
 export type DriveEntryKind = "folder" | "file";
@@ -30,6 +32,9 @@ export interface DriveFolderEntry {
   contentType?: "comic" | "book";
   size: number | null;
   modifiedAt: string | null;
+  /** Immediate Drive parent and full root-to-entry trail returned by the BFF. */
+  parentId?: string;
+  collectionPath?: readonly string[];
   /** Present when the entry is a Drive shortcut resolved to its target. */
   shortcut?: boolean;
 }
@@ -44,4 +49,5 @@ export interface DriveFolderListing {
   /** Items that could not be shown, such as a shortcut whose target is gone. The folder is
    *  still served: one bad row must not cost the reader the screen. */
   warnings: readonly { code: string; entryId: string; name: string }[];
+  sourceRootId?: string;
 }

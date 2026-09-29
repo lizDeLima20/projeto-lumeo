@@ -171,7 +171,7 @@ export class App {
     this.router.register("library", () => new LibraryView(this.state,
       (genreId) => this.router.navigate("genre", { id: genreId }), (bookId) => this.openLibraryBook(bookId), (bookId) => void this.deleteBook(bookId, false)));
     this.router.register("explore", (params) => new CatalogExplorerView(this.catalog, this.state, (bookId) => this.router.navigate("catalog-book", { id: bookId }), () => this.router.navigate("catalog-admin"),
-      { collections: this.driveCollections, open: (id) => this.router.navigate("collection-genre", { id }),
+      { collections: this.driveCollections, open: (collection) => this.router.navigate(collection.navigationMode === "folders" ? "collection" : "collection-genre", { id: collection.id }),
         openEntry: (id, entry, listing) => this.openComicDetails(id, entry, listing) }, params.get("genre") ?? ""));
     /* A published Drive folder browsed live. The folder id travels in the URL, so a
      * breadcrumb step and the browser's own Back button land on the same screen. */
@@ -206,15 +206,15 @@ export class App {
     });
     this.router.register("collection", (params) => new CollectionBrowserView(this.driveCollections,
       params.get("id") ?? "", params.get("folder") ?? undefined,
-      (collectionId, folderId) => this.router.navigate("collection", { id: collectionId, folder: folderId,
-        path: [...(params.get("path")?.split(",").filter(Boolean) ?? [params.get("folder")].filter((value): value is string => Boolean(value))), folderId].join(",") }),
+      (collectionId, folderId, path) => this.router.navigate("collection", { id: collectionId, ...(folderId ? { folder: folderId } : {}),
+        ...(path?.length ? { path: path.join(",") } : {}) }),
       () => this.router.navigate("explore"),
       params.get("path")?.split(",").filter(Boolean),
       (entry, listing) => this.openComicDetails(params.get("id") ?? "", entry, listing)));
     this.router.register("collection-genre", (params) => new DriveCollectionGenreView(this.driveCollections, this.catalog,
       params.get("id") ?? "", () => this.router.navigate("explore"),
       (genreId) => this.router.navigate("explore", { genre: genreId }),
-      (collectionId) => this.router.navigate("collection-genre", { id: collectionId }),
+      (collection) => this.router.navigate(collection.navigationMode === "folders" ? "collection" : "collection-genre", { id: collection.id }),
       (entry, listing) => this.openComicDetails(params.get("id") ?? "", entry, listing)));
     /* A comic opens to its own details page, the way a catalogue book does: download first,
      * then add. The folder and its trail travel in the URL so the page can reload itself. */

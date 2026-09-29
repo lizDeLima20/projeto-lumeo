@@ -17,7 +17,7 @@ export class CollectionBrowserView extends BaseView {
   private listing: DriveFolderListing | null = null;
   public constructor(private readonly collections: DriveCollectionService,
     private readonly collectionId: string, private readonly folderId: string | undefined,
-    private readonly onOpenFolder: (collectionId: string, folderId: string) => void,
+    private readonly onOpenFolder: (collectionId: string, folderId?: string, path?: readonly string[]) => void,
     private readonly onBack: () => void,
     private readonly path?: readonly string[],
     private readonly onAdd?: (entry: DriveFolderEntry, listing: DriveFolderListing) => void) { super(); }
@@ -64,7 +64,10 @@ export class CollectionBrowserView extends BaseView {
       if (last) { this.trail!.append(this.createElement("span", "collection-breadcrumb__current", step.name)); return; }
       const crumb = this.createElement("button", "collection-breadcrumb__step", step.name);
       crumb.type = "button";
-      crumb.addEventListener("click", () => this.onOpenFolder(listing.collectionId, step.id));
+      crumb.addEventListener("click", () => {
+        if (index === 0) this.onOpenFolder(listing.collectionId);
+        else this.onOpenFolder(listing.collectionId, step.id, [listing.sourceRootId ?? listing.breadcrumb[0]!.id, ...listing.breadcrumb.slice(1, index + 1).map(item => item.id)]);
+      });
       this.trail!.append(crumb);
     });
     this.list.replaceChildren();
@@ -84,7 +87,7 @@ export class CollectionBrowserView extends BaseView {
       open.type = "button";
       const icon = this.createElement("span", "collection-entry__icon", "📁"); icon.setAttribute("aria-hidden", "true");
       open.append(icon, label, this.createElement("span", "collection-entry__chevron", "›"));
-      open.addEventListener("click", () => this.onOpenFolder(collectionId, entry.id));
+      open.addEventListener("click", () => this.onOpenFolder(collectionId, entry.id, entry.collectionPath));
       item.append(open);
       return item;
     }

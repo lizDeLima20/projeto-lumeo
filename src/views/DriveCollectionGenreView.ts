@@ -30,7 +30,7 @@ export class DriveCollectionGenreView extends BaseView {
     private readonly collectionId: string,
     private readonly onBack: () => void,
     private readonly onSelectCatalogGenre: (genreId: string) => void,
-    private readonly onSelectCollection: (collectionId: string) => void,
+    private readonly onSelectCollection: (collection: import("../services/DriveCollectionService").DriveCollection) => void,
     private readonly onAdd: (entry: DriveFolderEntry, listing: DriveFolderListing) => void,
   ) { super(); }
 
@@ -159,7 +159,7 @@ export class DriveCollectionGenreView extends BaseView {
     try {
       const [page, collections] = await Promise.all([this.catalog.list(), this.collections.list()]);
       page.genres?.forEach(genre => this.addGenre(container, genre.id, genre.name, () => this.onSelectCatalogGenre(genre.id)));
-      collections.forEach(collection => this.addGenre(container, `collection:${collection.id}`, collection.name, () => this.onSelectCollection(collection.id)));
+      collections.forEach(collection => this.addGenre(container, `collection:${collection.id}`, collection.name, () => this.onSelectCollection(collection)));
     } catch { /* Keep the current collection usable if the genre list is unavailable. */ }
   }
 

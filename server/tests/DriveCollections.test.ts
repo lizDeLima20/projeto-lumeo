@@ -59,18 +59,18 @@ const service = (nodes = marvel) => {
 };
 
 describe("coleções do Drive: configuração", () => {
-  it("1. Marvel permanece intacta e DC usa o mesmo motor de coleções", () => {
+  it("1. registra a raiz pública inteira sem alterar Marvel e DC", () => {
     assert.equal(DEFAULT_DRIVE_COLLECTIONS.length, 2);
-    const [marvelConfig, dcConfig] = DEFAULT_DRIVE_COLLECTIONS;
-    assert.deepEqual({ ...marvelConfig }, { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT, contentType: "comic" });
-    assert.deepEqual({ ...dcConfig }, { id: "dc-hqs", name: "HQs da DC", rootFolderId: "1-9bSxiCfavMPf9g0wzSDFVkzJqS6j2nI", contentType: "comic" });
+    assert.deepEqual({ ...DEFAULT_DRIVE_COLLECTIONS[0]! }, { id: "marvel-hqs", name: "HQs da Marvel", rootFolderId: ROOT, contentType: "comic", navigationMode: "folders", sourceRootFolderIds: ["1zjVQ0K6mWgXcZSTV8gNi-jxY0x2KWjGN"] });
+    assert.deepEqual({ ...DEFAULT_DRIVE_COLLECTIONS[1]! }, { id: "dc-hqs", name: "HQs da DC", rootFolderId: "1-9bSxiCfavMPf9g0wzSDFVkzJqS6j2nI", contentType: "comic" });
   });
   it("uma coleção nova é configuração, não código", () => {
     const parsed = driveCollectionsFromEnvironment(JSON.stringify([
       { id: "dc-hqs", name: "HQs da DC", rootFolderId: "0BxAbCdEfGhIjKlMnOpQ" },
     ]));
-    assert.equal(parsed.length, 1);
-    assert.equal(parsed[0]!.id, "dc-hqs");
+    assert.equal(parsed.length, 2);
+    assert.equal(parsed.find(item => item.id === "dc-hqs")!.rootFolderId, "0BxAbCdEfGhIjKlMnOpQ");
+    assert.deepEqual(parsed.find(item => item.id === "marvel-hqs")!.sourceRootFolderIds, ["1zjVQ0K6mWgXcZSTV8gNi-jxY0x2KWjGN"]);
   });
   it("DC mostra subcoleções e PDF sem misturar com a Marvel", async () => {
     const dc = DEFAULT_DRIVE_COLLECTIONS.find(item => item.id === "dc-hqs")!;
@@ -114,6 +114,8 @@ describe("coleções do Drive: navegação sob demanda", () => {
     assert.ok(!drive.calls.includes("list:sw-v1"), "não pode descer sozinho para dentro dos volumes");
     assert.ok(drive.calls.includes("list:sw"));
     assert.deepEqual(listing.breadcrumb.map(step => step.name), ["HQs da Marvel", "STAR WARS"]);
+    assert.equal(listing.entries[0]?.parentId, "sw");
+    assert.deepEqual(listing.entries[0]?.collectionPath, [ROOT, "sw", "sw-v1"]);
   });
   it("4. aceita vários níveis, com breadcrumb completo", async () => {
     const { service: value } = service();

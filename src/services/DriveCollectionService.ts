@@ -1,7 +1,7 @@
 import type { ApiClient } from "./ApiClient";
 import { matchesCatalogText } from "../../shared/CatalogTextSearch";
 
-export interface DriveCollection { id: string; name: string; rootFolderId: string; contentType: "comic" | "book"; }
+export interface DriveCollection { id: string; name: string; rootFolderId: string; contentType: "comic" | "book"; navigationMode?: "sections" | "folders"; sourceRootFolderIds?: readonly string[]; }
 /** Decided by the BFF from Drive metadata, never from the filename. */
 export type DriveEntryFormat = "pdf" | "epub" | "cbr" | "cbz" | "unknown";
 export interface DriveFolderEntry {
@@ -11,13 +11,15 @@ export interface DriveFolderEntry {
   /** False for a format Lumeo cannot open yet, such as CBR. Still listed, never hidden. */
   supported: boolean;
   contentType?: "comic" | "book";
-  size: number | null; modifiedAt: string | null; shortcut?: boolean;
+  size: number | null; modifiedAt: string | null;
+  parentId?: string; collectionPath?: readonly string[]; shortcut?: boolean;
 }
 export interface DriveFolderListing {
   collectionId: string; folderId: string;
   breadcrumb: readonly { id: string; name: string }[];
   entries: readonly DriveFolderEntry[];
   warnings?: readonly { code: string; entryId: string; name: string }[];
+  sourceRootId?: string;
 }
 export interface DriveCollectionSearchResult {
   collection: DriveCollection;

@@ -82,7 +82,7 @@ describe("10/11/12. nada mais foi tocado", () => {
   it("a navegação da Tarefa 1 continua no lugar", () => {
     const view = source("src/views/CollectionBrowserView.ts");
     assert.match(view, /collection-breadcrumb__step/);
-    assert.match(view, /this\.onOpenFolder\(collectionId, entry\.id\)/);
+    assert.match(view, /this\.onOpenFolder\(collectionId, entry\.id, entry\.collectionPath\)/);
     assert.match(source("src/services/DriveCollectionService.ts"), /private readonly folders = new Map/);
   });
   it("ComicReader, OCR e o leitor de livros seguem intactos", () => {

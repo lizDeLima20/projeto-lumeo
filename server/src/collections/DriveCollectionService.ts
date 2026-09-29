@@ -9,7 +9,7 @@ import type { DriveCollection, DriveFolderEntry, DriveFolderListing } from "./ty
  *  inside this folder". */
 export class DriveCollectionService {
   private readonly entryCache: DriveFolderCache<readonly DriveFolderEntry[]>;
-  private static readonly maxDepth = 12;
+  private static readonly maxDepth = 32;
 
   public constructor(
     private readonly collections: readonly DriveCollection[],
@@ -25,9 +25,25 @@ export class DriveCollectionService {
     const collection = this.collections.find(item => item.id === collectionId);
     if (!collection) throw new ApiError(404, "COLLECTION_NOT_FOUND", "Esta coleção não existe.");
     const target = folderId?.trim() || collection.rootFolderId;
-    const breadcrumb = await this.breadcrumb(collection, target, path);
-    const entries = sortEntries(await this.entries(target, collection));
-    return { collectionId: collection.id, folderId: target, breadcrumb, entries, warnings: [...this.browser.warnings] };
+    const rootIds = this.rootIds(collection);
+    if (target === collection.rootFolderId && !folderId) {
+      const pages = await Promise.all(rootIds.map(async sourceRootId => ({ sourceRootId, entries: await this.entries(sourceRootId, collection) })));
+      const seen = new Set<string>();
+      const entries = sortEntries(pages.flatMap(page => page.entries
+        .filter(entry => !seen.has(entry.id) && Boolean(seen.add(entry.id)))
+        .map(entry => ({ ...entry, parentId: page.sourceRootId, collectionPath: [page.sourceRootId, entry.id] }))));
+      return { collectionId: collection.id, folderId: collection.rootFolderId,
+        breadcrumb: [{ id: collection.rootFolderId, name: collection.name }], entries,
+        warnings: [...this.browser.warnings], sourceRootId: collection.rootFolderId };
+    }
+    const steps = this.normalizePath(collection, target, path);
+    const breadcrumb = await this.breadcrumb(collection, steps);
+    const entries = sortEntries(await this.entries(target, collection)).map(entry => ({
+      ...entry, parentId: target, collectionPath: [...steps, entry.id],
+    }));
+    return { collectionId: collection.id, folderId: target, breadcrumb, entries,
+      warnings: [...this.browser.warnings], sourceRootId: steps[0] };
+
   }
 
   private async entries(folderId: string, collection: DriveCollection): Promise<readonly DriveFolderEntry[]> {
@@ -46,11 +62,8 @@ export class DriveCollectionService {
    *  chain to climb. Descending needs only `files.list`, which does work - and it costs
    *  nothing extra, because each step is a listing that is cached anyway and it supplies
    *  the breadcrumb names for free. */
-  private async breadcrumb(collection: DriveCollection, folderId: string, path?: readonly string[]): Promise<readonly { id: string; name: string }[]> {
-    const root = { id: collection.rootFolderId, name: collection.name };
-    if (folderId === collection.rootFolderId) return [root];
-    const steps = this.normalizePath(collection, folderId, path);
-    const trail = [root];
+  private async breadcrumb(collection: DriveCollection, steps: readonly string[]): Promise<readonly { id: string; name: string }[]> {
+    const trail = [{ id: collection.rootFolderId, name: collection.name }];
     for (let index = 1; index < steps.length; index++) {
       const parent = steps[index - 1]!, child = steps[index]!;
       const children = await this.entries(parent, collection);
@@ -66,11 +79,15 @@ export class DriveCollectionService {
   private normalizePath(collection: DriveCollection, folderId: string, path?: readonly string[]): readonly string[] {
     const steps = (path ?? []).filter(step => step.trim());
     if (!steps.length) throw new ApiError(404, "COLLECTION_FOLDER_NOT_FOUND", "Esta pasta não pertence a esta coleção.");
-    if (steps[0] !== collection.rootFolderId) throw new ApiError(404, "COLLECTION_FOLDER_NOT_FOUND", "Esta pasta não pertence a esta coleção.");
+    if (!this.rootIds(collection).includes(steps[0]!)) throw new ApiError(404, "COLLECTION_FOLDER_NOT_FOUND", "Esta pasta não pertence a esta coleção.");
     if (steps[steps.length - 1] !== folderId) throw new ApiError(404, "COLLECTION_FOLDER_NOT_FOUND", "Esta pasta não pertence a esta coleção.");
     if (steps.length > DriveCollectionService.maxDepth) throw new ApiError(400, "COLLECTION_PATH_TOO_DEEP", "Caminho longo demais.");
     if (new Set(steps).size !== steps.length) throw new ApiError(400, "COLLECTION_PATH_INVALID", "Caminho inválido.");
     return steps;
+  }
+
+  private rootIds(collection: DriveCollection): readonly string[] {
+    return [...new Set([collection.rootFolderId, ...(collection.sourceRootFolderIds ?? [])])];
   }
 
   private async guard<T>(action: () => Promise<T>): Promise<T> {
