@@ -183,12 +183,12 @@ export class CatalogExplorerView extends BaseView {
       this.classified.append(this.comicCard(result));
     });
     this.searchResults = [...this.searchResults, ...comics];
-    this.refreshStatus(this.selectedGenre);
+    this.refreshStatus();
     this.classified.closest<HTMLElement>(".catalog__section")!.hidden = this.classified.childElementCount === 0;
   }
-  private refreshStatus(genreId: string): void {
+  private refreshStatus(): void {
     const empty = this.isSearching ? this.searchResults.length === 0 : this.loaded.size === 0;
-    this.status!.textContent = empty ? this.t("ui.catalog.empty") : genreId === "espiritualidade" && this.lastTotal !== undefined ? `${this.loaded.size} de ${this.lastTotal} livros` : "";
+    this.status!.textContent = empty ? this.t("ui.catalog.empty") : "";
   }
   private comicCard(result: DriveCollectionSearchResult): HTMLElement {
     const { collection, entry, listing } = result;
