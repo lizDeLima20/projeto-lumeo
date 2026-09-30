@@ -1,3 +1,4 @@
+import { defaultComicCoverGenerator, type ComicCoverGenerator } from "./ComicCoverGenerator";
 import type { DriveFolderEntry } from "./DriveCollectionService";
 
 /** The cover of a comic in a published collection is its own first page: Drive renders
@@ -35,33 +36,47 @@ export class ComicCoverSource {
 }
 
 /** Attaches covers as rows come into view. A folder with two hundred issues costs two
- *  hundred covers only if the reader actually scrolls past all of them. */
+ *  hundred covers only if the reader actually scrolls past all of them.
+ *
+ *  A PDF, or a CBR/CBZ Drive already rendered a thumbnail for, just gets that URL. A
+ *  CBR/CBZ with no thumbnail gets its cover generated on the same reveal - the comic's own
+ *  first page, read lazily, cached locally, never blocking the card or the rest of the
+ *  screen while it works. */
 export class LazyCoverLoader {
   private readonly observer: IntersectionObserver | null;
-  public constructor(private readonly covers: ComicCoverSource) {
+  private readonly pending = new WeakMap<HTMLImageElement, () => void>();
+  public constructor(private readonly covers: ComicCoverSource, private readonly generator: ComicCoverGenerator | null = defaultComicCoverGenerator()) {
     this.observer = typeof IntersectionObserver === "function"
       ? new IntersectionObserver(entries => entries.forEach(entry => {
         if (!entry.isIntersecting) return;
-        this.reveal(entry.target as HTMLImageElement);
+        const image = entry.target as HTMLImageElement;
+        this.observer?.unobserve(image);
+        const start = this.pending.get(image);
+        this.pending.delete(image);
+        start?.();
       }), { rootMargin: "200px" })
       : null;
   }
 
-  public observe(image: HTMLImageElement, entry: DriveFolderEntry): void {
+  /** `onUnavailable` is the caller's placeholder - it runs immediately when neither a
+   *  direct URL nor generation is possible, and later if generation is tried but fails. */
+  public observe(image: HTMLImageElement, entry: DriveFolderEntry, onUnavailable?: () => void): void {
     const url = this.covers.coverUrl(entry);
-    if (!url) return;
-    image.dataset.coverUrl = url;
+    const canGenerate = !url && Boolean(this.generator) && entry.kind === "file" && entry.supported
+      && (entry.format === "cbr" || entry.format === "cbz");
+    if (!url && !canGenerate) { onUnavailable?.(); return; }
+    const start = url
+      ? () => { image.src = url; }
+      : () => {
+        void this.generator!.cover(entry, () => image.isConnected).then(dataUrl => {
+          if (dataUrl) image.src = dataUrl; else onUnavailable?.();
+        });
+      };
     // Without IntersectionObserver the browser's own lazy loading still holds the line.
-    if (!this.observer) { this.reveal(image); return; }
+    if (!this.observer) { start(); return; }
+    this.pending.set(image, start);
     this.observer.observe(image);
   }
 
   public destroy(): void { this.observer?.disconnect(); }
-
-  private reveal(image: HTMLImageElement): void {
-    const url = image.dataset.coverUrl;
-    if (!url || image.src) return;
-    image.src = url;
-    this.observer?.unobserve(image);
-  }
 }

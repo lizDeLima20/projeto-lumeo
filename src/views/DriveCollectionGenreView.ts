@@ -135,11 +135,10 @@ export class DriveCollectionGenreView extends BaseView {
     if (supported) { card.tabIndex = 0; card.addEventListener("click", () => this.onAdd(entry, listing)); card.addEventListener("keydown", event => { if (event.key === "Enter") this.onAdd(entry, listing); }); }
     const cover = this.createElement("div", "drive-comic-card__cover");
     const fallback = (): void => cover.replaceChildren(this.createElement("span", "drive-comic-card__fallback", "📚"));
-    if (this.covers.hasCover(entry)) {
-      const image = this.createElement("img", "") as HTMLImageElement;
-      image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
-      image.addEventListener("error", fallback, { once: true }); this.coverLoader.observe(image, entry); cover.append(image);
-    } else fallback();
+    const image = this.createElement("img", "") as HTMLImageElement;
+    image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", fallback, { once: true }); cover.append(image);
+    this.coverLoader.observe(image, entry, fallback);
     const title = this.createElement("h3", "drive-comic-card__title", entry.name.trim());
     const format = this.createElement("small", "drive-comic-card__format", entry.format?.toUpperCase() ?? this.i18n.t("ui.collections.unknownFormat"));
     card.append(cover, title, format);

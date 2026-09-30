@@ -1,5 +1,6 @@
 import { Archive } from "libarchive.js";
 import type { PDFPageProxy } from "pdfjs-dist";
+import { comicPageCollator, isComicPageImagePath, isSafeArchivePath, sniffComicPageMime } from "./ComicArchiveEntryFilter";
 import type { ComicPageSource } from "./ComicPageSource";
 import type { ComicStageSize } from "./ComicPageEngine";
 
@@ -40,15 +41,15 @@ export class ComicArchiveSource implements ComicPageSource {
       const pages: Page[] = [];
       for (const item of listed) {
         const path = `${item.path}${item.file.name}`.replace(/\\/g, "/");
-        if (!ComicArchiveSource.safePath(path)) throw new Error("HQ contém caminho inseguro.");
-        if (!ComicArchiveSource.imagePath(path)) continue;
+        if (!isSafeArchivePath(path)) throw new Error("HQ contém caminho inseguro.");
+        if (!isComicPageImagePath(path)) continue;
         if (!Number.isFinite(item.file.size) || item.file.size <= 0 || item.file.size > MAX_PAGE_BYTES) throw new Error("Página de HQ excede o limite de tamanho.");
         expanded += item.file.size;
         if (expanded > MAX_EXPANDED_BYTES || expanded / Math.max(blob.size, 1) > 150) throw new Error("HQ excede os limites de descompactação.");
         pages.push({ path, file: item.file });
       }
       if (!pages.length) throw new Error("HQ sem páginas JPEG, PNG ou WebP.");
-      pages.sort((a, b) => ComicArchiveSource.collator.compare(a.path, b.path));
+      pages.sort((a, b) => comicPageCollator.compare(a.path, b.path));
       this.archive = archive; this.pages = pages;
       return pages.length;
     } catch (error) { await archive.close(); throw error; }
@@ -62,7 +63,7 @@ export class ComicArchiveSource implements ComicPageSource {
     const file = await entry.file.extract();
     if (file.size <= 0 || file.size > MAX_PAGE_BYTES || file.size !== entry.file.size) throw new Error("Página da HQ incompleta ou excessiva.");
     const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-    const mime = ComicArchiveSource.imageMime(header);
+    const mime = sniffComicPageMime(header);
     const extension = entry.path.split(".").pop()?.toLowerCase();
     if (!mime || (extension === "jpg" || extension === "jpeg" ? mime !== "image/jpeg" : mime !== `image/${extension}`)) {
       throw new Error("Imagem da HQ não corresponde ao formato declarado.");
@@ -106,19 +107,4 @@ export class ComicArchiveSource implements ComicPageSource {
 
   public invalidate(): void { this.generation++; this.canvases.clear(); }
   public async close(): Promise<void> { this.invalidate(); this.decoded.clear(); this.pages = []; await this.archive?.close(); this.archive = null; }
-
-  private static readonly collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-  private static safePath(path: string): boolean {
-    return !path.startsWith("/") && !/^[a-z]:\//i.test(path) && !path.split("/").some(part => part === ".." || part === "" || part === ".");
-  }
-  private static imagePath(path: string): boolean {
-    const parts = path.split("/");
-    return !parts.some(part => part.startsWith(".") || part === "__MACOSX" || part.toLowerCase() === "thumbs.db") && /\.(jpe?g|png|webp)$/i.test(path);
-  }
-  private static imageMime(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null {
-    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
-    if (String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP") return "image/webp";
-    return null;
-  }
 }

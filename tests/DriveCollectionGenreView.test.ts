@@ -26,7 +26,7 @@ describe("HQs publicadas como gênero do catálogo", () => {
     const view = source("src/views/DriveCollectionGenreView.ts");
     assert.match(view, /ComicCoverSource/);
     assert.match(view, /LazyCoverLoader/);
-    assert.match(view, /this\.coverLoader\.observe\(image, entry\)/);
+    assert.match(view, /this\.coverLoader\.observe\(image, entry, fallback\)/);
     assert.match(view, /this\.onAdd\(entry, listing\)/);
     assert.match(view, /entry\.format === "pdf"/);
   });

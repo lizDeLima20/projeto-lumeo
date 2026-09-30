@@ -197,11 +197,10 @@ export class CatalogExplorerView extends BaseView {
     card.addEventListener("click", open); card.addEventListener("keydown", event => { if (event.key === "Enter") open(); });
     const cover = this.createElement("div", "drive-comic-card__cover");
     const fallback = (): void => cover.replaceChildren(this.createElement("span", "drive-comic-card__fallback", "📚"));
-    if (this.comicCovers.hasCover(entry)) {
-      const image = this.createElement("img", "") as HTMLImageElement;
-      image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
-      image.addEventListener("error", fallback, { once: true }); this.comicCoverLoader.observe(image, entry); cover.append(image);
-    } else fallback();
+    const image = this.createElement("img", "") as HTMLImageElement;
+    image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", fallback, { once: true }); cover.append(image);
+    this.comicCoverLoader.observe(image, entry, fallback);
     const path = listing.breadcrumb.slice(1).map(step => step.name).join(" · ") || collection.name;
     card.append(cover, this.createElement("h3", "drive-comic-card__title", entry.name.trim()), this.createElement("small", "drive-comic-card__format", path));
     return card;

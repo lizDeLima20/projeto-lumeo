@@ -54,6 +54,19 @@ describe("3/4. capa da HQ", () => {
     assert.match(source("src/services/ComicCoverSource.ts"), /IntersectionObserver/);
     assert.match(view, /image\.loading = "lazy"/);
   });
+  it("9. um CBR/CBZ sem capa também só é gerado quando o card se aproxima da tela, nunca em massa", () => {
+    const loader = source("src/services/ComicCoverSource.ts");
+    // The same IntersectionObserver instance gates both paths - a Drive URL revealed
+    // immediately, or a CBR/CBZ generated on the very same reveal. Neither starts eagerly
+    // for every card a folder happens to hold.
+    const observeMethod = loader.slice(loader.indexOf("public observe("), loader.indexOf("public destroy("));
+    assert.match(observeMethod, /this\.pending\.set\(image, start\)/);
+    assert.match(observeMethod, /this\.observer\.observe\(image\)/);
+    // The generator is only ever reached from inside the deferred `start` closure - never
+    // eagerly, before the entry is even known to be near the viewport.
+    const beforeDeferred = observeMethod.slice(0, observeMethod.indexOf("const start ="));
+    assert.doesNotMatch(beforeDeferred, /this\.generator!\.cover\(/);
+  });
 });
 
 describe("5/6. formatos na tela", () => {

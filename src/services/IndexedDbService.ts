@@ -20,13 +20,14 @@ export const STORE_NAMES = {
   localDiagnostics: "localDiagnostics",
   readingReviews: "readingReviews",
   syncOutbox: "syncOutbox",
+  comicCoverCache: "comicCoverCache",
 } as const;
 
 export type StoreName = typeof STORE_NAMES[keyof typeof STORE_NAMES];
 export type TransactionMode = "readonly" | "readwrite";
 
 export class IndexedDbService {
-  public static readonly SCHEMA_VERSION = 11;
+  public static readonly SCHEMA_VERSION = 12;
   private connection: Promise<IDBDatabase> | null = null;
   public constructor(private readonly databaseName = "lumeo-library", private readonly version = IndexedDbService.SCHEMA_VERSION) {}
 
@@ -66,6 +67,12 @@ export class IndexedDbService {
         if (!database.objectStoreNames.contains(STORE_NAMES.syncOutbox)) {
           const store = database.createObjectStore(STORE_NAMES.syncOutbox, { keyPath: "id" });
           store.createIndex("userCreated", ["userId", "createdAt"], { unique: false });
+        }
+        // Generated CBR/CBZ cover thumbnails only - never part of the library itself, safe
+        // to evict or clear entirely at any time.
+        if (!database.objectStoreNames.contains(STORE_NAMES.comicCoverCache)) {
+          const store = database.createObjectStore(STORE_NAMES.comicCoverCache, { keyPath: "key" });
+          store.createIndex("updatedAt", "updatedAt", { unique: false });
         }
       };
       request.onsuccess = () => resolve(request.result);
