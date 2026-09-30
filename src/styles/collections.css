@@ -59,6 +59,10 @@
 .drive-collection-genre__status:empty { display: none; }
 .drive-collection-genre__search-results:empty { display: none; }
 .drive-collection-genre__sections { display: grid; gap: 2rem; }
+/* Its own `display: grid` above wins over the UA [hidden] rule unless restated here - without
+   this, searching a collection left every unfiltered section rendered (just visually pushed
+   below the real results), instead of actually swapping the two views. */
+.drive-collection-genre__sections[hidden] { display: none; }
 .drive-collection-section { display: grid; gap: .8rem; min-height: 8rem; }
 .drive-collection-section__title, .drive-comic-carousel__title {
   margin: 0; font: 600 clamp(1.1rem, 3vw, 1.5rem)/1.2 Georgia, serif;

@@ -65,4 +65,13 @@ describe("controles sempre acessíveis no catálogo", () => {
     assert.match(collectionStyles, /\.drive-comic-card__cover \{ width: 92%; justify-self: center; \}/);
     assert.match(pt, /"catalog\.findBook": "Buscar"/);
   });
+
+  it("pesquisar dentro de uma coleção realmente esconde as seções não filtradas", () => {
+    // drive-collection-genre__sections sets its own `display: grid`, which otherwise wins
+    // over the browser's default `[hidden] { display: none }` - search() correctly set the
+    // hidden attribute, but the section stayed rendered (just pushed below the real results)
+    // until this rule restated display:none for the [hidden] case explicitly.
+    const collectionStyles = readFileSync("src/styles/collections.css", "utf8");
+    assert.match(collectionStyles, /\.drive-collection-genre__sections\[hidden\]\s*\{\s*display:\s*none;?\s*\}/);
+  });
 });
