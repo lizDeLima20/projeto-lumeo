@@ -102,7 +102,7 @@ export class ComicCoverThumbnailService {
   private async runQueued(entry: DriveFolderEntry): Promise<ComicCoverResult | null> {
     await this.acquire();
     try { return await this.withTimeout(this.generate(entry)); }
-    catch { return null; }
+    catch (error) { this.log("COMIC_COVER_FAILED", { fileId: entry.id, format: entry.format, stage: "runQueued", ...this.describeError(error) }); return null; }
     finally { this.release(); }
   }
 
@@ -128,9 +128,9 @@ export class ComicCoverThumbnailService {
 
   private async generate(entry: DriveFolderEntry): Promise<ComicCoverResult | null> {
     const extracted = entry.format === "cbz" ? await this.fromCbz(entry) : await this.fromFullArchive(entry);
-    if (!extracted?.page) return null;
+    if (!extracted?.page) { this.log("COMIC_COVER_FAILED", { fileId: entry.id, format: entry.format, stage: "extract" }); return null; }
     const image = await this.resize(extracted.page);
-    if (!image) return null;
+    if (!image) { this.log("COMIC_COVER_FAILED", { fileId: entry.id, format: entry.format, stage: "resize" }); return null; }
     return {
       image, contentType: "image/jpeg", etag: `"${entry.id}-${entry.modifiedAt ?? "unknown"}"`,
       metadata: extracted.comicInfoXml ? parseComicInfo(extracted.comicInfoXml) : EMPTY_METADATA,
@@ -143,8 +143,10 @@ export class ComicCoverThumbnailService {
    * make sense of. */
   private async fromCbz(entry: DriveFolderEntry): Promise<{ page: Blob | null; comicInfoXml: string | null } | null> {
     if (entry.size) {
-      const result = await extractCbzCoverAndInfo(entry.size, (start, end) => this.rangeFetch(entry.id, start, end));
+      const result = await extractCbzCoverAndInfo(entry.size, (start, end) => this.rangeFetch(entry.id, start, end))
+        .catch((error: unknown) => { this.log("COMIC_COVER_FAILED", { fileId: entry.id, format: "cbz", stage: "range-extract", ...this.describeError(error) }); return { page: null, comicInfoXml: null }; });
       if (result.page) return result;
+      this.log("COMIC_COVER_FALLBACK", { fileId: entry.id, format: "cbz", reason: "range-extract-empty" });
     }
     return this.fromFullArchive(entry);
   }
@@ -167,7 +169,7 @@ export class ComicCoverThumbnailService {
     const buffer = await this.download(entry.id, entry.size);
     const archive = await this.openArchive(new File([new Uint8Array(buffer)], entry.format === "cbr" ? "comic.cbr" : "comic.cbz"));
     try {
-      if (await archive.hasEncryptedData()) return null;
+      if (await archive.hasEncryptedData()) { this.log("COMIC_COVER_FAILED", { fileId: entry.id, format: entry.format, stage: "archive-open", reason: "encrypted" }); return null; }
       const listed = await archive.getFilesArray() as ArchiveEntryRow[];
       const rows = listed
         .map(item => ({ path: `${item.path}${item.file.name}`.replace(/\\/g, "/"), file: item.file }))
@@ -175,6 +177,7 @@ export class ComicCoverThumbnailService {
       // libarchive's own listing order is whatever the archive stored, not natural order -
       // the exact same natural-sort collator the real reader uses picks the same "page one".
       const pages = rows.filter(item => isComicPageImagePath(item.path)).sort((a, b) => comicPageCollator.compare(a.path, b.path));
+      if (!pages.length) this.log("COMIC_COVER_FAILED", { fileId: entry.id, format: entry.format, stage: "archive-open", reason: "no-page-entries", entryCount: rows.length });
       const comicInfo = rows.find(item => /(^|\/)comicinfo\.xml$/i.test(item.path));
       const [page, comicInfoXml] = await Promise.all([
         pages[0] ? this.extractPage(pages[0].file) : Promise.resolve(null),
@@ -221,7 +224,13 @@ export class ComicCoverThumbnailService {
         .resize({ width: THUMBNAIL_MAX_WIDTH, height: THUMBNAIL_MAX_HEIGHT, fit: "inside", withoutEnlargement: true })
         .jpeg({ quality: JPEG_QUALITY })
         .toBuffer();
-    } catch { return null; }
+    } catch (error) { this.log("COMIC_COVER_FAILED", { stage: "sharp-resize", ...this.describeError(error) }); return null; }
+  }
+
+  private log(event: string, details: Record<string, unknown>): void { console.info(JSON.stringify({ event, ...details })); }
+  private describeError(error: unknown): { errorMessage: string; errorName?: string; httpStatus?: number } {
+    const details = error as { message?: string; name?: string; status?: number };
+    return { errorMessage: details?.message ?? String(error), errorName: details?.name, httpStatus: details?.status };
   }
 }
 
