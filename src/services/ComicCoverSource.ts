@@ -59,8 +59,10 @@ export class LazyCoverLoader {
   }
 
   /** `onUnavailable` is the caller's placeholder - it runs immediately when neither a
-   *  direct URL nor generation is possible, and later if generation is tried but fails. */
-  public observe(image: HTMLImageElement, entry: DriveFolderEntry, onUnavailable?: () => void): void {
+   *  direct URL nor generation is possible, and later if generation is tried but fails.
+   *  `collectionId` is only ever needed for the generation path: it is what the BFF's
+   *  comic-cover endpoint validates the entry's own path trail against. */
+  public observe(image: HTMLImageElement, entry: DriveFolderEntry, collectionId: string, onUnavailable?: () => void): void {
     const url = this.covers.coverUrl(entry);
     const canGenerate = !url && Boolean(this.generator) && entry.kind === "file" && entry.supported
       && (entry.format === "cbr" || entry.format === "cbz");
@@ -68,7 +70,7 @@ export class LazyCoverLoader {
     const start = url
       ? () => { image.src = url; }
       : () => {
-        void this.generator!.cover(entry, () => image.isConnected).then(dataUrl => {
+        void this.generator!.cover(collectionId, entry, () => image.isConnected).then(dataUrl => {
           if (dataUrl) image.src = dataUrl; else onUnavailable?.();
         });
       };

@@ -28,6 +28,7 @@ import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalog
 import { StructuredDriveCatalogProvider } from "./catalog/StructuredDriveCatalogProvider.js";
 import { PublicDriveFolderReader } from "./catalog/PublicDriveFolderReader.js";
 import { DriveCollectionService } from "./collections/DriveCollectionService.js";
+import { ComicCoverThumbnailService } from "./collections/ComicCoverThumbnailService.js";
 import { SupabaseCollectionIndexStore } from "./collections/SupabaseCollectionIndexStore.js";
 import { DriveFolderBrowser } from "./collections/DriveFolderBrowser.js";
 import { DriveRequestLimiter } from "./collections/DriveRequestLimiter.js";
@@ -43,7 +44,7 @@ export const isPublicCatalogRequest = (method: string | undefined, path: string)
  * the one write here, and it is never a Lumeo account: it is public in the same sense
  * (no Bearer token expected), gated instead by its own shared secret inside the handler. */
 export const isPublicCollectionRequest = (method: string | undefined, path: string): boolean =>
-  (method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/(?:folders(?:\/[A-Za-z0-9_-]+)?|search-index))?$/i.test(path))
+  (method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/(?:folders(?:\/[A-Za-z0-9_-]+)?|search-index|comic-cover\/[A-Za-z0-9_-]+))?$/i.test(path))
   || (method === "POST" && /^\/api\/collections\/[a-z0-9-]+\/reindex$/i.test(path));
 
 export class ServerApp {
@@ -77,6 +78,16 @@ export class ServerApp {
         structured: (source) => new StructuredDriveCatalogProvider(source, new PublicDriveFolderReader(), fetch, { read: (folderId) => metadataDrive!.readCatalogJson(folderId) }),
       } : undefined);
       const catalogStore = new CatalogRepository(supabase.admin);
+      // The Drive tree is the navigation: this only ever lists the folder that was asked for.
+      // The materialized search index lives in Supabase Storage, not the database - no
+      // migration needed, and it is metadata only, never a comic's own bytes.
+      const collectionsService = new DriveCollectionService(config.driveCollections, new DriveFolderBrowser((url) => createDrive().request(url), new DriveRequestLimiter()),
+        {}, new SupabaseCollectionIndexStore(supabase.admin));
+      // A CBR/CBZ cover is the one place a comic's own bytes are read server-side, and only
+      // long enough to find its first page and discard the rest - reuses the exact same
+      // service account already trusted to browse the collection's folders, and the exact
+      // same open() validation collectionsService itself already enforces.
+      const comicCovers = new ComicCoverThumbnailService(collectionsService, { mediaRange: (fileId, range) => createDrive().mediaRange(fileId, range) });
       controller = new ApiController(
         auth,
         new AuthMiddleware(auth),
@@ -86,12 +97,9 @@ export class ServerApp {
         new CatalogApplicationService(catalogStore, () => createDrive(), new HybridCatalogSourceProvider((locale) => catalogSources.providers(locale))),
         new UserPersistenceRepository(supabase.admin),
         new CatalogSourceAdminService(sourceStore, configuredSources, catalogSources, (userId) => catalogStore.isAdmin(userId)),
-        // The Drive tree is the navigation: this only ever lists the folder that was asked for.
-        // The materialized search index lives in Supabase Storage, not the database - no
-        // migration needed, and it is metadata only, never a comic's own bytes.
-        new DriveCollectionService(config.driveCollections, new DriveFolderBrowser((url) => createDrive().request(url), new DriveRequestLimiter()),
-          {}, new SupabaseCollectionIndexStore(supabase.admin)),
+        collectionsService,
         config.collectionReindexSecret,
+        comicCovers,
       );
       return controller;
     };
@@ -156,6 +164,10 @@ export class ServerApp {
       response.setHeader("Vary", "Origin");
       response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Installation-Id");
       response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      // A cross-origin fetch() (Capacitor's https://localhost origin) can read the response
+      // body without this, but not these headers - browsers only expose the CORS safelist by
+      // default, which excludes ETag and any custom X- header.
+      response.setHeader("Access-Control-Expose-Headers", "ETag, X-Comic-Title, X-Comic-Series, X-Comic-Number, X-Comic-Year, X-Comic-Writer, X-Comic-Publisher, X-Comic-Genre, X-Comic-Summary");
     }
     if (request.method === "OPTIONS") {
       response.statusCode = origin && !config.allowedOrigins.includes(origin) ? 403 : 204;

@@ -25,6 +25,13 @@ export class ApiClient {
     return this.request<T>(path, { method: "POST", body: JSON.stringify(body) }, authenticated);
   }
 
+  /** For a response this client must read itself - a binary body, custom headers - rather
+   *  than the uniform JSON contract request() assumes. Still goes through the same fetch,
+   *  refresh-and-retry and Android logging as every other call. */
+  public getRaw(path: string, authenticated = true): Promise<Response> {
+    return this.fetchWithRefresh(path, { method: "GET" }, authenticated);
+  }
+
   /** Streams a protected book download while keeping its credentials out of URLs. */
   public async download(path: string, onProgress: (percent: number | null) => void, signal?: AbortSignal): Promise<File> {
     const response = await this.fetchWithRefresh(path, { signal }, true);

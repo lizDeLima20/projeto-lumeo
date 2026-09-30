@@ -200,7 +200,7 @@ export class CatalogExplorerView extends BaseView {
     const image = this.createElement("img", "") as HTMLImageElement;
     image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
     image.addEventListener("error", fallback, { once: true }); cover.append(image);
-    this.comicCoverLoader.observe(image, entry, fallback);
+    this.comicCoverLoader.observe(image, entry, collection.id, fallback);
     const path = listing.breadcrumb.slice(1).map(step => step.name).join(" · ") || collection.name;
     card.append(cover, this.createElement("h3", "drive-comic-card__title", entry.name.trim()), this.createElement("small", "drive-comic-card__format", path));
     return card;

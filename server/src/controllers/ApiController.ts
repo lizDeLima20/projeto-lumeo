@@ -9,6 +9,7 @@ import { RequestValidator } from "../validation/RequestValidator.js";
 import { CatalogApplicationService } from "../catalog/CatalogApplicationService.js";
 import type { CatalogSourceAdminService } from "../catalog/CatalogSourceAdminService.js";
 import type { DriveCollectionService } from "../collections/DriveCollectionService.js";
+import type { ComicCoverThumbnailService, ComicCoverMetadata, ComicCoverResult } from "../collections/ComicCoverThumbnailService.js";
 import type { PersistedGenre, PersistedLibraryBook, PersistedPreferences, UserPersistenceStore } from "../repositories/UserPersistenceRepository.js";
 
 export class ApiController {
@@ -24,6 +25,7 @@ export class ApiController {
     private readonly catalogSources?: CatalogSourceAdminService,
     private readonly collections?: DriveCollectionService,
     private readonly collectionReindexSecret?: string,
+    private readonly comicCovers?: ComicCoverThumbnailService,
   ) {}
 
   public async handle(request: AuthenticatedRequest, response: ApiResponse, path: string): Promise<void> {
@@ -78,6 +80,18 @@ export class ApiController {
           throw new ApiError(403, "REINDEX_FORBIDDEN", "Segredo de reindexação ausente ou incorreto.");
         }
         return this.json(response, 200, await this.collections.rebuildIndex(reindex[1]!));
+      }
+      // The one place a comic's own bytes are ever touched server-side, and only long enough
+      // to find its first page: the client sends the same fileId + path trail every entry
+      // already carries, never an arbitrary URL, and the folder/path validation below is the
+      // exact same one /folders uses to prove a file belongs to this collection.
+      const comicCover = /^\/api\/collections\/([a-z0-9-]+)\/comic-cover\/([A-Za-z0-9_-]+)$/i.exec(path);
+      if (request.method === "GET" && comicCover) {
+        if (!this.comicCovers) throw new ApiError(503, "COMIC_COVERS_UNAVAILABLE", "A geração de capas não está disponível.");
+        const trail = new URL(request.url ?? "/", "http://localhost").searchParams.get("path");
+        const pathSteps = trail ? trail.split(",").map(step => step.trim()).filter(Boolean) : [];
+        const result = await this.comicCovers.thumbnail(comicCover[1]!, comicCover[2]!, pathSteps);
+        return this.comicCoverResponse(request, response, result);
       }
       await this.authMiddleware.requireAuth(request);
       const user = request.user;
@@ -235,6 +249,32 @@ export class ApiController {
     response.statusCode = status;
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.end(JSON.stringify(data));
+  }
+  /** The image itself is the response body; ComicInfo.xml's fields (when the archive had
+   * one) ride along as headers instead of a second call that would have to re-open the same
+   * archive - each one percent-encoded, since a title or writer name is free text that HTTP
+   * headers cannot carry as-is. A field ComicInfo.xml did not have is simply absent, never
+   * an empty header. */
+  private comicCoverResponse(request: AuthenticatedRequest, response: ApiResponse, result: ComicCoverResult | null): void {
+    if (!result) throw new ApiError(404, "COMIC_COVER_UNAVAILABLE", "Não foi possível gerar a capa desta HQ.");
+    if (request.headers["if-none-match"] === result.etag) { response.statusCode = 304; response.end(); return; }
+    response.statusCode = 200;
+    response.setHeader("Content-Type", result.contentType);
+    response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    response.setHeader("ETag", result.etag);
+    for (const [header, value] of Object.entries(this.comicMetadataHeaders(result.metadata))) {
+      if (value !== null) response.setHeader(header, value);
+    }
+    response.end(result.image);
+  }
+  private comicMetadataHeaders(metadata: ComicCoverMetadata): Record<string, string | null> {
+    const encode = (value: string | null): string | null => value ? encodeURIComponent(value) : null;
+    return {
+      "X-Comic-Title": encode(metadata.title), "X-Comic-Series": encode(metadata.series),
+      "X-Comic-Number": encode(metadata.number), "X-Comic-Year": encode(metadata.year),
+      "X-Comic-Writer": encode(metadata.writer), "X-Comic-Publisher": encode(metadata.publisher),
+      "X-Comic-Genre": encode(metadata.genre), "X-Comic-Summary": encode(metadata.summary),
+    };
   }
   private requiredCatalogSources(): CatalogSourceAdminService {
     if (!this.catalogSources) throw new ApiError(503, "CATALOG_SOURCES_UNAVAILABLE", "As fontes do catálogo não estão disponíveis.");

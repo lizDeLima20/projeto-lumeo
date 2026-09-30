@@ -1,6 +1,6 @@
 import { Archive } from "libarchive.js";
 import type { PDFPageProxy } from "pdfjs-dist";
-import { comicPageCollator, isComicPageImagePath, isSafeArchivePath, sniffComicPageMime } from "./ComicArchiveEntryFilter";
+import { comicPageCollator, isComicPageImagePath, isSafeArchivePath, sniffComicPageMime } from "../../../shared/ComicArchiveEntryFilter";
 import type { ComicPageSource } from "./ComicPageSource";
 import type { ComicStageSize } from "./ComicPageEngine";
 

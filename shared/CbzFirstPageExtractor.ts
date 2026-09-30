@@ -1,5 +1,5 @@
 import { inflateSync } from "fflate";
-import { comicPageCollator, isComicPageImagePath, isSafeArchivePath, sniffComicPageMime } from "./ComicArchiveEntryFilter";
+import { comicPageCollator, isComicPageImagePath, isSafeArchivePath, sniffComicPageMime } from "./ComicArchiveEntryFilter.js";
 
 /** Reads one byte range of a remote file, inclusive on both ends - the same contract as an
  *  HTTP `Range: bytes=start-end` header. */
@@ -26,12 +26,38 @@ interface CentralDirectoryEntry { name: string; method: number; compressedSize: 
  *  Returns null (never throws) whenever the archive can't be read this way - the caller's
  *  placeholder stands in either way. */
 export async function extractFirstCbzPage(totalSize: number, fetchRange: ByteRangeFetcher): Promise<Blob | null> {
-  try {
-    return await extractFirstCbzPageOrThrow(totalSize, fetchRange);
-  } catch { return null; }
+  const entries = await readCentralDirectory(totalSize, fetchRange).catch(() => null);
+  if (!entries) return null;
+  const first = firstPageEntry(entries);
+  if (!first) return null;
+  return extractEntry(first, fetchRange).catch(() => null);
 }
 
-async function extractFirstCbzPageOrThrow(totalSize: number, fetchRange: ByteRangeFetcher): Promise<Blob | null> {
+export interface CbzCoverAndInfo { page: Blob | null; comicInfoXml: string | null }
+
+/** Same directory read as extractFirstCbzPage(), but also returns ComicInfo.xml's raw text
+ *  when the archive has one - one round of Range requests serving both the cover and the
+ *  metadata a server-side caller wants alongside it. */
+export async function extractCbzCoverAndInfo(totalSize: number, fetchRange: ByteRangeFetcher): Promise<CbzCoverAndInfo> {
+  try {
+    const entries = await readCentralDirectory(totalSize, fetchRange);
+    if (!entries) return { page: null, comicInfoXml: null };
+    const first = firstPageEntry(entries);
+    const comicInfo = entries.find(entry => isSafeArchivePath(entry.name) && /(^|\/)comicinfo\.xml$/i.test(entry.name));
+    const [page, comicInfoXml] = await Promise.all([
+      first ? extractEntry(first, fetchRange) : Promise.resolve(null),
+      comicInfo ? extractXmlEntry(comicInfo, fetchRange) : Promise.resolve(null),
+    ]);
+    return { page, comicInfoXml };
+  } catch { return { page: null, comicInfoXml: null }; }
+}
+
+function firstPageEntry(entries: readonly CentralDirectoryEntry[]): CentralDirectoryEntry | undefined {
+  return entries.filter(entry => isSafeArchivePath(entry.name) && isComicPageImagePath(entry.name))
+    .sort((a, b) => comicPageCollator.compare(a.name, b.name))[0];
+}
+
+async function readCentralDirectory(totalSize: number, fetchRange: ByteRangeFetcher): Promise<CentralDirectoryEntry[] | null> {
   if (totalSize <= EOCD_FIXED_SIZE) return null;
   const tailSize = Math.min(totalSize, EOCD_FIXED_SIZE + MAX_EOCD_COMMENT);
   const tailStart = totalSize - tailSize;
@@ -52,12 +78,7 @@ async function extractFirstCbzPageOrThrow(totalSize: number, fetchRange: ByteRan
     : await fetchRange(centralDirOffset, centralDirOffset + centralDirSize - 1);
   if (centralDirectory.length < centralDirSize) return null;
 
-  const entries = parseCentralDirectory(centralDirectory, entryCount);
-  const pages = entries.filter(entry => isSafeArchivePath(entry.name) && isComicPageImagePath(entry.name))
-    .sort((a, b) => comicPageCollator.compare(a.name, b.name));
-  const first = pages[0];
-  if (!first) return null;
-  return extractEntry(first, fetchRange);
+  return parseCentralDirectory(centralDirectory, entryCount);
 }
 
 function findEocd(tail: Uint8Array): number {
@@ -90,6 +111,20 @@ function parseCentralDirectory(buffer: Uint8Array, expectedCount: number): Centr
 }
 
 async function extractEntry(entry: CentralDirectoryEntry, fetchRange: ByteRangeFetcher): Promise<Blob | null> {
+  const raw = await extractRawEntryBytes(entry, fetchRange);
+  if (!raw) return null;
+  const mime = sniffComicPageMime(raw);
+  if (!mime) return null;
+  return new Blob([new Uint8Array(raw)], { type: mime });
+}
+
+async function extractXmlEntry(entry: CentralDirectoryEntry, fetchRange: ByteRangeFetcher): Promise<string | null> {
+  const raw = await extractRawEntryBytes(entry, fetchRange).catch(() => null);
+  if (!raw) return null;
+  try { return new TextDecoder("utf-8").decode(raw); } catch { return null; }
+}
+
+async function extractRawEntryBytes(entry: CentralDirectoryEntry, fetchRange: ByteRangeFetcher): Promise<Uint8Array | null> {
   // Store (0) and Deflate (8) cover the overwhelming majority of real CBZ files, and are
   // the only methods this narrow extractor - not a general unzip - needs to support.
   if (entry.method !== 0 && entry.method !== 8) return null;
@@ -105,11 +140,7 @@ async function extractEntry(entry: CentralDirectoryEntry, fetchRange: ByteRangeF
   const dataStart = 30 + nameLength + extraLength;
   const compressed = headerAndData.subarray(dataStart, dataStart + entry.compressedSize);
   if (compressed.length < entry.compressedSize) return null;
-  const raw = entry.method === 0 ? compressed : inflate(compressed);
-  if (!raw) return null;
-  const mime = sniffComicPageMime(raw);
-  if (!mime) return null;
-  return new Blob([new Uint8Array(raw)], { type: mime });
+  return entry.method === 0 ? compressed : inflate(compressed);
 }
 
 function inflate(compressed: Uint8Array): Uint8Array | null {

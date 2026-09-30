@@ -124,7 +124,7 @@ export class CollectionBrowserView extends BaseView {
     const image = this.createElement("img", "collection-entry__cover") as HTMLImageElement;
     image.alt = ""; image.loading = "lazy"; image.decoding = "async"; image.width = 40; image.height = 56;
     image.addEventListener("error", () => image.replaceWith(Object.assign(this.createElement("span", "collection-entry__icon", "📕"), { ariaHidden: "true" })));
-    this.loader?.observe(image, entry);
+    this.loader?.observe(image, entry, this.collectionId);
     return image;
   }
 

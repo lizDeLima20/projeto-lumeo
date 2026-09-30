@@ -79,6 +79,7 @@ import { ComicContentTypeResolver } from "../reader/comic/ComicContentType";
 import { CollectionBrowserView } from "../views/CollectionBrowserView";
 import { DriveCollectionGenreView } from "../views/DriveCollectionGenreView";
 import { DriveCollectionService } from "../services/DriveCollectionService";
+import { configureComicCoverGenerator } from "../services/ComicCoverGenerator";
 import { CollectionImportService } from "../services/CollectionImportService";
 import { ComicDetailsView } from "../views/ComicDetailsView";
 import type { DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
@@ -116,6 +117,9 @@ export class App {
   private readonly pwaInstall = new PwaInstallManager();
 
   public constructor(outlet: HTMLElement, private readonly headerRoot: HTMLElement, private readonly footerRoot: HTMLElement) {
+    // A CBR/CBZ cover is generated through this same ApiClient, never a direct Drive fetch -
+    // configured once here so LazyCoverLoader's own default resolves a real generator.
+    configureComicCoverGenerator(this.api);
     this.router = new Router(outlet);
     this.router.setGuard((route) => this.guardRoute(route));
     this.registerRoutes();

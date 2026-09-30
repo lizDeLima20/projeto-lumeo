@@ -138,7 +138,7 @@ export class DriveCollectionGenreView extends BaseView {
     const image = this.createElement("img", "") as HTMLImageElement;
     image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
     image.addEventListener("error", fallback, { once: true }); cover.append(image);
-    this.coverLoader.observe(image, entry, fallback);
+    this.coverLoader.observe(image, entry, this.collectionId, fallback);
     const title = this.createElement("h3", "drive-comic-card__title", entry.name.trim());
     const format = this.createElement("small", "drive-comic-card__format", entry.format?.toUpperCase() ?? this.i18n.t("ui.collections.unknownFormat"));
     card.append(cover, title, format);

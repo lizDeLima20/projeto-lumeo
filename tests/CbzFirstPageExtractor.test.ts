@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { describe, it } from "node:test";
 import { zipSync } from "fflate";
-import { extractFirstCbzPage } from "../src/reader/comic/CbzFirstPageExtractor";
+import { extractFirstCbzPage } from "../shared/CbzFirstPageExtractor";
 
 /** A tiny, valid image payload - real magic bytes plus filler, exactly what
  *  sniffComicPageMime needs to recognize the format without a real decoder. */

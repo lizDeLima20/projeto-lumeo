@@ -50,7 +50,7 @@ describe("3/4. capa da HQ", () => {
   it("as capas não são geradas todas ao abrir a pasta", () => {
     const view = source("src/views/CollectionBrowserView.ts");
     // The loader only fetches a cover once its row is near the viewport.
-    assert.match(view, /this\.loader\?\.observe\(image, entry\)/);
+    assert.match(view, /this\.loader\?\.observe\(image, entry, this\.collectionId\)/);
     assert.match(source("src/services/ComicCoverSource.ts"), /IntersectionObserver/);
     assert.match(view, /image\.loading = "lazy"/);
   });
