@@ -3,12 +3,19 @@ import type { ComicTextRegion } from "./ComicInteractionTypes";
 
 export interface ComicOriginalArt { image: CanvasImageSource; x: number; y: number; width: number; height: number; fallback?: boolean; }
 
-/** One original-pixel representation shared by the open balloon and its hint. */
-export function comicArtworkCanvas(art: ComicOriginalArt): HTMLCanvasElement {
+/** One original-pixel representation shared by the open balloon and its hint.
+ *
+ *  `target`, when given, draws at that backing resolution instead of the source art's own
+ *  size - the one place a balloon is actually upscaled for reading, done once with the
+ *  browser's best resampler rather than left to however a CSS-stretched canvas happens to
+ *  scale. The hint preview never passes one, and keeps drawing at the source's own size
+ *  exactly as before. */
+export function comicArtworkCanvas(art: ComicOriginalArt, target?: { width: number; height: number }): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(art.width)); canvas.height = Math.max(1, Math.round(art.height));
-  const context = canvas.getContext("2d");
+  canvas.width = Math.max(1, Math.round(target?.width ?? art.width)); canvas.height = Math.max(1, Math.round(target?.height ?? art.height));
+  const context = canvas.getContext("2d", { willReadFrequently: Boolean(target) });
   if (!context) throw new Error("Canvas unavailable");
+  if (target) { context.imageSmoothingEnabled = true; context.imageSmoothingQuality = "high"; }
   context.drawImage(art.image, art.x, art.y, art.width, art.height, 0, 0, canvas.width, canvas.height);
   return canvas;
 }

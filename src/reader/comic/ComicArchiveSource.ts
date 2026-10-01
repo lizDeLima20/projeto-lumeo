@@ -96,6 +96,11 @@ export class ComicArchiveSource implements ComicPageSource {
       const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
       if (!context) return null;
       context.fillStyle = "#fff"; context.fillRect(0, 0, canvas.width, canvas.height);
+      // Default smoothing quality is "low" in Chromium - soft enough, scaling a full
+      // archive page down (or up) onto its backing canvas, to read as blur nobody asked
+      // for. This is the one place that resample happens, so it is the one place to ask
+      // for the browser's best resampler, same as the turn renderer already does.
+      context.imageSmoothingEnabled = true; context.imageSmoothingQuality = "high";
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       if (generation === this.generation) {
         this.canvases.set(key, canvas);

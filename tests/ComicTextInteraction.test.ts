@@ -126,7 +126,7 @@ describe("HQ: o asset original é ampliado sem distorcer ou reescrever sua arte"
     assert.equal(comicBubbleFallbackPath("rectangle"), "M 1 1 L 99 1 L 99 99 L 1 99 Z");
 
     const view = source("reader/comic/interaction/ComicBubbleView.ts");
-    assert.match(view, /comicArtworkCanvas\(art\)/);
+    assert.match(view, /comicArtworkCanvas\(art, \{ width, height \}\)/);
     assert.doesNotMatch(view, /paragraph\.textContent|createElementNS|fillText|comicBubbleFallbackPath/);
   });
 });
@@ -178,8 +178,11 @@ describe("HQ: reconhecimento incerto e depuração", () => {
   it("a região incerta é marcada no elemento, sem mensagem técnica ao leitor", () => {
     const bubble = source("reader/comic/interaction/ComicBubbleView.ts");
     assert.match(bubble, /element\.dataset\.review = region\.recognitionStatus \?\? "needs-review";/);
-    // Recognition confidence steers nothing the reader can see: no label, no message.
-    assert.doesNotMatch(bubble, /ocrConfidence|textContent = .*confian/i);
+    // Recognition confidence steers how hard the enhancement pass works, never anything
+    // the reader can see as a label or a message: it reaches exactly one place, the plan
+    // it feeds, and nowhere near text shown on screen.
+    assert.match(bubble, /comicPlanBalloonEnhancement\(metrics, region\.ocrConfidence\)/);
+    assert.doesNotMatch(bubble, /textContent\s*=[^;]*ocrConfidence|ocrConfidence[^;]*textContent|aria-label[^;]*ocrConfidence|confian/i);
     const view = source("views/ComicReaderView.ts");
     assert.match(view, /target\.dataset\.review = region\.recognitionStatus \?\? "recognized";/);
   });
@@ -525,7 +528,7 @@ describe("HQ: leitura no desktop", () => {
 describe("HQ: mesmo coberto, o vizinho continua clicável", () => {
   it("a arte original usa sua máscara completa sem um segundo recorte simplificado", () => {
     const view = source("reader/comic/interaction/ComicBubbleView.ts");
-    assert.match(view, /comicArtworkCanvas\(art\)/);
+    assert.match(view, /comicArtworkCanvas\(art, \{ width, height \}\)/);
     assert.doesNotMatch(view, /element\.style\.clipPath\s*=/);
   });
 

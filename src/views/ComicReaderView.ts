@@ -484,6 +484,10 @@ export class ComicReaderView extends BaseView {
    *  while this balloon is still growing belong to the tap that opened it - Android's
    *  WebView delivers them that late - and are left alone. */
   private readonly handleBubbleClick = (event: MouseEvent): void => {
+    // The original/enhanced switch sits on top of the enlarged balloon, which this
+    // listener's own capture phase would otherwise reach first - a tap there is never a
+    // tap on the page behind it, whatever region happens to be under it on screen.
+    if ((event.target as HTMLElement | null)?.closest(".comic-bubble__toggle")) return;
     const bubble = this.bubble; if (!bubble?.isOpen || !this.stage) return;
     const now = typeof performance === "object" ? performance.now() : Date.now();
     if (now - bubble.openedAt < COMIC_BUBBLE_MOTION.openMs) return;

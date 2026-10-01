@@ -144,6 +144,14 @@
 .comic-bubble--leaving { pointer-events: none; }
 .comic-bubble__art { display: block; width: 100%; height: 100%; object-fit: contain; background: transparent; }
 
+/* Proof, on demand, that the enhancement pass changed how a balloon reads and nothing
+   about what it says - hidden whenever there was nothing worth toggling. */
+.comic-bubble__toggle {
+  position: absolute; right: .4rem; bottom: .4rem; z-index: 1; border: 1px solid rgba(0, 0, 0, .18);
+  border-radius: .5rem; padding: .2rem .5rem; font-size: .72rem; line-height: 1.2; cursor: pointer;
+  color: #25221c; background: rgba(255, 255, 255, .82); backdrop-filter: blur(4px);
+}
+
 /* The discovery nudge: the page's own balloon, cut to its outline, over itself. */
 .comic-hint { position: absolute; pointer-events: none; transform-origin: 50% 50%; will-change: transform; filter: none; }
 .comic-hint canvas { display: block; width: 100%; height: 100%; }
