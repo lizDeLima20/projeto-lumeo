@@ -3,6 +3,7 @@ import type { Book } from "../models/Book";
 import { ComicCoverSource } from "../services/ComicCoverSource";
 import { CollectionFileMismatchError, type CollectionImportRequest, type CollectionImportService } from "../services/CollectionImportService";
 import type { DriveCollectionService, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
+import { DuplicateBookImportError } from "../services/ImportManager";
 import { BaseView } from "./BaseView";
 
 export interface ComicDetailsActions {
@@ -120,17 +121,27 @@ export class ComicDetailsView extends BaseView {
             ? `${this.i18n.t("ui.catalog.downloading")} ${Math.min(100, Math.round(current * 100 / total))}%` : this.i18n.t("ui.catalog.downloading");
         });
         if (result.kind === "native-file") {
-          this.downloaded = result.file;
-          progress.dataset.state = "downloaded"; progress.textContent = this.i18n.t("ui.comic.downloaded");
+          progress.dataset.state = "saving"; progress.textContent = this.i18n.t("ui.catalog.saving");
+          const saved = await importer.addDownloadedFile(await request(), result.file);
+          if (saved.kind === "browser-download") return;
+          if (saved.kind === "saved") this.actions.added(saved.book);
+          this.downloaded = null;
+          showOpen(saved.book, saved.kind === "existing" ? this.i18n.t("ui.comic.alreadyInLibrary") : this.i18n.t("ui.comic.added"));
+          return;
         } else {
           this.browserDownloadStarted = true;
           progress.dataset.state = "downloaded"; progress.textContent = `${this.i18n.t("catalog.downloadStarted")} ${this.i18n.t("catalog.selectExpectedFile", { filename: result.expectedFilename })}`;
         }
         download.textContent = this.i18n.t("ui.comic.downloadAgain"); download.disabled = false;
         add.disabled = false;
-      } catch {
+      } catch (error) {
+        // The download itself can succeed while the later import step finds this exact file
+        // already in the library (by content hash, not only by this comic's own identity) -
+        // that is success, not a download failure, and the UI must say so.
+        if (error instanceof DuplicateBookImportError) { showOpen(error.decision.book, this.i18n.t("ui.comic.alreadyInLibrary")); return; }
         download.disabled = false; progress.dataset.state = "error"; download.textContent = this.i18n.t("ui.common.retry");
-        progress.textContent = this.i18n.t("ui.catalog.downloadFailed");
+        progress.textContent = error instanceof CollectionFileMismatchError ? this.i18n.t("ui.comic.fileMismatch")
+          : error instanceof Error ? error.message : this.i18n.t("ui.catalog.downloadFailed");
       }
     })();
 
@@ -146,6 +157,7 @@ export class ComicDetailsView extends BaseView {
         this.downloaded = null;
         showOpen(result.book, result.kind === "existing" ? this.i18n.t("ui.comic.alreadyInLibrary") : this.i18n.t("ui.comic.added"));
       } catch (error) {
+        if (error instanceof DuplicateBookImportError) { showOpen(error.decision.book, this.i18n.t("ui.comic.alreadyInLibrary")); return; }
         add.disabled = false;
         progress.dataset.state = "error"; progress.textContent = error instanceof CollectionFileMismatchError ? this.i18n.t("ui.comic.fileMismatch")
           : error instanceof Error ? error.message : this.i18n.t("ui.catalog.downloadFailed");
