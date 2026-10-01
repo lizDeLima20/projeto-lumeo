@@ -27,6 +27,7 @@ import type { ComicTextRegion } from "../reader/comic/interaction/ComicInteracti
 import { comicRegionBounds } from "../reader/comic/interaction/ComicRegionBounds";
 import type { ComicPoint } from "../reader/comic/ComicFoldGeometry";
 import { ReaderFileMissingError, type ReaderManager } from "../reader/ReaderManager";
+import { ReaderImmersive } from "../services/ReaderImmersive";
 import { BaseView } from "./BaseView";
 
 const THEME_KEY = "lumeo.comic.theme";
@@ -139,12 +140,14 @@ export class ComicReaderView extends BaseView {
     document.body.classList.add("reader-mode");
     document.addEventListener("keydown", this.handleKeydown);
     window.addEventListener("resize", this.handleResize);
+    void ReaderImmersive.enter();
     queueMicrotask(() => void this.initialize());
     return reader;
   }
 
   public override unmount(): void {
     this.disposed = true;
+    void ReaderImmersive.exit();
     this.stage?.removeEventListener("pointerdown", this.handlePointerDown, { capture: true });
     this.bubbleLayer?.removeEventListener("click", this.handleBubbleClick, { capture: true });
     window.clearTimeout(this.resizeTimer); window.clearTimeout(this.labelTimer);

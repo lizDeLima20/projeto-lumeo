@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { ComicHitMap, COMIC_HIT_SLOP_PX, type ComicPageArt } from "../src/reader/comic/interaction/ComicHitMap";
+import { ComicHitMap, COMIC_HIT_SLOP_PX, COMIC_SMALL_BALLOON_SLOP_PX, type ComicPageArt } from "../src/reader/comic/interaction/ComicHitMap";
 import { ComicInteractionEngine } from "../src/reader/comic/interaction/ComicInteractionEngine";
 import { comicBubbleTarget, comicBubbleText, comicBubbleZoom, COMIC_BUBBLE_ZOOM } from "../src/reader/comic/interaction/ComicBubbleLayout";
 import { comicBubbleFallbackPath, comicBubblePath } from "../src/reader/comic/interaction/ComicBubbleShape";
@@ -362,6 +362,110 @@ describe("HQ: o toque pertence à silhueta, não ao retângulo", () => {
     const swapped = new ComicHitMap(pages, engineWith(neighbour(), lobes()));
     assert.equal(swapped.hit({ x: 620, y: 340 })?.region.id, "vizinho");
     assert.equal(map().hit({ x: 620, y: 340 })?.region.id, "vizinho");
+  });
+});
+
+describe("HQ: a conversa em grupo tem um halo próprio, maior que o de um balão", () => {
+  const art = { x: 0, y: 0, width: 1000, height: 1000 };
+  const pages: ComicPageArt[] = [{ pageIndex: 0, rect: art }];
+  const conversationGroup: ComicTextRegion["bubbleGroup"] = { id: "g1", unionBounds: { x: .4, y: .4, width: .2, height: .1 },
+    members: [{ id: "g1-m1", bounds: { x: .4, y: .4, width: .1, height: .1 } }, { id: "g1-m2", bounds: { x: .5, y: .4, width: .1, height: .1 } }] };
+  const grupo = (): ComicTextRegion => region("grupo", 0, [.40, .40, .20, .10], {
+    visualBounds: { x: .40, y: .40, width: .20, height: .10 }, hitBounds: { x: .40, y: .40, width: .20, height: .10 },
+    segmentationMethod: "component-mask", bubbleGroup: conversationGroup,
+    contour: [{ x: .40, y: .40 }, { x: .60, y: .40 }, { x: .60, y: .50 }, { x: .40, y: .50 }],
+  });
+  // An independent caption nearby, its own edge 15px past the group's own - close enough
+  // to sit beside it on the page - and no bubbleGroup of its own: it must never be
+  // shadowed by the group's halo, on a tap that lands on the caption itself.
+  const legenda = (): ComicTextRegion => region("legenda", 0, [.615, .40, .10, .10], {
+    visualBounds: { x: .615, y: .40, width: .10, height: .10 }, hitBounds: { x: .615, y: .40, width: .10, height: .10 },
+  });
+  const map = (): ComicHitMap => new ComicHitMap(pages, engineWith(grupo(), legenda()));
+
+  it("tocar dentro do grupo continua abrindo o grupo, sem mudança", () => {
+    assert.equal(map().hit({ x: 500, y: 450 })?.region.id, "grupo");
+  });
+
+  it("tocar no vão vazio a poucos pixels do grupo, além do halo normal de um balão, ainda abre o grupo", () => {
+    // 8px past the group's own edge (600), and short of the caption at 615: outside
+    // COMIC_HIT_SLOP_PX (6) but inside the group's own COMIC_GROUP_HIT_SLOP_PX (10).
+    assert.ok(COMIC_HIT_SLOP_PX < 8);
+    assert.equal(map().hit({ x: 608, y: 450 })?.region.id, "grupo");
+  });
+
+  it("um objeto independente perto do grupo responde por si, nunca é engolido pelo halo", () => {
+    // Squarely inside the caption's own rectangle: its real hit must win outright, no
+    // matter how close it sits to the group.
+    assert.equal(map().hit({ x: 640, y: 450 })?.region.id, "legenda");
+  });
+
+  it("fora do halo do grupo, nada abre - o Reader segue seu comportamento normal", () => {
+    assert.equal(map().hit({ x: 500, y: 900 }), null);
+    // Just past the 10px halo itself.
+    assert.equal(map().hit({ x: 500, y: 388 }), null);
+  });
+
+  it("um balão isolado, sem bubbleGroup, não ganha o halo maior", () => {
+    const isolated = region("solo", 0, [.10, .10, .10, .10], {
+      visualBounds: { x: .10, y: .10, width: .10, height: .10 }, hitBounds: { x: .10, y: .10, width: .10, height: .10 },
+      contour: [{ x: .10, y: .10 }, { x: .20, y: .10 }, { x: .20, y: .20 }, { x: .10, y: .20 }],
+    });
+    const solo = new ComicHitMap(pages, engineWith(isolated));
+    // 8px past its edge (200): inside 10px but this region carries no bubbleGroup.
+    assert.equal(solo.hit({ x: 208, y: 150 }), null);
+  });
+});
+
+describe("HQ: um balão pequeno ganha uma área de toque maior que a área visual", () => {
+  // 1000x1000 art: a region's normalized bounds land on screen pixels one-to-one, so the
+  // math below reads directly as "px past the edge".
+  const art = { x: 0, y: 0, width: 1000, height: 1000 };
+  const pages: ComicPageArt[] = [{ pageIndex: 0, rect: art }];
+
+  it("um balão menor que o alvo confortável (44px) estica sua tolerância de toque até o teto, sem mudar de tamanho na tela", () => {
+    // 20x20px on screen: well under the 44px comfortable target, so its slop widens past
+    // the flat COMIC_HIT_SLOP_PX, up to the COMIC_SMALL_BALLOON_SLOP_PX ceiling (16px).
+    const small = region("pequeno", 0, [.400, .400, .020, .020], { shape: "caption", type: "caption" });
+    const map = new ComicHitMap(pages, engineWith(small));
+    assert.ok(COMIC_SMALL_BALLOON_SLOP_PX > COMIC_HIT_SLOP_PX, "o teto do pequeno precisa ser maior que a tolerância padrão, ou a correção não faz nada");
+    // 14px past the right edge (420): inside the widened slop.
+    assert.equal(map.hit({ x: 434, y: 410 })?.region.id, "pequeno");
+    // 20px past: outside even the widened ceiling.
+    assert.equal(map.hit({ x: 440, y: 410 }), null);
+    // The drawn, enlargeable region itself never grows - only how close a touch must land.
+    const hit = map.hit({ x: 410, y: 410 });
+    assert.deepEqual(hit?.source, { x: 400, y: 400, width: 20, height: 20 });
+  });
+
+  it("um balão com área visual confortável (>=44px) mantém a tolerância padrão, sem halo extra", () => {
+    const big = region("grande", 0, [.100, .100, .060, .060], { shape: "caption", type: "caption" });
+    const map = new ComicHitMap(pages, engineWith(big));
+    // 5px past the edge (160): inside the flat COMIC_HIT_SLOP_PX (6).
+    assert.equal(map.hit({ x: 165, y: 130 })?.region.id, "grande");
+    // 7px past: outside it - unchanged from before this fix, so a big balloon's neighbours
+    // are never put at risk by the small-balloon widening.
+    assert.equal(map.hit({ x: 167, y: 130 }), null);
+  });
+
+  it("um balão minúsculo, abaixo do teto inteiro, ainda assim não ultrapassa o teto de widening", () => {
+    // 4x4px: tiny enough that the raw formula would ask for more slop than the ceiling allows.
+    const tiny = region("minusculo", 0, [.500, .500, .004, .004], { shape: "caption", type: "caption" });
+    const map = new ComicHitMap(pages, engineWith(tiny));
+    // 15px past the edge (504): inside the 16px ceiling.
+    assert.equal(map.hit({ x: 519, y: 502 })?.region.id, "minusculo");
+    // 17px past: outside the ceiling, even for a balloon this small.
+    assert.equal(map.hit({ x: 521, y: 502 }), null);
+  });
+
+  it("dois balões pequenos vizinhos continuam respondendo cada um por si, sem um alcançar o toque do outro", () => {
+    const left = region("esquerda", 0, [.300, .500, .020, .020], { shape: "caption", type: "caption" });
+    const right = region("direita", 0, [.360, .500, .020, .020], { shape: "caption", type: "caption" });
+    const map = new ComicHitMap(pages, engineWith(left, right));
+    // left spans 300-320, right spans 360-380: a 40px gap, comfortably wider than twice the
+    // 16px ceiling, so a touch anywhere in the gap resolves to whichever edge is nearest.
+    assert.equal(map.hit({ x: 330, y: 510 })?.region.id, "esquerda");
+    assert.equal(map.hit({ x: 350, y: 510 })?.region.id, "direita");
   });
 });
 

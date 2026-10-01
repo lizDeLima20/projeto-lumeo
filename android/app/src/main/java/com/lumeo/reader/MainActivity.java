@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(android.os.Bundle savedInstanceState) {
         registerPlugin(NativeBookDownloadPlugin.class);
         registerPlugin(ReaderDisplayPlugin.class);
+        registerPlugin(ReaderImmersivePlugin.class);
         registerPlugin(ReadingOpticsPlugin.class);
         registerPlugin(ReaderSoundPlugin.class);
         registerPlugin(ReadingReminderPlugin.class);

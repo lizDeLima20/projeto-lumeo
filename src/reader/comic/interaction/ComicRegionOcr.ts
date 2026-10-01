@@ -69,6 +69,22 @@ export function groupComicTextLines(candidates: readonly ComicTextCandidate[]): 
 
 export { comicContainerIsConvincing };
 
+/** Whether a seed's own centre reads as inside this container's artwork: inside its box,
+ *  and on or close enough to its traced fill. A word drawn right at the edge of the fill -
+ *  cramped lettering, a touch of anti-aliasing the flood fill's own tolerance did not cross
+ *  - can measure a few pixels outside the traced contour even though a reader plainly sees
+ *  it inside the balloon; requiring its centre to land exactly on or inside that line turned
+ *  a balloon's own last word into an orphan "free-text" fragment with no container to open
+ *  the whole balloon from. A few grid cells of slack, scaled to how fine this container's own
+ *  fill was traced, closes that without reaching far enough to claim a separate object's
+ *  words - a genuinely different balloon or caption never sits this close. */
+export function comicSeedBelongsToContainer(seed: { bbox: Bbox }, container: ComicVisualContainer): boolean {
+  const b = seed.bbox, centerX = (b.x0 + b.x1) / 2, centerY = (b.y0 + b.y1) / 2;
+  if (centerX < container.bbox.x0 || centerX > container.bbox.x1 || centerY < container.bbox.y0 || centerY > container.bbox.y1) return false;
+  // A separate balloon between two lobes is inside the BOX, not this artwork.
+  return container.contour.length < 3 || comicDistanceToContour(container.contour, { x: centerX, y: centerY }) <= Math.max(10, container.stencil.step * 6);
+}
+
 /** Whether a container is worth handing to recognition at all.
  *
  *  A page holds a couple of dozen flat shapes that enclose something, and only a handful
@@ -156,12 +172,7 @@ export class ComicRegionOcr {
     const entries: Entry[] = [];
     for (const container of containers) {
       if (!comicContainerIsWorthReading(container)) { timer?.count("ocrSkipped"); continue; }
-      const inside = seeds.filter(seed => {
-        const b = seed.bbox, centerX = (b.x0 + b.x1) / 2, centerY = (b.y0 + b.y1) / 2;
-        if (centerX < container.bbox.x0 || centerX > container.bbox.x1 || centerY < container.bbox.y0 || centerY > container.bbox.y1) return false;
-        // A separate balloon between two lobes is inside the BOX, not this artwork.
-        return container.contour.length < 3 || comicDistanceToContour(container.contour, { x: centerX, y: centerY }) === 0;
-      });
+      const inside = seeds.filter(seed => comicSeedBelongsToContainer(seed, container));
       inside.forEach(seed => taken.add(seed));
       const groups = groupComicTextLines(inside);
       const area = (container.bbox.x1 - container.bbox.x0) * (container.bbox.y1 - container.bbox.y0) / (width * height);

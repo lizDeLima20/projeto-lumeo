@@ -17,6 +17,38 @@ export interface ComicHit { region: ComicTextRegion; pageIndex: number; source: 
  *  the small balloon beside it. */
 export const COMIC_HIT_SLOP_PX = 6;
 
+/** Android/iOS guidelines both converge near this as the smallest comfortable touch target,
+ *  in stage pixels - the size a fingertip can land inside without needing precision. A
+ *  balloon narrower than this in its own screen footprint is widened toward it below. */
+const COMIC_COMFORTABLE_TOUCH_PX = 44;
+
+/** How far a small balloon's own near-miss tolerance may grow, in stage pixels - well short
+ *  of COMIC_COMFORTABLE_TOUCH_PX itself, so a cluster of tiny balloons standing close
+ *  together still keeps each one's own separate touch rather than reaching into a neighbour
+ *  that is also small. */
+export const COMIC_SMALL_BALLOON_SLOP_PX = 16;
+
+/** A region's own near-miss tolerance, in the same normalized page units `comicDistanceTo*`
+ *  work in. A balloon with a comfortable screen footprint gets the flat COMIC_HIT_SLOP_PX;
+ *  one smaller than a fingertip - the small balloon the detector found but a reader keeps
+ *  missing - gets pulled up toward that comfortable size instead, capped at
+ *  COMIC_SMALL_BALLOON_SLOP_PX. The visual region drawn on screen never changes size; only
+ *  how close a touch has to land to still count as hitting it does. */
+function regionSlop(hit: NormalizedBounds, art: ComicRect, scale: number): number {
+  const smaller = Math.min(hit.width * art.width, hit.height * art.height);
+  if (smaller >= COMIC_COMFORTABLE_TOUCH_PX) return COMIC_HIT_SLOP_PX / scale;
+  const widened = COMIC_HIT_SLOP_PX + (COMIC_COMFORTABLE_TOUCH_PX - smaller) / 2;
+  return Math.min(widened, COMIC_SMALL_BALLOON_SLOP_PX) / scale;
+}
+
+/** A grouped conversation's own halo, wider than one balloon's near-miss. The gap left
+ *  between chained balloons after they are drawn is real empty page, not any one member's
+ *  own edge, so it needs a tolerance of its own rather than a bigger COMIC_HIT_SLOP_PX -
+ *  which would just as generously swallow whatever an independent object beside the group
+ *  is standing on. Checked last, and only once nothing - group or not - already answered
+ *  for the point, so a real object always keeps its own touch. */
+export const COMIC_GROUP_HIT_SLOP_PX = 10;
+
 /** Maps a point on the stage to the text region under it.
  *
  *  Regions are stored normalized (0..1) against their page. Everything is resolved against
@@ -68,13 +100,13 @@ export class ComicHitMap {
     const located = this.locate(point); if (!located) return null;
     const page = this.pages.find(value => value.pageIndex === located.pageIndex)!;
     const scale = Math.max(1, Math.min(page.rect.width, page.rect.height));
-    const slop = COMIC_HIT_SLOP_PX / scale;
     let silhouette: { region: ComicTextRegion; area: number } | null = null;
     let boxed: { region: ComicTextRegion; area: number } | null = null;
     let nearest: { region: ComicTextRegion; distance: number } | null = null;
     for (const region of this.engine.regionsForPage(located.pageIndex)) {
       const bounds = comicRegionBounds(region);
       const area = bounds.hit.width * bounds.hit.height;
+      const slop = regionSlop(bounds.hit, page.rect, scale);
       const outline = region.contour && region.contour.length >= 3 ? region.contour : null;
       if (outline) {
         // A balloon that knows its own shape is answered by that shape alone: the empty
@@ -92,7 +124,20 @@ export class ComicHitMap {
       else if (boxDistance <= slop && (!nearest || boxDistance < nearest.distance)) nearest = { region, distance: boxDistance };
     }
     const chosen = silhouette?.region ?? boxed?.region ?? nearest?.region ?? null;
-    return chosen ? { region: chosen, pageIndex: located.pageIndex, source: ComicHitMap.visualRect(page.rect, chosen) } : null;
+    if (chosen) return { region: chosen, pageIndex: located.pageIndex, source: ComicHitMap.visualRect(page.rect, chosen) };
+
+    // Nothing answered for the point on its own terms. A grouped conversation still might,
+    // within its own wider halo - the point is in the gap the artist actually left between
+    // two of its balloons, not on an object of its own.
+    const groupSlop = COMIC_GROUP_HIT_SLOP_PX / scale;
+    let group: { region: ComicTextRegion; distance: number } | null = null;
+    for (const region of this.engine.regionsForPage(located.pageIndex)) {
+      if (!region.bubbleGroup) continue;
+      const outline = region.contour && region.contour.length >= 3 ? region.contour : null;
+      const distance = outline ? comicDistanceToContour(outline, located) : comicDistanceToBounds(comicRegionBounds(region).hit, located);
+      if (distance <= groupSlop && (!group || distance < group.distance)) group = { region, distance };
+    }
+    return group ? { region: group.region, pageIndex: located.pageIndex, source: ComicHitMap.visualRect(page.rect, group.region) } : null;
   }
 
   public regions(): { pageIndex: number; art: ComicRect; regions: readonly ComicTextRegion[] }[] {

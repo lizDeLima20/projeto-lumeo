@@ -1,5 +1,5 @@
 import type { ComicVisualContainer, ComicStencil } from "./ComicContainerDetector";
-import { comicDistanceToContour, comicPointInContour } from "./ComicSilhouette";
+import { comicPointInContour } from "./ComicSilhouette";
 import { dilateMask, emptyMask, erodeMask, simplifyContour, traceMaskContour, type ComicMask, type ComicPoint2D } from "./ComicShapeMask";
 
 /** Two balloons the artist drew as one piece of speech, joined by a connector too thin to
@@ -23,25 +23,78 @@ function gapLimit(a: ComicVisualContainer, b: ComicVisualContainer): number {
   return Math.min(steps, Math.max(6, smaller * .35));
 }
 
-/** Whichever two points, one from each outline, are nearest each other - where a real
- *  connector would run. */
-function nearestPoints(a: readonly ComicPoint2D[], b: readonly ComicPoint2D[]): { from: ComicPoint2D; to: ComicPoint2D; distance: number } {
-  let best = { from: a[0]!, to: b[0]!, distance: Number.POSITIVE_INFINITY };
-  for (const from of a) {
-    const distance = comicDistanceToContour(b, from);
-    if (distance < best.distance) best = { from, to: nearestOn(b, from), distance };
-  }
+/** The point on segment (a,b) nearest to `point`, and how far it is - the same projection
+ *  for every segment regardless of its slope, and exact for a segment collapsed to a
+ *  single point (length 0), where the projection settles on that point itself. */
+function closestOnSegment(point: ComicPoint2D, a: ComicPoint2D, b: ComicPoint2D): { point: ComicPoint2D; distance: number } {
+  const dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
+  const t = length === 0 ? 0 : Math.min(1, Math.max(0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / length));
+  const closest = { x: a.x + dx * t, y: a.y + dy * t };
+  return { point: closest, distance: Math.hypot(point.x - closest.x, point.y - closest.y) };
+}
+
+/** Whether q lies on the segment (p,r) - only meaningful once the three are already known
+ *  to be collinear, which is exactly when this is called. A small epsilon absorbs the
+ *  rounding a traced-and-simplified contour already carries. */
+function onSegment(p: ComicPoint2D, q: ComicPoint2D, r: ComicPoint2D): boolean {
+  const epsilon = 1e-6;
+  return Math.min(p.x, r.x) - epsilon <= q.x && q.x <= Math.max(p.x, r.x) + epsilon
+    && Math.min(p.y, r.y) - epsilon <= q.y && q.y <= Math.max(p.y, r.y) + epsilon;
+}
+
+/** Whether segments (a1,a2) and (b1,b2) touch or cross anywhere - including end to end,
+ *  end to middle, and lying along the same line - the case two balloons drawn with edges
+ *  that meet needs to read as distance zero, not the nearest-vertex approximation. */
+function segmentsIntersect(a1: ComicPoint2D, a2: ComicPoint2D, b1: ComicPoint2D, b2: ComicPoint2D): boolean {
+  const orient = (o: ComicPoint2D, p: ComicPoint2D, q: ComicPoint2D): number => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const d1 = orient(b1, b2, a1), d2 = orient(b1, b2, a2), d3 = orient(a1, a2, b1), d4 = orient(a1, a2, b2);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  if (d1 === 0 && onSegment(b1, a1, b2)) return true;
+  if (d2 === 0 && onSegment(b1, a2, b2)) return true;
+  if (d3 === 0 && onSegment(a1, b1, a2)) return true;
+  if (d4 === 0 && onSegment(a1, b2, a2)) return true;
+  return false;
+}
+
+/** The true minimum distance between two segments, and a point on each that achieves it:
+ *  zero the moment they touch or cross, otherwise the smaller of the four ways a segment
+ *  can be nearest to another - each of its own endpoints against the other segment. This
+ *  is what a curve's or a straight edge's middle needs, which a scan of vertices alone
+ *  never sees: the closest approach between two shapes is exactly as often along an edge
+ *  as at a corner. */
+function closestBetweenSegments(a1: ComicPoint2D, a2: ComicPoint2D, b1: ComicPoint2D, b2: ComicPoint2D):
+{ from: ComicPoint2D; to: ComicPoint2D; distance: number } {
+  if (segmentsIntersect(a1, a2, b1, b2)) return { from: a1, to: a1, distance: 0 };
+  const onB1 = closestOnSegment(a1, b1, b2), onB2 = closestOnSegment(a2, b1, b2);
+  const onA1 = closestOnSegment(b1, a1, a2), onA2 = closestOnSegment(b2, a1, a2);
+  const candidates = [
+    { from: a1, to: onB1.point, distance: onB1.distance },
+    { from: a2, to: onB2.point, distance: onB2.distance },
+    { from: onA1.point, to: b1, distance: onA1.distance },
+    { from: onA2.point, to: b2, distance: onA2.distance },
+  ];
+  let best = candidates[0]!;
+  for (const candidate of candidates) if (candidate.distance < best.distance) best = candidate;
   return best;
 }
 
-function nearestOn(contour: readonly ComicPoint2D[], point: ComicPoint2D): ComicPoint2D {
-  let best = contour[0]!, bestDistance = Number.POSITIVE_INFINITY;
-  for (let index = 0, previous = contour.length - 1; index < contour.length; previous = index++) {
-    const a = contour[previous]!, b = contour[index]!, dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
-    const t = length === 0 ? 0 : Math.min(1, Math.max(0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / length));
-    const candidate = { x: a.x + dx * t, y: a.y + dy * t };
-    const distance = Math.hypot(point.x - candidate.x, point.y - candidate.y);
-    if (distance < bestDistance) { bestDistance = distance; best = candidate; }
+/** Whichever two points, one from each outline, are nearest each other - where a real
+ *  connector would run. Every edge of one against every edge of the other: a shape's
+ *  closest approach to another is as often along the flat middle of an edge as at one of
+ *  its own corners, and a scan limited to vertices alone misses exactly that case - a
+ *  small lobe sitting mid-edge on a much larger balloon, not tucked into one of its
+ *  corners. Contours are closed and stay small after simplification, so the full edge-pair
+ *  scan is a bounded, one-off cost paid once per candidate pair during conversion, never
+ *  on a touch. */
+export function nearestPoints(a: readonly ComicPoint2D[], b: readonly ComicPoint2D[]): { from: ComicPoint2D; to: ComicPoint2D; distance: number } {
+  let best = { from: a[0]!, to: b[0]!, distance: Number.POSITIVE_INFINITY };
+  for (let ai = 0, aPrev = a.length - 1; ai < a.length; aPrev = ai++) {
+    const a1 = a[aPrev]!, a2 = a[ai]!;
+    for (let bi = 0, bPrev = b.length - 1; bi < b.length; bPrev = bi++) {
+      const candidate = closestBetweenSegments(a1, a2, b[bPrev]!, b[bi]!);
+      if (candidate.distance < best.distance) best = candidate;
+      if (best.distance === 0) return best;
+    }
   }
   return best;
 }
@@ -70,16 +123,35 @@ function styleMatches(a: ComicVisualContainer, b: ComicVisualContainer): boolean
   return distance(a.backgroundColor, b.backgroundColor) <= 40;
 }
 
+/** Two fills sitting close enough that no real page gap could separate them - a connector,
+ *  or one balloon the wall-finder itself cut in two. At this distance the two are reporting
+ *  on the same ink, not describing two nearby-but-separate objects. */
+function hairlineGap(a: ComicVisualContainer, b: ComicVisualContainer): number {
+  return Math.max(2, Math.min(a.stencil.step, b.stencil.step) * 3);
+}
+
 /** Whether `b` is close enough, aligned enough and coloured alike enough that a reader
  *  sees `a` and `b` as one speech running from one balloon into the next. */
 export function comicContainersLookConnected(a: ComicVisualContainer, b: ComicVisualContainer): boolean {
-  if (a.type !== b.type || (a.type !== "speech" && a.type !== "thought")) return false;
-  if (a.shape === "rectangle" || b.shape === "rectangle") return false;
-  if (!styleMatches(a, b)) return false;
   if (a.contour.length < 3 || b.contour.length < 3) return false;
+  if (!styleMatches(a, b)) return false;
   const gap = nearestPoints(a.contour, b.contour).distance;
-  if (gap > gapLimit(a, b)) return false;
-  return crossAxisOverlap(a, b) >= .18;
+  if (crossAxisOverlap(a, b) < .18) return false;
+  if (gap <= gapLimit(a, b) && a.type === b.type && (a.type === "speech" || a.type === "thought") && a.shape !== "rectangle" && b.shape !== "rectangle") return true;
+  // A wall inside a single balloon - heavy lettering, a drop shadow around one word, a
+  // highlight the fill tolerance would not cross - can split its fill into pieces whose own
+  // outlines sit only a sliver apart. Right at that hairline, a piece's own small silhouette
+  // is often dense and boxy enough to misread as a caption/rectangle entirely on its own,
+  // even though it is really the stray half of a speech balloon: this is what let a balloon's
+  // own word ("FEIOSO!", "CUIDADO!") become its only surviving region, and what left its
+  // sibling piece's pixels carved out of the shown crop as a hole. Checked on its own terms,
+  // not only once the stricter gapLimit above has already let the pair through - a hairline
+  // sliver between two differently-shaped pieces (a cloud and whatever its stray word reads
+  // as) can easily sit past gapLimit's own, size-scaled ceiling while still being nowhere
+  // near a real gap. Allowing a merge here only when the two are essentially touching,
+  // same-coloured, and at least one side is already confirmed speech/thought keeps a real
+  // nearby caption - which never sits this close - from being swallowed by mistake.
+  return gap <= hairlineGap(a, b) && (a.type === "speech" || a.type === "thought" || b.type === "speech" || b.type === "thought");
 }
 
 /** The bridge between two containers: the strip of page they both come close to. Two
@@ -117,11 +189,20 @@ function bridgeTest(a: ComicVisualContainer, b: ComicVisualContainer, step: numb
  *  short bridge across the gap between them - exactly wide enough to read as continuous,
  *  never wider than the gap it closes. */
 function mergeContainers(a: ComicVisualContainer, b: ComicVisualContainer): ComicVisualContainer {
-  const step = Math.min(a.stencil.step, b.stencil.step);
-  const x0 = Math.min(a.bbox.x0, b.bbox.x0) - step, y0 = Math.min(a.bbox.y0, b.bbox.y0) - step;
-  const x1 = Math.max(a.bbox.x1, b.bbox.x1) + step, y1 = Math.max(a.bbox.y1, b.bbox.y1) + step;
-  const originCellX = Math.floor(x0 / step), originCellY = Math.floor(y0 / step);
-  const width = Math.max(1, Math.ceil(x1 / step) - originCellX), height = Math.max(1, Math.ceil(y1 / step) - originCellY);
+  const smallestSpan = Math.min(a.bbox.x1 - a.bbox.x0, a.bbox.y1 - a.bbox.y0, b.bbox.x1 - b.bbox.x0, b.bbox.y1 - b.bbox.y0);
+  const x0 = Math.min(a.bbox.x0, b.bbox.x0), y0 = Math.min(a.bbox.y0, b.bbox.y0);
+  const x1 = Math.max(a.bbox.x1, b.bbox.x1), y1 = Math.max(a.bbox.y1, b.bbox.y1);
+  // Fine enough to resolve the smaller of the two even when it is itself small - sampling
+  // only at each stencil's own step can skip a tiny balloon's own body entirely if that
+  // body is narrower than one cell, silently dropping it from the merged silhouette while
+  // it stays "part of the conversation" in name only, recognized by the merge but invisible
+  // to the hit it produces. Never finer than the union needs to stay a bounded grid, so one
+  // tiny member chained onto an otherwise large group cannot force a page-sized raster.
+  const cellBudget = 300_000;
+  const finest = Math.max(1, Math.sqrt(Math.max(1, (x1 - x0 + 2) * (y1 - y0 + 2)) / cellBudget));
+  const step = Math.max(1, finest, Math.min(a.stencil.step, b.stencil.step, smallestSpan / 6));
+  const originCellX = Math.floor((x0 - step) / step), originCellY = Math.floor((y0 - step) / step);
+  const width = Math.max(1, Math.ceil((x1 + step) / step) - originCellX), height = Math.max(1, Math.ceil((y1 + step) / step) - originCellY);
   const onBridge = bridgeTest(a, b, step);
 
   const mask: ComicMask = emptyMask(width, height);
