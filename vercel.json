@@ -23,6 +23,11 @@
       ]
     }
   ],
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "node_modules/libarchive.js/dist/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/collections/:collectionId/folders/:folderId",
