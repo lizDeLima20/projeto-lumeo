@@ -137,8 +137,12 @@ export class ComicDetailsView extends BaseView {
       } catch (error) {
         // The download itself can succeed while the later import step finds this exact file
         // already in the library (by content hash, not only by this comic's own identity) -
-        // that is success, not a download failure, and the UI must say so.
-        if (error instanceof DuplicateBookImportError) { showOpen(error.decision.book, this.i18n.t("ui.comic.alreadyInLibrary")); return; }
+        // that is success, not a download failure, and the UI must say so. Unlike the
+        // existing(request) check above (which only ever matches a book this session's own
+        // library state already knows about), this is the one path where the match comes
+        // from the repository alone - this session has not seen this book yet, so it must be
+        // added to the live state here, or it would stay invisible until the app restarts.
+        if (error instanceof DuplicateBookImportError) { this.actions.added(error.decision.book); showOpen(error.decision.book, this.i18n.t("ui.comic.alreadyInLibrary")); return; }
         download.disabled = false; progress.dataset.state = "error"; download.textContent = this.i18n.t("ui.common.retry");
         progress.textContent = error instanceof CollectionFileMismatchError ? this.i18n.t("ui.comic.fileMismatch")
           : error instanceof Error ? error.message : this.i18n.t("ui.catalog.downloadFailed");
@@ -157,7 +161,7 @@ export class ComicDetailsView extends BaseView {
         this.downloaded = null;
         showOpen(result.book, result.kind === "existing" ? this.i18n.t("ui.comic.alreadyInLibrary") : this.i18n.t("ui.comic.added"));
       } catch (error) {
-        if (error instanceof DuplicateBookImportError) { showOpen(error.decision.book, this.i18n.t("ui.comic.alreadyInLibrary")); return; }
+        if (error instanceof DuplicateBookImportError) { this.actions.added(error.decision.book); showOpen(error.decision.book, this.i18n.t("ui.comic.alreadyInLibrary")); return; }
         add.disabled = false;
         progress.dataset.state = "error"; progress.textContent = error instanceof CollectionFileMismatchError ? this.i18n.t("ui.comic.fileMismatch")
           : error instanceof Error ? error.message : this.i18n.t("ui.catalog.downloadFailed");

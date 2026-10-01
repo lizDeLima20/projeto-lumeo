@@ -150,12 +150,14 @@ describe("ComicDetailsView: a tela reconhece corretamente um resultado de Duplic
     const downloadHandler = view.slice(view.indexOf("download.onclick ="), view.indexOf("add.onclick ="));
     const addHandler = view.slice(view.indexOf("add.onclick ="));
     for (const [name, handler] of [["download.onclick", downloadHandler], ["add.onclick", addHandler]] as const) {
-      // The DuplicateBookImportError branch must reuse showOpen() and return immediately -
+      // The DuplicateBookImportError branch must add the book to this session's live
+      // library state (it was only ever found in the repository, by hash - never seen by
+      // this session's own identity-based check), reuse showOpen() and return immediately -
       // never fall through to the generic "ui.catalog.downloadFailed" text further down in
-      // the same catch block.
+      // the same catch block, and never leave the book invisible until the app restarts.
       assert.match(handler,
-        /if \(error instanceof DuplicateBookImportError\) \{ showOpen\(error\.decision\.book, this\.i18n\.t\("ui\.comic\.alreadyInLibrary"\)\); return; \}/,
-        `${name} deveria reconhecer DuplicateBookImportError como sucesso (reabrir a HQ já existente) e retornar, nunca cair na mensagem genérica de falha`);
+        /if \(error instanceof DuplicateBookImportError\) \{ this\.actions\.added\(error\.decision\.book\); showOpen\(error\.decision\.book, this\.i18n\.t\("ui\.comic\.alreadyInLibrary"\)\); return; \}/,
+        `${name} deveria registrar a HQ já existente na biblioteca desta sessão, reconhecer sucesso e retornar, nunca cair na mensagem genérica de falha`);
     }
   });
   it("outros erros reais (ex.: arquivo não corresponde) continuam mostrando sua própria mensagem, nunca a genérica de download", () => {
