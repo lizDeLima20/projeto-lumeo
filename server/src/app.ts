@@ -78,16 +78,22 @@ export class ServerApp {
         structured: (source) => new StructuredDriveCatalogProvider(source, new PublicDriveFolderReader(), fetch, { read: (folderId) => metadataDrive!.readCatalogJson(folderId) }),
       } : undefined);
       const catalogStore = new CatalogRepository(supabase.admin);
+      // One client, reused for every folder listing and comic-cover read this instance ever
+      // serves - not a new one per call. GoogleCatalogDriveClient caches its own OAuth token
+      // across calls on the same instance, but only if the instance itself is reused; a
+      // fresh createDrive() per call was paying for a full JWT-bearer exchange on every
+      // single Drive request, which is what made a CBR's breadcrumb walk + download time out.
+      const collectionsDrive = createDrive();
       // The Drive tree is the navigation: this only ever lists the folder that was asked for.
       // The materialized search index lives in Supabase Storage, not the database - no
       // migration needed, and it is metadata only, never a comic's own bytes.
-      const collectionsService = new DriveCollectionService(config.driveCollections, new DriveFolderBrowser((url) => createDrive().request(url), new DriveRequestLimiter()),
+      const collectionsService = new DriveCollectionService(config.driveCollections, new DriveFolderBrowser((url) => collectionsDrive.request(url), new DriveRequestLimiter()),
         {}, new SupabaseCollectionIndexStore(supabase.admin));
       // A CBR/CBZ cover is the one place a comic's own bytes are read server-side, and only
       // long enough to find its first page and discard the rest - reuses the exact same
       // service account already trusted to browse the collection's folders, and the exact
       // same open() validation collectionsService itself already enforces.
-      const comicCovers = new ComicCoverThumbnailService(collectionsService, { mediaRange: (fileId, range) => createDrive().mediaRange(fileId, range) });
+      const comicCovers = new ComicCoverThumbnailService(collectionsService, collectionsDrive);
       controller = new ApiController(
         auth,
         new AuthMiddleware(auth),
