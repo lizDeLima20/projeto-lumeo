@@ -6,6 +6,7 @@ import type { CoverService } from "./CoverService";
 import type { DriveFolderEntry, DriveFolderListing } from "./DriveCollectionService";
 import type { ImportManager } from "./ImportManager";
 import { ComicCollectionTrail } from "../reader/comic/ComicCollectionTrail";
+import { ComicPresentationService, type ComicMetadata } from "./ComicPresentationService";
 
 export class CollectionFormatUnsupportedError extends Error {
   public readonly code = "COLLECTION_FORMAT_UNSUPPORTED";
@@ -24,6 +25,7 @@ export interface CollectionImportRequest {
   listing: Pick<DriveFolderListing, "folderId" | "breadcrumb">;
   genreId: string;
   cover?: string;
+  comicMetadata?: ComicMetadata;
 }
 export type CollectionDownloadResult =
   | { kind: "native-file"; file: File }
@@ -54,6 +56,7 @@ export class CollectionImportService {
     private readonly covers: CoverService,
     private readonly library: LibraryLookup = () => undefined,
     private readonly importer = new LocalFileImporter(),
+    private readonly presentations = new ComicPresentationService(),
   ) {}
 
   public identity(request: Pick<CollectionImportRequest, "collectionId" | "entry">): string {
@@ -75,22 +78,21 @@ export class CollectionImportService {
   }
 
   /** "Capítulo 01" alone says nothing on a shelf; the arc it belongs to does. */
-  public title(entry: DriveFolderEntry, listing: Pick<DriveFolderListing, "breadcrumb">): string {
-    const file = entry.name.replace(/\.(pdf|epub|cbr|cbz)$/i, "").trim() || entry.name.trim();
-    const parent = listing.breadcrumb.length > 1 ? listing.breadcrumb[listing.breadcrumb.length - 1]!.name.trim() : "";
-    return parent && !file.toLocaleLowerCase().includes(parent.toLocaleLowerCase()) ? `${parent} — ${file}` : file;
+  public title(entry: DriveFolderEntry, listing: Pick<DriveFolderListing, "breadcrumb">, metadata?: ComicMetadata): string {
+    return this.presentations.present(entry, listing, metadata).title;
   }
 
   public link(request: CollectionImportRequest): CatalogDownloadLink {
     const entry = request.entry;
     const format = this.assertReadable(entry);
     const filename = this.filename(entry);
+    const presentation = this.presentations.present(entry, request.listing, request.comicMetadata);
     const downloadUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(entry.id)}`;
     return {
       bookId: this.identity(request),
       driveFileId: entry.id,
       downloadUrl, downloadUrls: [downloadUrl],
-      title: this.title(entry, request.listing), author: "", genreId: request.genreId, genreName: "",
+      title: presentation.title, author: presentation.author, genreId: request.genreId, genreName: "",
       format, sha256: null, coverUrl: null, fileSize: entry.size,
       filename, expectedFilename: filename, expiresAt: null,
     };
@@ -125,16 +127,18 @@ export class CollectionImportService {
     const named = file.name === this.filename(entry) ? file : new File([file], this.filename(entry), { type: entry.mimeType || file.type });
     const imported = await this.importer.import(named, "google-drive");
     if (imported.fileType !== entry.format) throw new CollectionFileMismatchError();
-    const title = this.title(entry, request.listing);
+    const presentation = this.presentations.present(entry, request.listing, request.comicMetadata);
+    const title = presentation.title;
     // The cover is the comic's own first page, taken from the file itself: it is the page
     // Drive shows as the thumbnail, and it stays with the book offline.
     const cover = request.cover ?? await this.covers.fromBookFile(imported.file, imported.fileType, title);
     const trail = ComicCollectionTrail.fromBreadcrumb(request.listing.breadcrumb);
     const book = await this.imports.save(imported, {
-      title, author: "", genreId: request.genreId, collectionId: request.collectionId, readingStatus: "unread", cover,
+      title, author: presentation.author, genreId: request.genreId, collectionId: request.collectionId, readingStatus: "unread", cover,
+      summary: presentation.summary, description: presentation.summary, publicationYear: presentation.year,
+      volume: presentation.number, series: presentation.series ?? trail.collection ?? undefined,
       contentType: entry.contentType ?? "comic",
       collectionPath: trail.serialize(),
-      series: trail.collection ?? undefined,
     }, undefined, {
       signal, catalogBookId: this.identity(request),
       // The identity above is exact, so the importer's fuzzy "same title, another edition?"

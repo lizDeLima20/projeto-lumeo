@@ -1,6 +1,8 @@
 import { I18nManager } from "../i18n/I18nManager";
 import type { Book } from "../models/Book";
 import { ComicCoverSource } from "../services/ComicCoverSource";
+import { defaultComicCoverGenerator, type ComicCoverAsset } from "../services/ComicCoverGenerator";
+import { ComicPresentationService, type ComicMetadata } from "../services/ComicPresentationService";
 import { CollectionFileMismatchError, type CollectionImportRequest, type CollectionImportService } from "../services/CollectionImportService";
 import type { DriveCollectionService, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 import { DuplicateBookImportError } from "../services/ImportManager";
@@ -26,6 +28,8 @@ export interface ComicDetailsActions {
 export class ComicDetailsView extends BaseView {
   private readonly i18n = I18nManager.shared;
   private readonly covers = new ComicCoverSource(480, 680);
+  private readonly coverGenerator = defaultComicCoverGenerator();
+  private readonly presentations = new ComicPresentationService();
   private downloaded: File | null = null;
   private browserDownloadStarted = false;
 
@@ -64,22 +68,36 @@ export class ComicDetailsView extends BaseView {
     const importer = this.actions.importer;
     const root = this.createElement("article", "catalog-detail__content");
     const cover = this.createElement("div", "catalog-detail__cover");
-    this.appendCover(cover, entry);
     const copy = this.createElement("div", "catalog-detail__copy");
+    let resolvedCover: string | undefined;
+    let resolvedMetadata: ComicMetadata | undefined;
     const back = this.createElement("button", "link-button catalog-detail__back", this.i18n.t("ui.common.back"));
     back.type = "button"; back.addEventListener("click", this.onBack);
     const collection = listing.breadcrumb.slice(1).map(step => step.name.trim()).filter(Boolean);
     const readable = entry.supported && (entry.format === "pdf" || entry.format === "cbr" || entry.format === "cbz");
-    const title = readable ? importer.title(entry, listing) : entry.name.trim();
-    copy.append(back, this.createElement("h1", "page-title", title),
-      this.createElement("p", "page-subtitle", listing.breadcrumb[0]?.name ?? ""));
+    const initial = this.presentations.present(entry, listing);
+    const heading = this.createElement("h1", "page-title", readable ? initial.title : entry.name.trim());
+    const byline = this.createElement("p", "page-subtitle");
+    const updatePresentation = (metadata?: ComicMetadata): void => {
+      const value = this.presentations.present(entry, listing, metadata);
+      heading.textContent = readable ? value.title : entry.name.trim();
+      byline.textContent = [value.author, value.year ? String(value.year) : ""].filter(Boolean).join(" · ") || (listing.breadcrumb[0]?.name ?? "");
+    };
+    updatePresentation();
+    copy.append(back, heading, byline);
     const metadata = this.createElement("dl", "catalog-detail__metadata");
     if (collection[0]) this.meta(metadata, this.i18n.t("ui.catalog.collection"), collection[0]);
     if (collection.length > 1) this.meta(metadata, this.i18n.t("ui.comic.arc"), collection.slice(1).join(" › "));
     this.meta(metadata, this.i18n.t("ui.catalog.format"), entry.format === "pdf" ? "PDF" : (entry.format ?? "?").toUpperCase());
     if (entry.size) this.meta(metadata, this.i18n.t("ui.catalog.size"), this.formatSize(entry.size));
-    if (entry.description?.trim()) copy.append(this.createElement("p", "catalog-detail__description", entry.description.trim()));
-    copy.append(metadata);
+    const synopsis = this.createElement("p", "catalog-detail__description");
+    const updateSynopsis = (comicMetadata?: ComicMetadata): void => {
+      const text = comicMetadata?.summary?.trim() || entry.description?.trim() || "";
+      synopsis.textContent = text;
+      synopsis.toggleAttribute("hidden", !text);
+    };
+    updateSynopsis();
+    copy.append(synopsis, metadata);
 
     const progress = this.createElement("p", "catalog__status comic-detail__progress");
     progress.setAttribute("role", "status");
@@ -98,11 +116,18 @@ export class ComicDetailsView extends BaseView {
     actions.append(download, add);
     copy.append(actions, progress);
     root.append(cover, copy);
+    const coverResolution = this.appendCover(cover, entry, asset => {
+      resolvedCover = asset.dataUrl; resolvedMetadata = asset.metadata;
+      updatePresentation(asset.metadata); updateSynopsis(asset.metadata);
+    });
 
-    const request = async (): Promise<CollectionImportRequest> =>
-      // No cover URL here: Drive's preview links are temporary or need a session, and a
-      // shelf keeps its covers offline. The importer takes the comic's own first page.
-      ({ collectionId: this.collectionId, entry, listing, genreId: await this.actions.genreId(listing) });
+    const request = async (): Promise<CollectionImportRequest> => {
+      const asset = await coverResolution;
+      return {
+        collectionId: this.collectionId, entry, listing, genreId: await this.actions.genreId(listing),
+        cover: resolvedCover ?? asset?.dataUrl, comicMetadata: resolvedMetadata ?? asset?.metadata,
+      };
+    };
     const showOpen = (book: Book, message: string): void => {
       add.remove();
       download.disabled = false; download.textContent = this.i18n.t("ui.comic.open");
@@ -170,15 +195,22 @@ export class ComicDetailsView extends BaseView {
     return root;
   }
 
-  private appendCover(root: HTMLElement, entry: DriveFolderEntry): void {
-    const fallback = (): void => root.replaceChildren(this.createElement("span", "catalog-card__placeholder", "📚"));
-    const url = this.covers.coverUrl(entry);
-    if (!url) { fallback(); return; }
-    const image = this.createElement("img", "") as HTMLImageElement;
-    image.src = url; image.alt = this.i18n.t("ui.catalog.coverOf", { title: entry.name.trim() });
-    image.decoding = "async"; image.referrerPolicy = "no-referrer";
-    image.addEventListener("error", fallback, { once: true });
-    root.append(image);
+  private appendCover(root: HTMLElement, entry: DriveFolderEntry, onResolved: (asset: ComicCoverAsset) => void): Promise<ComicCoverAsset | null> {
+    const placeholder = this.createElement("span", "catalog-card__placeholder", "📚");
+    const show = (source: string): void => {
+      const image = this.createElement("img", "") as HTMLImageElement;
+      image.src = source; image.alt = this.i18n.t("ui.catalog.coverOf", { title: entry.name.trim() });
+      image.decoding = "async"; image.referrerPolicy = "no-referrer";
+      image.addEventListener("error", () => root.replaceChildren(placeholder), { once: true });
+      root.replaceChildren(image);
+    };
+    const direct = this.covers.coverUrl(entry);
+    if (direct) show(direct); else root.append(placeholder);
+    if (!this.coverGenerator || (entry.format !== "cbr" && entry.format !== "cbz")) return Promise.resolve(null);
+    return this.coverGenerator.resolve(this.collectionId, entry).then(asset => {
+      if (!asset) return null;
+      show(asset.dataUrl); onResolved(asset); return asset;
+    });
   }
 
   private meta(root: HTMLElement, label: string, value: string): void {

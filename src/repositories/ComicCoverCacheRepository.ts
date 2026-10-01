@@ -1,6 +1,7 @@
 import { IndexedDbService, STORE_NAMES } from "../services/IndexedDbService";
+import type { ComicMetadata } from "../services/ComicPresentationService";
 
-export interface ComicCoverCacheEntry { key: string; dataUrl: string; updatedAt: string }
+export interface ComicCoverCacheEntry { key: string; dataUrl: string; metadata?: ComicMetadata; updatedAt: string }
 
 /** Generated CBR/CBZ cover thumbnails, kept only on this device - never uploaded, never
  *  part of the library's own data. A small, disposable cache: safe to clear entirely at
@@ -13,13 +14,16 @@ export class ComicCoverCacheRepository {
   public constructor(private readonly database: IndexedDbService) {}
 
   public async get(key: string): Promise<string | null> {
-    const entry = await this.database.request<ComicCoverCacheEntry | undefined>(STORE_NAMES.comicCoverCache, "readonly", store => store.get(key));
-    return entry?.dataUrl ?? null;
+    return (await this.getEntry(key))?.dataUrl ?? null;
   }
 
-  public async save(key: string, dataUrl: string): Promise<void> {
+  public async getEntry(key: string): Promise<ComicCoverCacheEntry | null> {
+    return (await this.database.request<ComicCoverCacheEntry | undefined>(STORE_NAMES.comicCoverCache, "readonly", store => store.get(key))) ?? null;
+  }
+
+  public async save(key: string, dataUrl: string, metadata?: ComicMetadata): Promise<void> {
     await this.database.request(STORE_NAMES.comicCoverCache, "readwrite",
-      store => store.put({ key, dataUrl, updatedAt: new Date().toISOString() } satisfies ComicCoverCacheEntry));
+      store => store.put({ key, dataUrl, ...(metadata ? { metadata } : {}), updatedAt: new Date().toISOString() } satisfies ComicCoverCacheEntry));
     await this.evictOldest();
   }
 

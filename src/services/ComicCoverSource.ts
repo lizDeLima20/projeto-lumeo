@@ -1,4 +1,4 @@
-import { defaultComicCoverGenerator, type ComicCoverGenerator } from "./ComicCoverGenerator";
+import { defaultComicCoverGenerator, type ComicCoverAsset, type ComicCoverGenerator } from "./ComicCoverGenerator";
 import type { DriveFolderEntry } from "./DriveCollectionService";
 
 /** The cover of a comic in a published collection is its own first page: Drive renders
@@ -62,7 +62,7 @@ export class LazyCoverLoader {
    *  direct URL nor generation is possible, and later if generation is tried but fails.
    *  `collectionId` is only ever needed for the generation path: it is what the BFF's
    *  comic-cover endpoint validates the entry's own path trail against. */
-  public observe(image: HTMLImageElement, entry: DriveFolderEntry, collectionId: string, onUnavailable?: () => void): void {
+  public observe(image: HTMLImageElement, entry: DriveFolderEntry, collectionId: string, onUnavailable?: () => void, onResolved?: (asset: ComicCoverAsset) => void): void {
     const url = this.covers.coverUrl(entry);
     const canGenerate = !url && Boolean(this.generator) && entry.kind === "file" && entry.supported
       && (entry.format === "cbr" || entry.format === "cbz");
@@ -70,8 +70,8 @@ export class LazyCoverLoader {
     const start = url
       ? () => { image.src = url; }
       : () => {
-        void this.generator!.cover(collectionId, entry, () => image.isConnected).then(dataUrl => {
-          if (dataUrl) image.src = dataUrl; else onUnavailable?.();
+        void this.generator!.resolve(collectionId, entry, () => image.isConnected).then(asset => {
+          if (asset) { image.src = asset.dataUrl; onResolved?.(asset); } else onUnavailable?.();
         });
       };
     // Without IntersectionObserver the browser's own lazy loading still holds the line.

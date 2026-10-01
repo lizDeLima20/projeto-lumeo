@@ -15,11 +15,17 @@ function fakeCovers() {
 }
 
 function fakeCache() {
-  const store = new Map<string, string>();
+  const store = new Map<string, string | { dataUrl: string; metadata?: import("../src/services/ComicPresentationService").ComicMetadata }>();
   const calls: string[] = [];
   return {
-    get: async (key: string) => { calls.push(`get:${key}`); return store.get(key) ?? null; },
-    save: async (key: string, dataUrl: string) => { calls.push(`save:${key}`); store.set(key, dataUrl); },
+    get: async (key: string) => { calls.push("get:" + key); const value = store.get(key); return typeof value === "string" ? value : value?.dataUrl ?? null; },
+    getEntry: async (key: string) => {
+      calls.push("get:" + key); const value = store.get(key);
+      return typeof value === "string" ? { key, dataUrl: value, updatedAt: "now" } : value ? { key, ...value, updatedAt: "now" } : null;
+    },
+    save: async (key: string, dataUrl: string, metadata?: import("../src/services/ComicPresentationService").ComicMetadata) => {
+      calls.push("save:" + key); store.set(key, metadata ? { dataUrl, metadata } : dataUrl);
+    },
     store, calls,
   };
 }

@@ -1,6 +1,7 @@
 import { I18nManager } from "../i18n/I18nManager";
 import { ComicCoverSource, LazyCoverLoader } from "../services/ComicCoverSource";
 import type { CatalogService } from "../services/CatalogService";
+import { ComicPresentationService } from "../services/ComicPresentationService";
 import type { DriveCollectionService, DriveCollectionSearchResult, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
 import { BaseView } from "./BaseView";
 
@@ -13,6 +14,7 @@ export class DriveCollectionGenreView extends BaseView {
   private readonly i18n = I18nManager.shared;
   private readonly covers = new ComicCoverSource();
   private readonly coverLoader = new LazyCoverLoader(this.covers);
+  private readonly presentations = new ComicPresentationService();
   private observer: IntersectionObserver | null = null;
   private readonly loadingFolders = new Set<string>();
   private searchVersion = 0;
@@ -138,8 +140,10 @@ export class DriveCollectionGenreView extends BaseView {
     const image = this.createElement("img", "") as HTMLImageElement;
     image.alt = `Capa de ${entry.name.trim()}`; image.loading = "lazy"; image.decoding = "async"; image.referrerPolicy = "no-referrer";
     image.addEventListener("error", fallback, { once: true }); cover.append(image);
-    this.coverLoader.observe(image, entry, this.collectionId, fallback);
-    const title = this.createElement("h3", "drive-comic-card__title", entry.name.trim());
+    const title = this.createElement("h3", "drive-comic-card__title", this.presentations.present(entry, listing).title);
+    this.coverLoader.observe(image, entry, this.collectionId, fallback, asset => {
+      title.textContent = this.presentations.present(entry, listing, asset.metadata).title;
+    });
     const format = this.createElement("small", "drive-comic-card__format", entry.format?.toUpperCase() ?? this.i18n.t("ui.collections.unknownFormat"));
     card.append(cover, title, format);
     if (supported) {

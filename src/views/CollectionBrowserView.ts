@@ -1,6 +1,7 @@
 import { I18nManager } from "../i18n/I18nManager";
 import { ComicCoverSource, LazyCoverLoader } from "../services/ComicCoverSource";
 import type { DriveCollectionService, DriveFolderEntry, DriveFolderListing } from "../services/DriveCollectionService";
+import { ComicPresentationService } from "../services/ComicPresentationService";
 import { BaseView } from "./BaseView";
 
 /** Browses a published collection one folder at a time. It knows nothing about sagas,
@@ -9,6 +10,7 @@ import { BaseView } from "./BaseView";
 export class CollectionBrowserView extends BaseView {
   private readonly i18n = I18nManager.shared;
   private readonly covers = new ComicCoverSource();
+  private readonly presentations = new ComicPresentationService();
   private loader: LazyCoverLoader | null = null;
   private list: HTMLElement | null = null;
   private trail: HTMLElement | null = null;
@@ -81,7 +83,8 @@ export class CollectionBrowserView extends BaseView {
     const item = this.createElement("li", `collection-entry collection-entry--${entry.kind}`);
     item.dataset.driveId = entry.id;
     if (entry.format) item.dataset.format = entry.format;
-    const label = this.createElement("span", "collection-entry__name", entry.name);
+    const label = this.createElement("span", "collection-entry__name", entry.kind === "file"
+      ? this.presentations.present(entry, this.listing ?? { breadcrumb: [] }).title : entry.name);
     if (entry.kind === "folder") {
       const open = this.createElement("button", "collection-entry__open");
       open.type = "button";
@@ -92,7 +95,9 @@ export class CollectionBrowserView extends BaseView {
       return item;
     }
     const row = this.createElement("div", "collection-entry__file");
-    row.append(this.thumbnail(entry), label);
+    row.append(this.thumbnail(entry, asset => {
+      label.textContent = this.presentations.present(entry, this.listing ?? { breadcrumb: [] }, asset.metadata).title;
+    }), label);
     if (!entry.supported) {
       // Listed, named and clearly marked: hiding a CBR would quietly lose part of the folder.
       item.classList.add("collection-entry--unsupported");
@@ -115,8 +120,9 @@ export class CollectionBrowserView extends BaseView {
 
   /** A comic shows its own first page; anything else shows a glyph. The image is only
    *  requested once the row is near the viewport. */
-  private thumbnail(entry: DriveFolderEntry): HTMLElement {
-    if (!this.covers.hasCover(entry)) {
+  private thumbnail(entry: DriveFolderEntry, onResolved?: (asset: import("../services/ComicCoverGenerator").ComicCoverAsset) => void): HTMLElement {
+    const generatable = entry.supported && (entry.format === "cbr" || entry.format === "cbz");
+    if (!this.covers.hasCover(entry) && !generatable) {
       const icon = this.createElement("span", "collection-entry__icon", entry.supported ? "📄" : "🗜️");
       icon.setAttribute("aria-hidden", "true");
       return icon;
@@ -124,7 +130,7 @@ export class CollectionBrowserView extends BaseView {
     const image = this.createElement("img", "collection-entry__cover") as HTMLImageElement;
     image.alt = ""; image.loading = "lazy"; image.decoding = "async"; image.width = 40; image.height = 56;
     image.addEventListener("error", () => image.replaceWith(Object.assign(this.createElement("span", "collection-entry__icon", "📕"), { ariaHidden: "true" })));
-    this.loader?.observe(image, entry, this.collectionId);
+    this.loader?.observe(image, entry, this.collectionId, undefined, onResolved);
     return image;
   }
 

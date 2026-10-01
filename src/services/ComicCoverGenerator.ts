@@ -3,8 +3,10 @@ import type { ApiClient } from "./ApiClient";
 import { CoverService } from "./CoverService";
 import type { DriveFolderEntry } from "./DriveCollectionService";
 import { IndexedDbService } from "./IndexedDbService";
+import { EMPTY_COMIC_METADATA, type ComicMetadata } from "./ComicPresentationService";
 
 const DEFAULT_CONCURRENCY = 3;
+export interface ComicCoverAsset { dataUrl: string; metadata: ComicMetadata }
 
 /** Resolves a real cover for a CBR/CBZ Drive never rendered a thumbnail for, through the
  *  BFF's own comic-cover endpoint - never by downloading or opening the archive here.
@@ -14,7 +16,7 @@ const DEFAULT_CONCURRENCY = 3;
  *  already-resized image. Nothing is uploaded anywhere; the result only ever lives in the
  *  local cache. */
 export class ComicCoverGenerator {
-  private readonly inFlight = new Map<string, Promise<string | null>>();
+  private readonly inFlight = new Map<string, Promise<ComicCoverAsset | null>>();
   private running = 0;
   private readonly waiting: Array<() => void> = [];
 
@@ -30,12 +32,20 @@ export class ComicCoverGenerator {
    *  placeholder covers every one of those the same way. Two callers asking for the same
    *  entry at once share the one attempt; a cached result never re-fetches anything. */
   public async cover(collectionId: string, entry: DriveFolderEntry, shouldContinue?: () => boolean): Promise<string | null> {
+    return (await this.resolve(collectionId, entry, shouldContinue))?.dataUrl ?? null;
+  }
+
+  public async resolve(collectionId: string, entry: DriveFolderEntry, shouldContinue?: () => boolean): Promise<ComicCoverAsset | null> {
     if (entry.format !== "cbr" && entry.format !== "cbz") return null;
     const key = ComicCoverGenerator.cacheKey(entry);
-    const cached = await this.cache.get(key).catch(() => null);
-    if (cached) return cached;
+    const cached = await this.cache.getEntry(key).catch(() => null);
+    if (cached) return { dataUrl: cached.dataUrl, metadata: cached.metadata ?? EMPTY_COMIC_METADATA };
     const pending = this.inFlight.get(key);
-    if (pending) return pending;
+    if (pending) {
+      const resolved = await pending;
+      if (resolved || shouldContinue) return resolved;
+      this.inFlight.delete(key);
+    }
     const work = this.runQueued(collectionId, entry, key, shouldContinue);
     this.inFlight.set(key, work);
     void work.finally(() => this.inFlight.delete(key));
@@ -46,7 +56,7 @@ export class ComicCoverGenerator {
     return `${entry.id}:${entry.modifiedAt ?? "unknown"}`;
   }
 
-  private async runQueued(collectionId: string, entry: DriveFolderEntry, key: string, shouldContinue?: () => boolean): Promise<string | null> {
+  private async runQueued(collectionId: string, entry: DriveFolderEntry, key: string, shouldContinue?: () => boolean): Promise<ComicCoverAsset | null> {
     await this.acquire();
     try {
       // The queue can make an entry wait; if it left the screen in the meantime, this
@@ -70,7 +80,7 @@ export class ComicCoverGenerator {
    *  /search-index already hand out - sent back verbatim, exactly like opening a folder or
    *  downloading a book does, never a Drive URL built here. The BFF re-validates it against
    *  the real collection before touching Drive. */
-  private async generate(collectionId: string, entry: DriveFolderEntry, key: string): Promise<string | null> {
+  private async generate(collectionId: string, entry: DriveFolderEntry, key: string): Promise<ComicCoverAsset | null> {
     try {
       const path = entry.collectionPath;
       if (!path?.length) return null;
@@ -79,10 +89,24 @@ export class ComicCoverGenerator {
         false,
       );
       if (!response.ok) return null;
+      const metadata = ComicCoverGenerator.metadata(response.headers);
       const dataUrl = await this.covers.fromBlob(await response.blob());
-      await this.cache.save(key, dataUrl).catch(() => undefined);
-      return dataUrl;
+      await this.cache.save(key, dataUrl, metadata).catch(() => undefined);
+      return { dataUrl, metadata };
     } catch { return null; }
+  }
+
+  private static metadata(headers: Headers): ComicMetadata {
+    const read = (name: string): string | null => {
+      const value = headers.get(name);
+      if (!value) return null;
+      try { return decodeURIComponent(value).trim() || null; } catch { return null; }
+    };
+    return {
+      title: read("X-Comic-Title"), series: read("X-Comic-Series"), number: read("X-Comic-Number"),
+      year: read("X-Comic-Year"), writer: read("X-Comic-Writer"), publisher: read("X-Comic-Publisher"),
+      genre: read("X-Comic-Genre"), summary: read("X-Comic-Summary"),
+    };
   }
 }
 
