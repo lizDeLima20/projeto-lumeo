@@ -758,7 +758,7 @@ test("o recorte é sempre um retângulo contínuo, opaco - nunca uma máscara de
 
 test("sozinho na página, o balão recebe um respiro confortável em toda volta", () => {
   const solo = container({ bbox: { x0: 200, y0: 200, x1: 300, y1: 260 } });
-  const bounds = comicAdaptiveCropBounds(solo, [solo], 1000, 1000);
+  const bounds = comicAdaptiveCropBounds(solo.bbox, [solo], 1000, 1000, solo);
   // 8% of the shorter side (60px) = 4.8px, floored by the 6px minimum.
   assert.equal(bounds.x0, 194); assert.equal(bounds.y0, 194);
   assert.equal(bounds.x1, 306); assert.equal(bounds.y1, 266);
@@ -768,7 +768,7 @@ test("um vizinho colado de um lado reduz o respiro só daquele lado, sem nunca a
   const left = container({ bbox: { x0: 200, y0: 200, x1: 300, y1: 260 } });
   // 10px to the right, sharing the same rows - close enough to matter for that one side.
   const right = container({ bbox: { x0: 310, y0: 200, x1: 400, y1: 260 } });
-  const bounds = comicAdaptiveCropBounds(left, [left, right], 1000, 1000);
+  const bounds = comicAdaptiveCropBounds(left.bbox, [left, right], 1000, 1000, left);
   assert.equal(bounds.x0, 194, "o lado esquerdo, sem ninguém por perto, mantém o respiro confortável");
   assert.ok(bounds.x1 < 310, "o lado direito nunca alcança o território do vizinho");
   assert.equal(bounds.x1, 305, "metade do vão real de 10px, não o respiro confortável inteiro");
@@ -778,15 +778,50 @@ test("um vizinho que não compartilha linha ou coluna nenhuma não limita respir
   const upper = container({ bbox: { x0: 200, y0: 200, x1: 300, y1: 260 } });
   // Far below, and far to the side - never in the way of upper's own left/right/top/bottom.
   const distant = container({ bbox: { x0: 600, y0: 600, x1: 700, y1: 660 } });
-  const bounds = comicAdaptiveCropBounds(upper, [upper, distant], 1000, 1000);
+  const bounds = comicAdaptiveCropBounds(upper.bbox, [upper, distant], 1000, 1000, upper);
   assert.equal(bounds.x0, 194); assert.equal(bounds.y0, 194);
   assert.equal(bounds.x1, 306); assert.equal(bounds.y1, 266);
 });
 
 test("o recorte nunca sai da página, mesmo colado a uma borda", () => {
   const corner = container({ bbox: { x0: 0, y0: 0, x1: 100, y1: 60 } });
-  const bounds = comicAdaptiveCropBounds(corner, [corner], 1000, 1000);
+  const bounds = comicAdaptiveCropBounds(corner.bbox, [corner], 1000, 1000, corner);
   assert.equal(bounds.x0, 0); assert.equal(bounds.y0, 0);
+});
+
+// The real bug: a region whose own stored bounds never matched any container close enough
+// (OCR text with nothing the colour detector enclosed around it, or a container whose own
+// shape drifted from the region's recognized text box) used to fall back to the bare,
+// pixel-tight OCR rectangle - no padding at all - which read as broken, clipped letters at
+// every edge once it was upscaled into a popup. It now gets the exact same comfortable,
+// neighbour-aware padding as a region with a real container.
+test("uma região sem container correspondente também recebe o mesmo respiro, não um recorte cru", () => {
+  const neighbour = container({ bbox: { x0: 400, y0: 200, x1: 500, y1: 260 } });
+  const orphanTextBounds = { x0: 200, y0: 200, x1: 260, y1: 215 }; // No container owns this.
+  const bounds = comicAdaptiveCropBounds(orphanTextBounds, [neighbour], 1000, 1000);
+  // 8% of the shorter side (15px) = 1.2px, floored by the 6px minimum - not zero.
+  assert.equal(bounds.x0, 194); assert.equal(bounds.y0, 194);
+  assert.equal(bounds.x1, 266); assert.equal(bounds.y1, 221);
+});
+
+// The real case found on a page of the X-Men Unlimited CBZ: a balloon the colour detector
+// never found at all ("NOT POSSIBLE... NOT WHEN I CAN STILL OFFER ESSEX OR HYDRO-MAN IN MY
+// PLACE.") left every one of its own lines as a separate orphan region, open page on every
+// side of each. The 6px-ish comfortable padding `comicAdaptiveCropBounds` gives a real
+// container was plenty to reach into the very next line of that same balloon, sitting only
+// a few pixels above and below - the popup for "OFFER ESSEX OR" showed the bottom halves of
+// "I CAN STILL" and the top halves of "HYDRO-MAN IN" sliced across their own letters, even
+// after a first attempt at a smaller, capital-height-scaled ceiling - these lines pack
+// closer together than a quarter of their own letters are tall. An orphan gets none of this
+// function's own padding at all: the recognition step that found it already padded its box
+// by a few pixels of its own, and that is as far as a line with no detected shape behind it
+// is ever grown.
+test("uma linha órfã (balão nunca detectado) recebe só uma margem de antialiasing, não um respiro real", () => {
+  const orphanTextBounds = { x0: 400, y0: 400, x1: 460, y1: 409 }; // A single ~9px text line.
+  // comicCreateCutouts passes a 2px ceiling for exactly this case - verified here directly.
+  const bounds = comicAdaptiveCropBounds(orphanTextBounds, [], 1000, 1000, undefined, 2);
+  assert.equal(bounds.y0, 398, "2px acima, não os ~6-10px que alcançariam a linha de cima");
+  assert.equal(bounds.y1, 411, "2px abaixo, não os ~6-10px que alcançariam a linha de baixo");
 });
 
 test("uma página relata o próprio progresso, sempre para a frente, do zero ao pronto", async () => {

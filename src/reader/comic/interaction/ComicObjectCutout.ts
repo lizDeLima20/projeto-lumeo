@@ -13,16 +13,17 @@ export function comicMaskedPixels(source: ImageData, alpha: Uint8Array): Uint8Cl
   return output;
 }
 
-/** How far a container's own crop may stretch past its own art in one direction before a
- *  real neighbour, sharing enough of the other axis to actually be in the way, is reached.
- *  Half of whatever page is actually free in that direction, capped by a comfortable
- *  default - generous next to open page, next to nothing once a neighbour is close. */
-function comicCropPadding(container: ComicVisualContainer, siblings: readonly ComicVisualContainer[], direction: "left" | "right" | "top" | "bottom"): number {
-  const art = container.artBbox ?? container.bbox;
-  const comfortable = Math.max(6, Math.min(art.x1 - art.x0, art.y1 - art.y0) * .08);
+/** How far a crop may stretch past its own art in one direction before a real neighbour,
+ *  sharing enough of the other axis to actually be in the way, is reached. Half of
+ *  whatever page is actually free in that direction, capped by a comfortable default -
+ *  generous next to open page, next to nothing once a neighbour is close. `exclude` is the
+ *  container this crop is itself for, if it has one - never its own neighbour. */
+function comicCropPadding(art: Bbox, siblings: readonly ComicVisualContainer[], exclude: ComicVisualContainer | undefined,
+  direction: "left" | "right" | "top" | "bottom", ceiling = Number.POSITIVE_INFINITY): number {
+  const comfortable = Math.min(ceiling, Math.max(6, Math.min(art.x1 - art.x0, art.y1 - art.y0) * .08));
   let nearest = Number.POSITIVE_INFINITY;
   for (const other of siblings) {
-    if (other === container) continue;
+    if (other === exclude) continue;
     const box = other.artBbox ?? other.bbox;
     if (direction === "left" || direction === "right") {
       if (Math.min(art.y1, box.y1) - Math.max(art.y0, box.y0) <= 0) continue; // Never shares this row.
@@ -40,15 +41,28 @@ function comicCropPadding(container: ComicVisualContainer, siblings: readonly Co
   return Math.max(0, Math.min(comfortable, nearest / 2));
 }
 
-/** The rectangle one container's popup is cropped from: its own art, widened by padding
- *  that backs off on whichever side a real neighbour is actually close enough to reach -
- *  decided once, from the page's own geometry, never redrawn for the reader to see. */
-export function comicAdaptiveCropBounds(container: ComicVisualContainer, siblings: readonly ComicVisualContainer[], canvasWidth: number, canvasHeight: number): Bbox {
-  const art = container.artBbox ?? container.bbox;
-  const x0 = Math.max(0, Math.floor(art.x0 - comicCropPadding(container, siblings, "left")));
-  const y0 = Math.max(0, Math.floor(art.y0 - comicCropPadding(container, siblings, "top")));
-  const x1 = Math.min(canvasWidth, Math.ceil(art.x1 + comicCropPadding(container, siblings, "right")));
-  const y1 = Math.min(canvasHeight, Math.ceil(art.y1 + comicCropPadding(container, siblings, "bottom")));
+/** The rectangle one region's popup is cropped from: its own art, widened by padding that
+ *  backs off on whichever side a real neighbour is actually close enough to reach - decided
+ *  once, from the page's own geometry, never redrawn for the reader to see.
+ *
+ *  `art` is the container's own bounds when a container was found for this region, but a
+ *  region with no matching container - OCR text with nothing the colour detector ever
+ *  enclosed - still gets padding around its own recognized bounds too, rather than the
+ *  bare, pixel-tight rectangle a raw OCR box is. That padding is capped much tighter for an
+ *  orphan than for a real container, through `ceiling`: a container's own silhouette is
+ *  trusted to say where its art actually ends, but an orphan line has no such shape behind
+ *  it, only its neighbours' positions - the same balloon's own next line down is, to this
+ *  function, just another nearby box. Generous padding there does not add a margin, it
+ *  reaches into that next line and crops half of it: legible words above and below the one
+ *  line this region actually recognized, each sliced through its own letters. Kept to a
+ *  sliver instead, a miss stays a clean, honestly tight crop of the words that were
+ *  actually read - never somebody else's line shown broken. */
+export function comicAdaptiveCropBounds(art: Bbox, siblings: readonly ComicVisualContainer[], canvasWidth: number, canvasHeight: number,
+  exclude?: ComicVisualContainer, ceiling = Number.POSITIVE_INFINITY): Bbox {
+  const x0 = Math.max(0, Math.floor(art.x0 - comicCropPadding(art, siblings, exclude, "left", ceiling)));
+  const y0 = Math.max(0, Math.floor(art.y0 - comicCropPadding(art, siblings, exclude, "top", ceiling)));
+  const x1 = Math.min(canvasWidth, Math.ceil(art.x1 + comicCropPadding(art, siblings, exclude, "right", ceiling)));
+  const y1 = Math.min(canvasHeight, Math.ceil(art.y1 + comicCropPadding(art, siblings, exclude, "bottom", ceiling)));
   return { x0, y0, x1: Math.max(x1, x0 + 1), y1: Math.max(y1, y0 + 1) };
 }
 
@@ -70,19 +84,31 @@ export async function comicCreateCutouts(canvas: HTMLCanvasElement, regions: Com
   const source = canvas.getContext("2d", { willReadFrequently: true })!;
   const assets: ComicPageAsset[] = [];
   for (const region of regions) {
-    const visual = comicRegionBounds(region).visual;
+    const bounds = comicRegionBounds(region);
+    const visual = bounds.visual;
     const candidates = containers.map(container => ({ container, error:
       Math.abs(container.bbox.x0 / canvas.width - visual.x) + Math.abs(container.bbox.y0 / canvas.height - visual.y)
       + Math.abs((container.bbox.x1 - container.bbox.x0) / canvas.width - visual.width)
       + Math.abs((container.bbox.y1 - container.bbox.y0) / canvas.height - visual.height) }));
     const match = candidates.sort((a, b) => a.error - b.error)[0];
     const container = match && match.error < .015 ? match.container : undefined;
-    const bounds = container
-      ? comicAdaptiveCropBounds(container, containers, canvas.width, canvas.height)
-      : { x0: Math.max(0, Math.floor(visual.x * canvas.width)), y0: Math.max(0, Math.floor(visual.y * canvas.height)),
-          x1: Math.min(canvas.width, Math.ceil((visual.x + visual.width) * canvas.width)),
-          y1: Math.min(canvas.height, Math.ceil((visual.y + visual.height) * canvas.height)) };
-    const x = bounds.x0, y = bounds.y0, width = Math.max(1, bounds.x1 - x), height = Math.max(1, bounds.y1 - y);
+    // A container's own bounds when one was found for this region. An orphan line uses its
+    // own recognized glyphs instead of `visual` - the recognition step pads that one by a
+    // few pixels of its own, on purpose, to give itself margin to read the word by; this
+    // crop needs the tighter box those glyphs actually measured, not the margin around it,
+    // since a line with no detected shape behind it is the one case a few pixels in the
+    // wrong direction reaches the very next line of the same never-found balloon.
+    const text = bounds.text;
+    const art: Bbox = container?.artBbox ?? container?.bbox ?? {
+      x0: text.x * canvas.width, y0: text.y * canvas.height,
+      x1: (text.x + text.width) * canvas.width, y1: (text.y + text.height) * canvas.height,
+    };
+    // An orphan line gets only the barest antialiasing margin from this step - a balloon
+    // the colour detector never found at all can pack its own lines closely enough that
+    // real padding here, measured from nothing but this one line's own small size, reaches
+    // the next line up or down and crops it in half.
+    const cropBounds = comicAdaptiveCropBounds(art, containers, canvas.width, canvas.height, container, container ? Number.POSITIVE_INFINITY : 2);
+    const x = cropBounds.x0, y = cropBounds.y0, width = Math.max(1, cropBounds.x1 - x), height = Math.max(1, cropBounds.y1 - y);
     const pixels = source.getImageData(x, y, width, height);
     const assetPath = `interaction/assets/${region.id}.webp`, maskPath = `interaction/assets/${region.id}-mask.webp`;
     const output = document.createElement("canvas"); output.width = width; output.height = height;
