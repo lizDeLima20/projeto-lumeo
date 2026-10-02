@@ -181,7 +181,7 @@ describe("HQ: reconhecimento incerto e depuração", () => {
     // Recognition confidence steers how hard the enhancement pass works, never anything
     // the reader can see as a label or a message: it reaches exactly one place, the plan
     // it feeds, and nowhere near text shown on screen.
-    assert.match(bubble, /comicPlanBalloonEnhancement\(metrics, region\.ocrConfidence\)/);
+    assert.match(bubble, /comicPlanBalloonEnhancement\(before, region\.ocrConfidence\)/);
     assert.doesNotMatch(bubble, /textContent\s*=[^;]*ocrConfidence|ocrConfidence[^;]*textContent|aria-label[^;]*ocrConfidence|confian/i);
     const view = source("views/ComicReaderView.ts");
     assert.match(view, /target\.dataset\.review = region\.recognitionStatus \?\? "recognized";/);

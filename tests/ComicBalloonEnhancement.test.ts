@@ -178,7 +178,7 @@ test("9. original já perfeito: o realce não piora - a mudança fica pequena", 
 // 10. Enhancement failure must fall back to the original crop, never block the balloon.
 test("10. falha no realce cai para o recorte original, nunca impede o balão de abrir", () => {
   const view = source("reader/comic/interaction/ComicBubbleView.ts");
-  assert.match(view, /catch \{ return \{ original, enhanced: original, worth: false, fallback \}; \}/);
+  assert.match(view, /catch \{ return \{ canvas: original, fallback \}; \}/);
 });
 
 // 11. Resolution/memory limits: the enhancement works at a bubble-sized resolution, never
@@ -210,4 +210,39 @@ test("o recorte de reserva (sem asset pré-computado) também passa pelo mesmo r
   const view = source("reader/comic/interaction/ComicBubbleView.ts");
   assert.match(view, /function comicPrepareBubbleArtwork\(region: ComicTextRegion, width: number, height: number, art: ComicOriginalArt\)/);
   assert.doesNotMatch(view, /if \(art\.fallback\) return/);
+});
+
+// The reader is never asked to judge the enhancement: one version reaches the popup, the
+// better one, chosen before the balloon ever opens - not a switch, not a label, not a word
+// that admits the pixels were touched.
+test("não existe alternância Original/Melhorado nem qualquer rótulo técnico visível no popup", () => {
+  const view = source("reader/comic/interaction/ComicBubbleView.ts");
+  const css = source("styles/comic.css");
+  // Quoted strings only - "Original" and "melhorado" read fine in a comment explaining the
+  // architecture, but must never appear as a literal a reader could end up looking at.
+  for (const forbidden of [/["']Original["']/, /["']Melhorado["']/, /comic-bubble__toggle/, /buildToggle/, /showingOriginal/]) {
+    assert.doesNotMatch(view, forbidden, `ComicBubbleView.ts não deveria conter ${forbidden}`);
+    assert.doesNotMatch(css, forbidden, `comic.css não deveria conter ${forbidden}`);
+  }
+  // build() appends exactly the one canvas - no second element (a button, a badge) beside it.
+  const build = view.slice(view.indexOf("public static build("), view.indexOf("private retire("));
+  assert.match(build, /element\.append\(canvas\);/);
+  assert.doesNotMatch(build, /element\.append\([^)]*,/, "build() não deveria anexar um segundo elemento ao lado do canvas");
+});
+
+// A balloon's own debug outline (speech/thought/caption bounds) only ever paints when the
+// reader explicitly turned development visualization on - never by default, never because
+// a stray flag happened to survive from someone else's session.
+test("os contornos de depuração exigem a flag explícita e nunca aparecem por padrão", () => {
+  const view = source("views/ComicReaderView.ts");
+  assert.match(view, /localStorage\.getItem\("lumeo\.comic\.debug"\) === "1" \|\| new URLSearchParams\(location\.search\)\.get\("comicDebug"\) === "1"/);
+  const css = source("styles/comic.css");
+  // The base region rule itself never draws an outline - the line reads its own full
+  // declaration block, closing brace included, with nothing coloured in it. Only the
+  // keyboard-focus state (real accessibility) and the "--debug" modifier, gated by the
+  // flag above, ever do.
+  const base = css.match(/^\.comic-hitmap__target \{[^}]*\}/m)?.[0] ?? "";
+  assert.ok(base, "a regra base de .comic-hitmap__target deveria existir");
+  assert.doesNotMatch(base, /outline/);
+  assert.match(css, /\.comic-hitmap--debug \.comic-hitmap__target \{[^}]*outline/);
 });

@@ -8,39 +8,50 @@ import { comicEnhanceBalloonImage, comicPlanBalloonEnhancement } from "./ComicBa
 export const COMIC_BUBBLE_MOTION = { openMs: 340, closeMs: 240 } as const;
 interface Shown { region: ComicTextRegion; source: ComicRect; target: ComicBubbleTarget; element: HTMLElement }
 
-/** The same balloon, upscaled to its display size, in both forms it can be shown in - the
- *  untouched original pixels, and the reading-oriented enhanced pass over them. `worth` is
- *  false when the plan asked for next to nothing (an already-clean scan), which is when
- *  the original/enhanced toggle has nothing to show for itself and stays hidden. */
-interface ComicBubbleArtwork { original: HTMLCanvasElement; enhanced: HTMLCanvasElement; worth: boolean; fallback: boolean; }
+/** The one canvas the reader actually sees, already decided. There is no second, exposed
+ *  version: a reader taps a balloon and gets the best representation this pass could make
+ *  of it, never a choice to weigh. */
+interface ComicBubbleArtwork { canvas: HTMLCanvasElement; fallback: boolean; }
 
 /** A balloon is reprocessed once per size it is ever shown at in this session, not once
  *  per tap - reopening the same balloon at the same size is instant. Bounded well under
  *  what the decoded-bitmap cache it draws from already allows, since each entry here is a
- *  full display-resolution canvas pair rather than a compressed original. */
+ *  full display-resolution canvas rather than a compressed original. */
 const ARTWORK_CACHE_LIMIT = 8;
 
+/** The least improvement, read on the same 0..1 scale `comicAnalyzeBalloonQuality` uses,
+ *  that counts as the enhanced pass actually reading better rather than merely different -
+ *  noise and rounding alone can nudge these metrics by a point or two either way. */
+const MEANINGFUL_GAIN = .03;
+
 /** The original asset upscaled to its display size, with the page's one adaptive
- *  enhancement pass applied alongside it - both built from the same full-resolution draw,
- *  never from a reduced screen capture. Any failure in analysis or enhancement falls back
- *  to the plain upscaled original: a balloon that cannot be improved must still open. */
+ *  enhancement pass measured against it on the same terms a reader judges legibility by -
+ *  contrast and sharpness - and kept only when it actually reads better. Built from the
+ *  same full-resolution draw either way, never from a reduced screen capture. Any failure
+ *  in analysis or enhancement falls back to the plain upscaled original: a balloon that
+ *  cannot be improved must still open, and silently, never asking the reader to judge it. */
 function comicPrepareBubbleArtwork(region: ComicTextRegion, width: number, height: number, art: ComicOriginalArt): ComicBubbleArtwork {
   const original = comicArtworkCanvas(art, { width, height });
   const fallback = Boolean(art.fallback);
   try {
     const context = original.getContext("2d", { willReadFrequently: true });
-    if (!context) return { original, enhanced: original, worth: false, fallback };
+    if (!context) return { canvas: original, fallback };
     const source = context.getImageData(0, 0, original.width, original.height);
-    const metrics = comicAnalyzeBalloonQuality(source);
-    const plan = comicPlanBalloonEnhancement(metrics, region.ocrConfidence);
-    const worth = plan.sharpen + plan.denoise + plan.contrast + plan.whiten > .15;
-    if (!worth) return { original, enhanced: original, worth: false, fallback };
-    const enhancedData = comicEnhanceBalloonImage(source, plan);
+    const before = comicAnalyzeBalloonQuality(source);
+    const plan = comicPlanBalloonEnhancement(before, region.ocrConfidence);
+    if (plan.sharpen + plan.denoise + plan.contrast + plan.whiten <= .05) return { canvas: original, fallback };
+    const enhancedData = comicEnhanceBalloonImage(context.getImageData(0, 0, original.width, original.height), plan);
+    const after = comicAnalyzeBalloonQuality(enhancedData);
+    // The same test a reader would apply, not the size of the plan that produced it: a
+    // pass that asked for a lot but left contrast and sharpness no better than the
+    // original - a balloon that was already about as good as this pipeline gets - loses
+    // to the plain upscale rather than being shown just because work was done.
+    if (after.contrast - before.contrast < MEANINGFUL_GAIN && after.sharpness - before.sharpness < MEANINGFUL_GAIN) return { canvas: original, fallback };
     const enhanced = document.createElement("canvas");
     enhanced.width = original.width; enhanced.height = original.height;
     enhanced.getContext("2d")!.putImageData(enhancedData, 0, 0);
-    return { original, enhanced, worth: true, fallback };
-  } catch { return { original, enhanced: original, worth: false, fallback }; }
+    return { canvas: enhanced, fallback };
+  } catch { return { canvas: original, fallback }; }
 }
 
 /** Original artwork only. OCR is accessibility metadata, never visible lettering. */
@@ -120,33 +131,14 @@ export class ComicBubbleView {
     element.dataset.regionId = region.id;
     element.dataset.visual = artwork.fallback ? "original-crop-fallback" : "original-object";
     element.dataset.review = region.recognitionStatus ?? "needs-review";
-    element.dataset.enhanced = artwork.worth ? "1" : "0";
     const canvas = document.createElement("canvas"); canvas.className = "comic-bubble__art"; canvas.setAttribute("aria-hidden", "true");
-    canvas.width = artwork.enhanced.width; canvas.height = artwork.enhanced.height;
-    canvas.getContext("2d")!.drawImage(artwork.enhanced, 0, 0);
+    canvas.width = artwork.canvas.width; canvas.height = artwork.canvas.height;
+    canvas.getContext("2d")!.drawImage(artwork.canvas, 0, 0);
     Object.assign(element.style, { width: `${width}px`, height: `${height}px` }); element.append(canvas);
     // The original asset already carries its complete alpha mask. A second simplified
     // polygon clip cuts lettering, tails and icons that were preserved in that asset.
-    if (artwork.worth) element.append(ComicBubbleView.buildToggle(canvas, artwork));
+    // One version only: the reader never sees a choice between original and enhanced.
     return element;
-  }
-
-  /** A small, unobtrusive switch between the enhanced reading view and the untouched
-   *  original pixels - proof, on demand, that the enhancement changed how the page reads
-   *  and nothing about what it says. Shown only when there was anything to toggle. */
-  private static buildToggle(canvas: HTMLCanvasElement, artwork: ComicBubbleArtwork): HTMLElement {
-    const button = document.createElement("button"); button.type = "button";
-    button.className = "comic-bubble__toggle"; button.textContent = "Original";
-    let showingOriginal = false;
-    button.addEventListener("click", event => {
-      event.stopPropagation();
-      showingOriginal = !showingOriginal;
-      const context = canvas.getContext("2d")!;
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(showingOriginal ? artwork.original : artwork.enhanced, 0, 0);
-      button.textContent = showingOriginal ? "Melhorado" : "Original";
-    });
-    return button;
   }
   private retire(shown: Shown, switching: boolean): void {
     const { element, source, target } = shown;

@@ -4,7 +4,7 @@ import { comicContainerIsConvincing, type ComicStencil, type ComicVisualContaine
 import { comicCropPlans, type ComicCropPlan } from "./ComicRegionCrop";
 import type { ComicStageRecorder } from "./ComicStageTimer";
 import { comicRegionsDuplicate } from "./ComicRegionDedup";
-import { comicDistanceToContour } from "./ComicSilhouette";
+import { comicDistanceToContour, comicPointInContour } from "./ComicSilhouette";
 
 export interface ComicTextCandidate { bbox: Bbox; lines: Line[]; }
 
@@ -70,19 +70,27 @@ export function groupComicTextLines(candidates: readonly ComicTextCandidate[]): 
 export { comicContainerIsConvincing };
 
 /** Whether a seed's own centre reads as inside this container's artwork: inside its box,
- *  and on or close enough to its traced fill. A word drawn right at the edge of the fill -
- *  cramped lettering, a touch of anti-aliasing the flood fill's own tolerance did not cross
- *  - can measure a few pixels outside the traced contour even though a reader plainly sees
- *  it inside the balloon; requiring its centre to land exactly on or inside that line turned
- *  a balloon's own last word into an orphan "free-text" fragment with no container to open
- *  the whole balloon from. A few grid cells of slack, scaled to how fine this container's own
- *  fill was traced, closes that without reaching far enough to claim a separate object's
- *  words - a genuinely different balloon or caption never sits this close. */
-export function comicSeedBelongsToContainer(seed: { bbox: Bbox }, container: ComicVisualContainer): boolean {
-  const b = seed.bbox, centerX = (b.x0 + b.x1) / 2, centerY = (b.y0 + b.y1) / 2;
-  if (centerX < container.bbox.x0 || centerX > container.bbox.x1 || centerY < container.bbox.y0 || centerY > container.bbox.y1) return false;
-  // A separate balloon between two lobes is inside the BOX, not this artwork.
-  return container.contour.length < 3 || comicDistanceToContour(container.contour, { x: centerX, y: centerY }) <= Math.max(10, container.stencil.step * 6);
+ *  and not plainly explained by some other container instead.
+ *
+ *  The traced outline is not the whole story. A bumpy thought-cloud or a jagged balloon
+ *  can bite inward between two lobes right where a word sits - a concave notch the flood
+ *  fill's own tolerance never crossed - so a word mid-sentence, not just one cramped
+ *  against an edge, can measure outside the polygon while a reader plainly sees it inside
+ *  the balloon. Requiring the centre to land exactly on or inside that line turned entire
+ *  words ("EMOÇÕES", a balloon's own last word "LENÇOIS!") into orphan fragments with no
+ *  container to open the whole balloon from.
+ *
+ *  Exact containment still answers first when it can. Short of that, a word stays this
+ *  container's own as long as its centre falls in this container's box and no sibling's
+ *  own traced outline - not merely its box, which proves nothing where two balloons sit
+ *  close together - claims the same point instead. That second half is what keeps a
+ *  genuinely separate, nearby balloon or caption from being swallowed by mistake: its own
+ *  outline, wherever it has one, always outranks a neighbour's bare box. */
+export function comicSeedBelongsToContainer(seed: { bbox: Bbox }, container: ComicVisualContainer, siblings: readonly ComicVisualContainer[] = []): boolean {
+  const b = seed.bbox, center = { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 };
+  if (center.x < container.bbox.x0 || center.x > container.bbox.x1 || center.y < container.bbox.y0 || center.y > container.bbox.y1) return false;
+  if (container.contour.length < 3 || comicDistanceToContour(container.contour, center) === 0) return true;
+  return !siblings.some(other => other !== container && other.contour.length >= 3 && comicPointInContour(other.contour, center));
 }
 
 /** Whether a container is worth handing to recognition at all.
@@ -172,7 +180,10 @@ export class ComicRegionOcr {
     const entries: Entry[] = [];
     for (const container of containers) {
       if (!comicContainerIsWorthReading(container)) { timer?.count("ocrSkipped"); continue; }
-      const inside = seeds.filter(seed => comicSeedBelongsToContainer(seed, container));
+      // Already-claimed seeds are never reconsidered for a later container: the first
+      // container whose own outline or box explains a word is the one that keeps it, so
+      // the same word can never end up read twice, once into each of two entries.
+      const inside = seeds.filter(seed => !taken.has(seed) && comicSeedBelongsToContainer(seed, container, containers));
       inside.forEach(seed => taken.add(seed));
       const groups = groupComicTextLines(inside);
       const area = (container.bbox.x1 - container.bbox.x0) * (container.bbox.y1 - container.bbox.y0) / (width * height);

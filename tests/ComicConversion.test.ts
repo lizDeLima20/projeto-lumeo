@@ -20,7 +20,7 @@ import { maskArea, maskBounds, readMaskShape, simplifyContour, traceMaskContour,
 import { comicSourceKey } from "../src/reader/comic/interaction/ComicConversionIdentity";
 import { ComicStageTimer } from "../src/reader/comic/interaction/ComicStageTimer";
 import { ComicConversionService } from "../src/reader/comic/interaction/ComicConversionService";
-import { comicGrowStencil } from "../src/reader/comic/interaction/ComicObjectCutout";
+import { comicAdaptiveCropBounds, comicGrowStencil } from "../src/reader/comic/interaction/ComicObjectCutout";
 import type { ComicConversionResult } from "../src/reader/comic/interaction/ComicConverter";
 import type { ComicDocument } from "../src/reader/comic/interaction/ComicInteractionTypes";
 
@@ -744,13 +744,49 @@ test("a segmentação é determinística: a mesma página dá exatamente o mesmo
   assert.equal(shape(detectComicContainers(image(page), { step: 1 })), shape(detectComicContainers(image(page), { step: 1 })));
 });
 
-test("a máscara é afrouxada antes de desistir dela", () => {
+// A per-pixel silhouette used to be cut from the popup crop, loosened ring by ring before
+// falling back to a bare rectangle when it still clipped a letter. That shape never
+// perfectly matched what the flood fill found - a concave notch, a highlight the fill's own
+// tolerance missed - and every pixel it left out came back as a transparent hole in the
+// popup. The crop is a continuous rectangle now, with nothing inside it for a silhouette to
+// carve a hole in; `comicAdaptiveCropBounds`, not a mask, is what keeps it off a neighbour.
+test("o recorte é sempre um retângulo contínuo, opaco - nunca uma máscara de silhueta com buracos", () => {
   const cutout = readFileSync(new URL("../src/reader/comic/interaction/ComicObjectCutout.ts", import.meta.url), "utf8");
-  // Loosen, ring by ring, and only then fall back to the bare rectangle.
-  assert.match(cutout, /for \(const reach of \[2, 4, 7, 11\]\)/);
-  assert.match(cutout, /clippedInk = cutsInk\(\);\s*if \(!clippedInk\) break;/);
-  const fallbackAt = cutout.indexOf("const fallback = !container || clippedInk;");
-  assert.ok(cutout.indexOf("for (const reach of") < fallbackAt, "afrouxar vem antes de desistir");
+  assert.match(cutout, /new Uint8ClampedArray\(width \* height \* 4\)\.fill\(255\)/, "a máscara publicada é sempre totalmente opaca");
+  assert.doesNotMatch(cutout, /includesStencil|cutsInk|excluded\[/, "nada aqui decide pixel a pixel o que fica de fora");
+});
+
+test("sozinho na página, o balão recebe um respiro confortável em toda volta", () => {
+  const solo = container({ bbox: { x0: 200, y0: 200, x1: 300, y1: 260 } });
+  const bounds = comicAdaptiveCropBounds(solo, [solo], 1000, 1000);
+  // 8% of the shorter side (60px) = 4.8px, floored by the 6px minimum.
+  assert.equal(bounds.x0, 194); assert.equal(bounds.y0, 194);
+  assert.equal(bounds.x1, 306); assert.equal(bounds.y1, 266);
+});
+
+test("um vizinho colado de um lado reduz o respiro só daquele lado, sem nunca alcançá-lo", () => {
+  const left = container({ bbox: { x0: 200, y0: 200, x1: 300, y1: 260 } });
+  // 10px to the right, sharing the same rows - close enough to matter for that one side.
+  const right = container({ bbox: { x0: 310, y0: 200, x1: 400, y1: 260 } });
+  const bounds = comicAdaptiveCropBounds(left, [left, right], 1000, 1000);
+  assert.equal(bounds.x0, 194, "o lado esquerdo, sem ninguém por perto, mantém o respiro confortável");
+  assert.ok(bounds.x1 < 310, "o lado direito nunca alcança o território do vizinho");
+  assert.equal(bounds.x1, 305, "metade do vão real de 10px, não o respiro confortável inteiro");
+});
+
+test("um vizinho que não compartilha linha ou coluna nenhuma não limita respiro nenhum", () => {
+  const upper = container({ bbox: { x0: 200, y0: 200, x1: 300, y1: 260 } });
+  // Far below, and far to the side - never in the way of upper's own left/right/top/bottom.
+  const distant = container({ bbox: { x0: 600, y0: 600, x1: 700, y1: 660 } });
+  const bounds = comicAdaptiveCropBounds(upper, [upper, distant], 1000, 1000);
+  assert.equal(bounds.x0, 194); assert.equal(bounds.y0, 194);
+  assert.equal(bounds.x1, 306); assert.equal(bounds.y1, 266);
+});
+
+test("o recorte nunca sai da página, mesmo colado a uma borda", () => {
+  const corner = container({ bbox: { x0: 0, y0: 0, x1: 100, y1: 60 } });
+  const bounds = comicAdaptiveCropBounds(corner, [corner], 1000, 1000);
+  assert.equal(bounds.x0, 0); assert.equal(bounds.y0, 0);
 });
 
 test("uma página relata o próprio progresso, sempre para a frente, do zero ao pronto", async () => {
