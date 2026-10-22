@@ -1,0 +1,2069 @@
+{
+  "schemaVersion": 1,
+  "source": "lumeo-drive-2",
+  "updatedAt": "2026-10-08T16:05:27.040Z",
+  "items": [
+    {
+      "id": "bk_ebc5b632dc494e1f02662b860ad8b9e7926dab30d0c4573a85d321524600cdc5",
+      "titulo": "100 dias depois do fim",
+      "autor": "Victor Érik",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_ebc5b632dc494e1f02662b860ad8b9e7926dab30d0c4573a85d321524600cdc5.webp",
+      "sinopse": null,
+      "destaque": true,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_fa86e1da299898cdb960a1c757d3dbbf3936d7da95f8ddbc37c8fcd770f10aed",
+      "titulo": "124 fábulas de Esopo",
+      "autor": "Esopo",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_fa86e1da299898cdb960a1c757d3dbbf3936d7da95f8ddbc37c8fcd770f10aed.webp",
+      "sinopse": null,
+      "destaque": true,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_ab3deb8b4e317c2e1040c79891e25e321f8f346a6b444add498dd72d37cc8e84",
+      "titulo": "13 segundos",
+      "autor": "Bel Rodrigues",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_ab3deb8b4e317c2e1040c79891e25e321f8f346a6b444add498dd72d37cc8e84.webp",
+      "sinopse": null,
+      "destaque": true,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_2b7ae400571f0af74aa2875b21eb16310060b15d35281daddde3caf83db904ed",
+      "titulo": "1Q84 - Livro 3",
+      "autor": "Haruki Murakami",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_2b7ae400571f0af74aa2875b21eb16310060b15d35281daddde3caf83db904ed.webp",
+      "sinopse": "Em um ano próximo a 1984, dois personagens repletos de segredos e envolvidos em tramas obscuras tentam sair de uma realidade implacável: o mundo de 1Q84. No último volume da trilogia Haruki Murakami, os protagonistas Tengo e Aomame continuam presos ao mundo paralelo, “onde coisas estranhas podem acontecer”.",
+      "destaque": true,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_79af80d2f2ea601cbf8e6c18331faf011f90a7e41259c84cda49c87cd232087d",
+      "titulo": "1Q84",
+      "autor": "Haruki Murakami",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_79af80d2f2ea601cbf8e6c18331faf011f90a7e41259c84cda49c87cd232087d.webp",
+      "sinopse": "1Q84 é o livro mais ambicioso de Haruki Murakami, fenômeno da literatura contemporânea.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_ee95033ce28443522154a52b16e7e66c10b6ddbbd289e00de1a0226fcc8cde87",
+      "titulo": "1Q84 – Volume 2",
+      "autor": "Haruki Murakami",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_ee95033ce28443522154a52b16e7e66c10b6ddbbd289e00de1a0226fcc8cde87.webp",
+      "sinopse": "No primeiro volume do best seller 1Q84, mistérios rondam duas pessoas no Japão de 1984. A charmosa assassina Aomame e o aspirante a escritor Tengo vão aos poucos se dando conta de que entraram em um mundo paralelo, cada um à própria maneira, e o perigo em torno de ambos parece somente crescer.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_b4529274666b51ba3d9933ac73b88559c24bbb97bc01eff55a7e79243834c64b",
+      "titulo": "2083 Vicente Muñoz Puelles",
+      "autor": "",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_b4529274666b51ba3d9933ac73b88559c24bbb97bc01eff55a7e79243834c64b.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_1fb85dba65a746aa7a63706e6dd859286743ca67f996b152b0f0c13402884725",
+      "titulo": "47 Ronins",
+      "autor": "John Allyn",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_1fb85dba65a746aa7a63706e6dd859286743ca67f996b152b0f0c13402884725.webp",
+      "sinopse": "No Japão feudal, o senhor de um clã samurai é condenado à morte por um assalto em terras do castelo. Como ditada por lei, o clã deve vingar-se o responsável pela morte de seu senhor.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_301fab2b4a334a77037fa5ae442bee29cad5435af55d2cdff32e5f111af166a9",
+      "titulo": "54",
+      "autor": "Wu Ming",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_301fab2b4a334a77037fa5ae442bee29cad5435af55d2cdff32e5f111af166a9.webp",
+      "sinopse": "1954. O suposto clima de tranquilidade do pós-guerra dá lugar aos desdobramentos do conflito na Coréia, da retirada francesa da Indochina e do endurecimento da Guerra Fria, com a fundação da KGB, o serviço secreto soviético. É esse o pano de fundo para o enredo de '54'.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_003578d10c0a50223b11021cffec155be207823327ee69edd25cb54264a61d26",
+      "titulo": "60 anos depois(Oficial)",
+      "autor": "Fredrik Colting",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_003578d10c0a50223b11021cffec155be207823327ee69edd25cb54264a61d26.webp",
+      "sinopse": "60 anos depois é a impressionante continuação de O apanhador no campo de centeio, um dos maiores clássicos da literatura contemporânea. Fredrik Colting mescla aqui criador e criatura, em uma experimentação literária que põe J. D. Salinger e seu mais famoso personagem, Holden Caulfield, contracenando juntos.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_984b12fdbc37e3dc4497387327470afb6311231e0d88ed93662f23722c75f185",
+      "titulo": "10 Acusações Contra a Igreja Moderna",
+      "autor": "Paul Washer",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_984b12fdbc37e3dc4497387327470afb6311231e0d88ed93662f23722c75f185.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_e00ce2c8ff4e7f0cefe3c1353b32ac09bccdb63f91b879587862da3894419767",
+      "titulo": "12 passos para uma vida de compaixão",
+      "autor": "Karen Armstrong",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_e00ce2c8ff4e7f0cefe3c1353b32ac09bccdb63f91b879587862da3894419767.webp",
+      "sinopse": "Com base em um material extenso e variado - que abrange desde as crenças de diferentes religiões às descobertas da neurociência do início do século XXI -, Karen Armstrong busca sustentar neste livro que a compaixão é inerente ao cérebro humano, embora seja constantemente reprimida por instintos mais primitivos de…",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_e26e8c096ca379ccb2ac5efa945ee4187f905fb71e9d54a5d4fe2bd302695591",
+      "titulo": "141 SERMÕES DE JOHN WESLEY",
+      "autor": "soare",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_e26e8c096ca379ccb2ac5efa945ee4187f905fb71e9d54a5d4fe2bd302695591.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_111d674b4356afd8db0fb4669b2864c54a62158cff9ac9e3f390aa1c17042d0d",
+      "titulo": "30 Razões Porque Não Guardo o Sábado – Amilto Justus",
+      "autor": "Servicos Tecnicos",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_111d674b4356afd8db0fb4669b2864c54a62158cff9ac9e3f390aa1c17042d0d.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_3a37778fd2ee62e0dc247bf0374a3b331e7bd33a289f53d95d65484f95566663",
+      "titulo": "50 Mestres Fascinantes",
+      "autor": "Tom Butler-Bowdon",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_3a37778fd2ee62e0dc247bf0374a3b331e7bd33a289f53d95d65484f95566663.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_dc426cfc1ef14c1d0e59afe86a16d2d139d7ca3b02d127ba39a3bc099ff372aa",
+      "titulo": "54 perguntas sobre Jesus Cristo",
+      "autor": "Francisco Varo, Juan Chapa, Vicente Balaguer, Gonzalo Aranda, Santiago Ausín, Juan Luis Caballer",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_dc426cfc1ef14c1d0e59afe86a16d2d139d7ca3b02d127ba39a3bc099ff372aa.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_5f72cb31f41beadc26f43ce1f73763603f455f621f28ea306b8a55b27e08ed85",
+      "titulo": "terceiro olho : 7 Técnicas para abrir seu chakra com o terceiro olho: Técnicas rápidas e simples para aumentar a consciência e a espiritualidade: (glândula ... médium, espiritual)",
+      "autor": "Langlais, Madeleine",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_5f72cb31f41beadc26f43ce1f73763603f455f621f28ea306b8a55b27e08ed85.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_17d9270155e7b122b0cdc3dcafc5eb2162299486380379e4e1a546e3c593861f",
+      "titulo": "A Alma dos Animais",
+      "autor": "Prada, Irvênia",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_17d9270155e7b122b0cdc3dcafc5eb2162299486380379e4e1a546e3c593861f.webp",
+      "sinopse": "Qual a verdadeira natureza dos animais? Como se dá sua evolução espiritual e sua “entrada” no estágio humano? A manifestação da vida, evidências de que os animais têm mente e o papel do cérebro são questões amplamente discutidas, convergindo os pensamentos científico e espírita.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_f4ebd519b6eea03cb7db03290045407020e3121cfc615c5eaccdadf2c3f4ad44",
+      "titulo": "A arte de amar (Mindfulness essentials)",
+      "autor": "Thich Nhat Hanh",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_f4ebd519b6eea03cb7db03290045407020e3121cfc615c5eaccdadf2c3f4ad44.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_5ba2af0d7012060d209f9c17b5454ef58a8679152a0c5f7e456a84b726da5019",
+      "titulo": "A arte de comer (Mindfulness essentials)",
+      "autor": "Thich Nhat Hanh",
+      "genero": "Espiritualidade",
+      "capa": "assets/livros/bk_5ba2af0d7012060d209f9c17b5454ef58a8679152a0c5f7e456a84b726da5019.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_75258c5033bede5db4682281e3cc0fafcca704961ff70d0a92593399b6523a4a",
+      "titulo": "A sociedade perfeita",
+      "autor": "João Fragoso",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_75258c5033bede5db4682281e3cc0fafcca704961ff70d0a92593399b6523a4a.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_3f9ed6d60850b33af2cc543d040add12c2a2ee600a16c328cde96834d5d43d21",
+      "titulo": "A Teoria da Dependência: Do Nacional-Desenvolvimentismo ao Neoliberalismo",
+      "autor": "Cláudia Wasserman",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_3f9ed6d60850b33af2cc543d040add12c2a2ee600a16c328cde96834d5d43d21.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_c292a7fba81f56411a42c89bf659cfa1bd793efa70b1aeb713e7a6910a4e13d0",
+      "titulo": "A Teoria da Dependência: 50 Anos Depois",
+      "autor": "Claudio Katz",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_c292a7fba81f56411a42c89bf659cfa1bd793efa70b1aeb713e7a6910a4e13d0.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_9a0ae0e79cc6e5f11e36c93ab382f27691ada9144bb1b5d430780a460361a550",
+      "titulo": "A teoria da revolução no jovem Marx",
+      "autor": "Michael Löwy",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_9a0ae0e79cc6e5f11e36c93ab382f27691ada9144bb1b5d430780a460361a550.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_bdaab8b0105a49e8708532b0ef2c8840ce541ccddd7941695f313141e95e4bf8",
+      "titulo": "A Teoria das Formas de Governo",
+      "autor": "Norberto Bobbio",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_bdaab8b0105a49e8708532b0ef2c8840ce541ccddd7941695f313141e95e4bf8.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_12f2f6ba24e4413e5210d98a7368e0f69611a876c46c6eeef4aa3b131373229a",
+      "titulo": "A tolice da inteligência brasileira",
+      "autor": "Jessé Souza",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_12f2f6ba24e4413e5210d98a7368e0f69611a876c46c6eeef4aa3b131373229a.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_a5bc9c4a16440ae1500bb4a8cc5742747d39755edf1ee9021895a26a7d9b6d05",
+      "titulo": "A vida louca dos revolucionários",
+      "autor": "Demétrio Magnoli",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_a5bc9c4a16440ae1500bb4a8cc5742747d39755edf1ee9021895a26a7d9b6d05.webp",
+      "sinopse": "Descrição do produto A Revolução, assim, com maiúscula, é uma obsessão de nossa era histórica. Mudar radicalmente a sociedade, o mundo, a vida, engendrando um tempo em tudo diferente do presente - eis a ideia revolucionária.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_c3a52a6545d685fc6169d086d45c1b70d27125d59c1683860f7f33d98af7a878",
+      "titulo": "A vida secreta de Fidel – As revelações de seu guarda-costas pessoal",
+      "autor": "Juan Reinaldo Sánchez; Axel Gyldén",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_c3a52a6545d685fc6169d086d45c1b70d27125d59c1683860f7f33d98af7a878.webp",
+      "sinopse": "Poucos estiveram tão perto ou souberam da vida do líder máximo de Cuba quanto Juan Reinaldo Sánchez, seu guarda-costas pessoal. Ao longo de dezessete anos, ele foi responsável pela segurança de Fidel, mas também testemunha de seus relacionamentos, de sua vida em família, de suas horas de lazer, de suas estratégias…",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_d9f9fba5788ed1a9b16c01182d00f163d15d127c82814eb203bb3fc4004a43b9",
+      "titulo": "A volta do Estado planejador",
+      "autor": "Gilberto Maringoni (org.)",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_d9f9fba5788ed1a9b16c01182d00f163d15d127c82814eb203bb3fc4004a43b9.webp",
+      "sinopse": "1. Administração pública 2. Brasil - Política econômica 3. Brasil - Política e governo 4. Estado 5. Política social 6. Neoliberalismo - Brasil I. Maringoni, Gilberto.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_2ea2bf54fcbc675db796522f4e18cf6b6ad4e0ab22feac8429d65566d8d01b50",
+      "titulo": "A voz que ninguém escutou",
+      "autor": "Silva, Renan",
+      "genero": "Concursos",
+      "capa": "assets/livros/bk_2ea2bf54fcbc675db796522f4e18cf6b6ad4e0ab22feac8429d65566d8d01b50.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_a8badcbddf50c502d3387f33048483446242fc7a934629e2f08367d23f28eaaa",
+      "titulo": "A última casa em Needless Street",
+      "autor": "Catriona Ward",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_a8badcbddf50c502d3387f33048483446242fc7a934629e2f08367d23f28eaaa.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_f4c96d6016424af1a04dc41910ba8e722a8f261539a9bb5fead20a47ccdc7387",
+      "titulo": "100 Coisas Que Todo Corredor Deveria Saber",
+      "autor": "Sergio Rocha; Raquel Castanharo",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_f4c96d6016424af1a04dc41910ba8e722a8f261539a9bb5fead20a47ccdc7387.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_43b5de80602a48f1e5bfc0856d31c7cb2958fa7abee3653ff2576dd233d00771",
+      "titulo": "A arte cavalheiresca do negro",
+      "autor": "Haendel Motta",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_43b5de80602a48f1e5bfc0856d31c7cb2958fa7abee3653ff2576dd233d00771.webp",
+      "sinopse": "Com ares de quimera, “sushi-com-vatapá”, o relato inspirado – narrado em primeira pessoa e apresentado como monografia final na faculdade de psicologia – traz um estudante às voltas com os limites de seu próprio corpo e pensamento.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_c5f1e51df07a84809d8e228125dcaec5b4ee24541f8d9d797cb7e3ebce9d9d0b",
+      "titulo": "A copa como ela é - A história de dez anos de preparação para a Copa de 2014",
+      "autor": "Chade, Jamil",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_c5f1e51df07a84809d8e228125dcaec5b4ee24541f8d9d797cb7e3ebce9d9d0b.webp",
+      "sinopse": "Durante dez anos, o jornalista Jamil Chade acompanhou de perto as negociações que culminaram na escolha do Brasil para sediar a Copa do Mundo de 2014, bem como todas as polêmicas que se seguiram ao anúncio. Correspondente de O Estado de S.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_9f29c4b909bb70d333d256e322350dffd3b38014159dc75dab450d4328a80777",
+      "titulo": "A invasão corinthiana",
+      "autor": "Igor Ojeda",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_9f29c4b909bb70d333d256e322350dffd3b38014159dc75dab450d4328a80777.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_7a6d1a837fa50c5130e7d7709c6862b7e28df10eb31bd1105f7db7f9e84ef14c",
+      "titulo": "A pessoa mais feliz do mundo, Dani Valente",
+      "autor": "Dani Valente",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_7a6d1a837fa50c5130e7d7709c6862b7e28df10eb31bd1105f7db7f9e84ef14c.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_bcb3512904b3a18c488013688f971103fc5f3a04fda2ecd0403bd978a4ac6988",
+      "titulo": "Almanaque Completo da Copa do Mundo - A História de Todos os Campeões Mundiais (Discovery Publicações)",
+      "autor": "Discovery Publicações",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_bcb3512904b3a18c488013688f971103fc5f3a04fda2ecd0403bd978a4ac6988.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_7cb60449cb6fa02e1bc52ad71bf694879af8703df47fc757c3db1b917a604019",
+      "titulo": "Sexo nas Copas",
+      "autor": "Gustavo Hoffman, Leonardo Bertozzi",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_7cb60449cb6fa02e1bc52ad71bf694879af8703df47fc757c3db1b917a604019.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_4240b5a6e5ca904f7a2e9a7ad0d33e8e70bc2ea1afbf9823c8fa234e03315bbd",
+      "titulo": "Amém, Marcos",
+      "autor": "Cesar Greco",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_4240b5a6e5ca904f7a2e9a7ad0d33e8e70bc2ea1afbf9823c8fa234e03315bbd.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_4af9ff8d86fb7ba9ed89eed7250f9d5fc39fb5b8689e66d86fa5c28db0d6af59",
+      "titulo": "Anatomia de uma derrota",
+      "autor": "Paulo Perdigão",
+      "genero": "Esportes e jogos",
+      "capa": "assets/livros/bk_4af9ff8d86fb7ba9ed89eed7250f9d5fc39fb5b8689e66d86fa5c28db0d6af59.webp",
+      "sinopse": "O livro definitivo sobre a derrota brasileira na final da Copa do Mundo de 1950. Reúne, além de uma análise minuciosa dos acontecimentos e do Brasil da década de 50, a narração do jogo, o depoimento dos jogadores e uma análise exaustiva do significado do jogo que marcou a vida brasileira no século XX.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_d3c89a566c8d5cddef6adec3b1ffab780511a58704d1bf703a11dfef4dd331d7",
+      "titulo": "101 FATOS sobre Star Wars",
+      "autor": "Jonas Silvestre",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_d3c89a566c8d5cddef6adec3b1ffab780511a58704d1bf703a11dfef4dd331d7.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_2dd7659099966c3e234fe289aa43c426601bf57307522182945b08d97f58d9a7",
+      "titulo": "172 Horas na Lua",
+      "autor": "Johan Harstad",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_2dd7659099966c3e234fe289aa43c426601bf57307522182945b08d97f58d9a7.webp",
+      "sinopse": "O ano é 2018. Quase cinco décadas desde que o homem pisou na Lua pela primeira vez. Três adolescentes comuns vencem um sorteio mundial promovido pela NASA. Eles vão passar uma semana na base lunar DARLAH 2 - um lugar que, até então, só era conhecido pelos altos funcionários do governo americano.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_a2503235b5518d0690bbc74ccb235c0803b39f723e897c2208e1682c2ac39d76",
+      "titulo": "1984 - Edição especial",
+      "autor": "George Orwell",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_a2503235b5518d0690bbc74ccb235c0803b39f723e897c2208e1682c2ac39d76.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_5f057f5abc6e279c15020e900fa5216aa3d3dc06a7378bf896dd852f434577a5",
+      "titulo": "1984 - Edição Exclusiva Amazon",
+      "autor": "George Orwell",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_5f057f5abc6e279c15020e900fa5216aa3d3dc06a7378bf896dd852f434577a5.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_1fd71ba2a7f3554f76e1b1d51e5522b8e0ed7736538619fdfc5ed2ab768e3e26",
+      "titulo": "20 mil léguas submarinas",
+      "autor": "Jules Verne",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_1fd71ba2a7f3554f76e1b1d51e5522b8e0ed7736538619fdfc5ed2ab768e3e26.webp",
+      "sinopse": "Há mais de 150 anos, a obra mais famosa de Jules Verne encanta leitores de todas as idades. O escritor ajudou a criar um novo gênero literário, a ficção científica, e seus livros tinham um traço premonitório. Muitas das invenções humanas posteriores foram antecipadas em suas páginas.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_7c6f21aa395dac470a39d4b8059677e9d8868bfdb05394f7db28e0d88c480e04",
+      "titulo": "20.000 léguas submarinas: edição comentada e ilustrada (Clássicos Zahar)",
+      "autor": "Verne, Júlio",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_7c6f21aa395dac470a39d4b8059677e9d8868bfdb05394f7db28e0d88c480e04.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_60648535ce94ce5227e1bcc2733358fa04b1115ac9837b3d67f7b9f493211384",
+      "titulo": "20000 Leguas Submarinas",
+      "autor": "Júlio Verne",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_60648535ce94ce5227e1bcc2733358fa04b1115ac9837b3d67f7b9f493211384.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_d585e5f36d7eb925cf7cf401a29b5c491c31797734f9054a43e35bb93ec34cb3",
+      "titulo": "Untitled",
+      "autor": "Unknown Author",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_d585e5f36d7eb925cf7cf401a29b5c491c31797734f9054a43e35bb93ec34cb3.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_8a2db38d27a1ca90c6548e13e13f331a033b2d7a74e830b1f760a5e58573900a",
+      "titulo": "2001: uma odisseia no espaço",
+      "autor": "Arthur C. Clarke",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_8a2db38d27a1ca90c6548e13e13f331a033b2d7a74e830b1f760a5e58573900a.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_b872cb2fcb6ed96bee6510d38aaf627519a857cb61a6d9aa1a17f45cf1a6db3d",
+      "titulo": "2001: uma odisseia no espaço: Stanley Kubrick, Arthur C. Clarke, e a criação de uma obra-prima",
+      "autor": "Michael Benson",
+      "genero": "Ficção científica",
+      "capa": "assets/livros/bk_b872cb2fcb6ed96bee6510d38aaf627519a857cb61a6d9aa1a17f45cf1a6db3d.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_0d4664656c5ac212f3820d09026042dd047648de23d677d176844ec27e29f1bd",
+      "titulo": "O Poder do Mito",
+      "autor": "Joseph Campbell",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_0d4664656c5ac212f3820d09026042dd047648de23d677d176844ec27e29f1bd.webp",
+      "sinopse": "O poder do mito é fruto de uma série de conversas mantidas entre o autor e o destacado jornalista Bill Moyers, numa brilhante combinação de sabedoria e humor.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_dda58121cbd16171b8815d0fcc19c2b976ee84d2edd632d4b1d219c891de4391",
+      "titulo": "007 - A Morte no Japão",
+      "autor": "Ian Fleming",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_dda58121cbd16171b8815d0fcc19c2b976ee84d2edd632d4b1d219c891de4391.webp",
+      "sinopse": "Publicado no Reino Unido (UK) em 1964 (lançado originalmente no Brasil pela Livraria do Globo como \"A Morte no Japão\" e, em Portugal, 007 - Só Se Vive Duas Vezes\"). Foi o 5º filme da série com Sean Connery no papel de 007.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_eb2347e8caf537964b88aa9aedbb389daca0ea142b42c67df5f1fe67dea5df62",
+      "titulo": "007 - O Homem do Revólver de Ouro",
+      "autor": "Ian Fleming",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_eb2347e8caf537964b88aa9aedbb389daca0ea142b42c67df5f1fe67dea5df62.webp",
+      "sinopse": "Francisco Scaramanga, agente do KGB e impiedoso assassino profissional a sôldo das forças internacionais de subversão e beligerância (interpretado no Cinema pelo ator Christopher Lee, primo / \"real life step-cousin\" de Ian Fleming/(from wikipedia).",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_141da7aa071f5e569d4cb4a4e813e20ae53aee6bd69700146b1df5775275e9eb",
+      "titulo": "007 - Os Diamantes São Eternos",
+      "autor": "Ian Fleming",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_141da7aa071f5e569d4cb4a4e813e20ae53aee6bd69700146b1df5775275e9eb.webp",
+      "sinopse": "A história do livro é centrada na investigação de James Bond em uma operação internacional de contrabando de diamantes. Plano criado por uma rede que tem início nas minas de diamantes da Serra Leoa e termina em Las Vegas. Ao longo da trama, Bond conhece um dos membros da quadrilha de contrabando, a bela Tiffany Case.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_7360dfbedc6fcbd993b9b32f21e0eec5f27a541bfabb51e78418aa9222b99a73",
+      "titulo": "007 - Para Você, Somente",
+      "autor": "Ian Fleming",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_7360dfbedc6fcbd993b9b32f21e0eec5f27a541bfabb51e78418aa9222b99a73.webp",
+      "sinopse": "É o oitavo livro de Ian Fleming sobre o agente secreto britânico James Bond, publicado em 1960, na realidade um livro de contos. É o primeiro das duas coletâneas de contos da série James Bond de Ian Fleming, o outro se chama \"Octopussy and The Living Daylights\".",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_a04889f1571e3f295ce7874c43fc5e2a17a45f3986bb8bc45b085d39d520e205",
+      "titulo": "007 - O Foguete da Morte",
+      "autor": "Ian Fleming",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_a04889f1571e3f295ce7874c43fc5e2a17a45f3986bb8bc45b085d39d520e205.webp",
+      "sinopse": "\"Moonraker\" (lançado originalmente no Brasil como O Foguete da Morte) é o terceiro livro de Ian Fleming sobre o agente secreto britânico James Bond, lançado em 1953 no Reino Unido (UK).",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_b9719172eb2fa1b091c6e0fa58a1d678f37462d5980d7004ba1133360b9db820",
+      "titulo": "11 hábitos em 11 semanas",
+      "autor": "Ícaro Alcântara",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_b9719172eb2fa1b091c6e0fa58a1d678f37462d5980d7004ba1133360b9db820.webp",
+      "sinopse": "Nutrição. Saúde - Aspectos nutricionais. Hábitos alimentares. Qualidade de vida. Onze hábitos em onze semanas.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_af7be24b1eb1ed0c741f352253191338eb2638891554d0a4a0b14b18069ecea4",
+      "titulo": "24 horas da vida de uma mulher e outras novelas (Coleção Clássicos de Ouro)",
+      "autor": "Zweig, Stefan",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_af7be24b1eb1ed0c741f352253191338eb2638891554d0a4a0b14b18069ecea4.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_c2499131d1bbc8e8699f539c881fe57012e2f443b0774beb48e22b36db8fa4a2",
+      "titulo": "4 3 2 1",
+      "autor": "Paul Auster",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_c2499131d1bbc8e8699f539c881fe57012e2f443b0774beb48e22b36db8fa4a2.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_a8a7f818d71d638cbc3474bb186aa396af35be71e14ae915b7c8eed84a151887",
+      "titulo": "99 dias",
+      "autor": "Katie Cotugno",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_a8a7f818d71d638cbc3474bb186aa396af35be71e14ae915b7c8eed84a151887.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_5f4da98256d8c95af3c7d8943ddd0b8895d903e4271f2bf43bd1ef33c78efd4a",
+      "titulo": "Dez lições sobre Hannah Arendt",
+      "autor": "Oliveira, Luciano",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_5f4da98256d8c95af3c7d8943ddd0b8895d903e4271f2bf43bd1ef33c78efd4a.webp",
+      "sinopse": "Marcada pelo \"choque\" do fenômeno totalitário, a obra de Arendt contém, do princípio ao fim, uma exaltação e uma defesa vibrante das liberdades públicas.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_85e2d3373211be804a5743c5f06e941393be755b977df0ef2cfd3731e7e44f1b",
+      "titulo": "Dez Lições Sobre Hume",
+      "autor": "Marconi Pequeno,",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_85e2d3373211be804a5743c5f06e941393be755b977df0ef2cfd3731e7e44f1b.webp",
+      "sinopse": "A presente obra tem início com a apresentação da biografia intelectual de Hume para, em seguida, destacar a importância que ele assume na história da filosofia.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_f8bee30db953146354f57ea987fb40fdc772070c50a4b5e6bb520f931a088963",
+      "titulo": "100 Aforismos Sobre o Amor e a Morte",
+      "autor": "Friedrich Nietzsche",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_f8bee30db953146354f57ea987fb40fdc772070c50a4b5e6bb520f931a088963.webp",
+      "sinopse": "A maioria dos treze livros publicados durante a vida de Nietzsche se compõe de breves seções numeradas. São os chamados “aforismos”, que ele adotou dos moralistas franceses do século XVIII e a que deu maior extensão e amplitude temática.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_fd3c6cd0b6ffeabdf2b1f8d53fe9a956ca1469a7cae44df18e7eb896633e578d",
+      "titulo": "100 palavras do marxismo",
+      "autor": "Löwy, Michael; Gérard Duménil; Emmanuel Renault",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_fd3c6cd0b6ffeabdf2b1f8d53fe9a956ca1469a7cae44df18e7eb896633e578d.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_0cea16c638985755a6d5f2d50f53da163f666db27fdfb724732d069995c3cf89",
+      "titulo": "1001 frases de grandes pensadores",
+      "autor": "Barba , Danilo E.",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_0cea16c638985755a6d5f2d50f53da163f666db27fdfb724732d069995c3cf89.webp",
+      "sinopse": "Uma imagem pode valer mais do que mil palavras, mas mil citações de grandes pensadores formam a melhor imagem que o intelecto pode enxergar.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_38a4ef2e354f40b3baecda12b94aa3d6f83fee414f88580ad4e0cfb5033f4156",
+      "titulo": "101 Verdades Sobre A Vida",
+      "autor": "Arthur Schopenhauer",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_38a4ef2e354f40b3baecda12b94aa3d6f83fee414f88580ad4e0cfb5033f4156.webp",
+      "sinopse": "Arthur Schopenhauer defendia que a verdadeira felicidade do homem não pode advir de objetos ou bens materiais, mas sim, de seu próprio eu.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_42019fa7bedbf5e68f12ec26d850bc17884347f19e6236f589e720257e99a787",
+      "titulo": "38 Estratégias para Vencer Qualquer Debate - A Arte de ter Razão",
+      "autor": "Arthur Schopenhauer",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_42019fa7bedbf5e68f12ec26d850bc17884347f19e6236f589e720257e99a787.webp",
+      "sinopse": "A forma como nos comportamos socialmente não mudou muito desde Aristóteles. Partindo dos escritos do pensador grego, Schopenhauer desenvolve em sua Dialética Erística, 38 estratégias sobre a arte de vencer um oponente num debate não importando os meios.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_b2cba69c2c1e066040ab9962af834d5cb0049f9bbcad6fb9f6c620c23d6d9402",
+      "titulo": "50 clássicos da filosofia",
+      "autor": "Tom Butler-Bowdon",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_b2cba69c2c1e066040ab9962af834d5cb0049f9bbcad6fb9f6c620c23d6d9402.webp",
+      "sinopse": "De Aristóteles a Wittgenstein, 50 clássicos da filosofia oferece uma porta de entrada para o pensamento de grandes autores, ajudando os leitores a compreender as principais questões – e possíveis respostas – sobre a existência humana.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_d8f9733a5186620897f831ade1781ac73b7bc44d3a6378f6038572f91b4cbb5e",
+      "titulo": "50 ideias de Filosofia: Que você precisa conhecer",
+      "autor": "Dupré, Ben",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_d8f9733a5186620897f831ade1781ac73b7bc44d3a6378f6038572f91b4cbb5e.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_27650ce337c16701d3907336c910a444a3a77fa6cceffcb5d6941ec6bb551134",
+      "titulo": "A abolição do homem; A abolição do homem",
+      "autor": "C. S.Lewis",
+      "genero": "Filosofia",
+      "capa": "assets/livros/bk_27650ce337c16701d3907336c910a444a3a77fa6cceffcb5d6941ec6bb551134.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_32d6f668a1ca68249e8f2c67683d3c25aa00493d85af8fbf6515b08bfa88937b",
+      "titulo": "101 RECEITAS: Faça de tudo e mais um pouco!",
+      "autor": "Cecília Alves de Carvalho",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_32d6f668a1ca68249e8f2c67683d3c25aa00493d85af8fbf6515b08bfa88937b.webp",
+      "sinopse": "Que tal ter o mais completo e definitivo livro de culinária do Brasil? Esta seleção reúne os mais variados tipos de receitas para você preparar de tudo e mais um pouco.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_218511fc0f2efeab82cd2b40ae2b9de93eab8b37b85de6838414f62998f2d8a2",
+      "titulo": "30 Receitas de Boteco: comidinhas e porções",
+      "autor": "Alves de Carvalho, Cecília",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_218511fc0f2efeab82cd2b40ae2b9de93eab8b37b85de6838414f62998f2d8a2.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_ca9a02649c0fde2e6379590e6d6867779e2e0cb41549a15eeb26be391bfabd45",
+      "titulo": "417 Receitas Vegetarianas...",
+      "autor": "Mazokatto, Parinbbago",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_ca9a02649c0fde2e6379590e6d6867779e2e0cb41549a15eeb26be391bfabd45.webp",
+      "sinopse": "Preparando As Agradáveis E Magníficas 417 Receitas Para O Estilo De Vida Vegetariano Receitas Para Dieta Vegetariana - Receitas De Sopas, Pães, Café Da Manhã, Massas, Saladas, Pizzas, Sobremesas, Molhos, Bebidas, Macarrão, Sanduíches, Tortas E Muito Mais Introdução Dietas Vegetarianas Guia Ecológico Comida E Ecologia…",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_206eb2c8174d840029bd21675f6c0f4010672c714f173ef5d4d5175857d380f8",
+      "titulo": "A culinária caipira da paulistânia",
+      "autor": "Carlos Alberto Dória",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_206eb2c8174d840029bd21675f6c0f4010672c714f173ef5d4d5175857d380f8.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_6e0d7c1e65754324f5abe59540b1f25dc277fd1495e921038deadc81a73284c8",
+      "titulo": "A experiência da mesa - O segredo para criar relacionamentos profundos",
+      "autor": "Titus, Devi",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_6e0d7c1e65754324f5abe59540b1f25dc277fd1495e921038deadc81a73284c8.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_a7873195f049a1d91007eb4d4056695e678fe127c6afd2d5e511fd58a89d9242",
+      "titulo": "A experiência do gosto",
+      "autor": "Jorge Lucki",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_a7873195f049a1d91007eb4d4056695e678fe127c6afd2d5e511fd58a89d9242.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_24442b1e1f45d545e34588416c0f5ae60ee0f679c0859cd0dc1085344761836b",
+      "titulo": "A formação da culinária brasileira",
+      "autor": "Carlos Alberto Dória",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_24442b1e1f45d545e34588416c0f5ae60ee0f679c0859cd0dc1085344761836b.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_f2badcf79868bf17f702cf0fc6db46a6fefe5c3d4e007280cbf4eca868aa339e",
+      "titulo": "A história do Romanée-Conti",
+      "autor": "Maximillian Potter",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_f2badcf79868bf17f702cf0fc6db46a6fefe5c3d4e007280cbf4eca868aa339e.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_f40f9bb970091c0f96b812d8ec09d824fc91d8579362a717cf9a80f11996fc3a",
+      "titulo": "A pequena cozinha em Paris",
+      "autor": "Khoo, Rachel",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_f40f9bb970091c0f96b812d8ec09d824fc91d8579362a717cf9a80f11996fc3a.webp",
+      "sinopse": "“A pequena cozinha em Paris é um livro recheado de charme e bom gosto. As receitas são saborosas e, acima de tudo, funcionam. E são fáceis de preparar.” – The Boston Globe. “O conceito de ‘pequena cozinha’ pode ser um grande entrave para a maioria dos chefs, mas Rachel Khoo soube tirar proveito.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_706f1bc70e7fbcea15e1aa2ff8a1ce374dbc5f67eaec23fc12551ff0b413a46b",
+      "titulo": "A viúva Clicquot: A história de um império do champanhe e da mulher que o construiu",
+      "autor": "Tilar J. Mazzeo",
+      "genero": "Gastronomia",
+      "capa": "assets/livros/bk_706f1bc70e7fbcea15e1aa2ff8a1ce374dbc5f67eaec23fc12551ff0b413a46b.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_1c869953b35b206d428b706acfb976c184b52ae791ddcc59cd88c4c698910f4c",
+      "titulo": "Quanto mais sei acabo menos sabendo",
+      "autor": "RICHARD THE MARS",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_1c869953b35b206d428b706acfb976c184b52ae791ddcc59cd88c4c698910f4c.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_f8236ba4ca56c2774baf00d592a5d8cfc1c5f9e4c199d3d539d8884736c1157c",
+      "titulo": "@Re_vira_volta: uma experiência em twitteratura",
+      "autor": "André Lemos",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_f8236ba4ca56c2774baf00d592a5d8cfc1c5f9e4c199d3d539d8884736c1157c.webp",
+      "sinopse": "@re_vira_volta conta a história de um personagem que se vê desaparecendo dos bancos de dados eletrônicos que comandam a vida social. A narrativa cruza referências e citações da literatura (Paul Auster, T.S. Eliot, S. Mallarmé, P. Verlaine, S. Beckett, J. L. Borges, C. Baudelaire) e da música (R.E.M, P. J.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_65920e1a8ca5d3a20f9c2051d8c1f08c4d66af050b846b60bd2cc5bcb96f0a5a",
+      "titulo": "A 25ª Hora",
+      "autor": "C. Virgil Gheorghiu",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_65920e1a8ca5d3a20f9c2051d8c1f08c4d66af050b846b60bd2cc5bcb96f0a5a.webp",
+      "sinopse": "Iohann Moritz é um camponês romeno que, em meio à guerra, vê-se reduzido à sua dimensão social: homens deixaram de ser indivíduos e se tornaram simples membros de categorias.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_baf46c326f5223fc2152a636f243f1608d50990af4ab23c7e13eed181b4bf257",
+      "titulo": "A Auto-Estrada",
+      "autor": "Stephen King",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_baf46c326f5223fc2152a636f243f1608d50990af4ab23c7e13eed181b4bf257.webp",
+      "sinopse": "A história deste livro se passa no meio-oeste americano entre 1973 e 1974, no momento em que Dowes tem sua vida absolutamente desintegrada pelo profundo luto. Por consequência, todas as relações de sua vida se fragilizam, e entre elas está o casamento.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_4bb4cf8f89827655c5af045616d0ac90c8a3d3f8e7e3a554020c918fefeb0393",
+      "titulo": "A Avenida",
+      "autor": "James Lawless",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_4bb4cf8f89827655c5af045616d0ac90c8a3d3f8e7e3a554020c918fefeb0393.webp",
+      "sinopse": "A AVENIDA Uma rapariga, de roupa muito reduzida, dançando por trás de uma janela iluminada arrebata Francis Copeland do seu mundo de livros.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_49c2b88f663df9121f0d00239328da006ce4307610a9ed1818dbe31e0583b5fe",
+      "titulo": "A Bagaceira",
+      "autor": "José Américo de Almeida",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_49c2b88f663df9121f0d00239328da006ce4307610a9ed1818dbe31e0583b5fe.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_077f4b7ed0915cbe1b92a8ac2f80fee42e18f0daf98066415519c4806a1e89e0",
+      "titulo": "A balada de Adam Henry",
+      "autor": "Ian McEwan",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_077f4b7ed0915cbe1b92a8ac2f80fee42e18f0daf98066415519c4806a1e89e0.webp",
+      "sinopse": "Poucos autores de língua inglesa são mais importantes na atualidade do que Ian McEwan. Em quarenta anos de carreira, ele compôs marcos da literatura contemporânea, como Amor sem fim (1997), Amsterdam (1998) e Reparação (2001).",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_90e536af0846f0bbafe8235c5f5a5f38a926dcb97c1248e6333b248f93ddf402",
+      "titulo": "A Balada do Café Triste",
+      "autor": "Carson McCullers",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_90e536af0846f0bbafe8235c5f5a5f38a926dcb97c1248e6333b248f93ddf402.webp",
+      "sinopse": "A Balada do Café Triste narra o encontro, num pequeno povoado norte-americano, de Miss Amélia, um corcunda que se afirma vagamente seu primo e um condenado, Marvin Macy, que regressa da prisão para se vingar de um repúdio antigo.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_5e05e02cdccf30dabd145e323ecefae6101664d79532fe0a01c622238861a6b8",
+      "titulo": "A BESTA DOS MIL ANOS",
+      "autor": "Ilmar Penna Marinho Junior",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_5e05e02cdccf30dabd145e323ecefae6101664d79532fe0a01c622238861a6b8.webp",
+      "sinopse": "Em 2007, durante visita ao Vale do Loire, berço da gloriosa tradição castelar francesa, Ilmar Penna Marinho Junior e a esposa Solange, se encantaram com a sedutora cidade de Angers e o seu Castelo (Château d ́Angers).",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_06f62b9c48ed29e6e13756f7fb344aa0fff2a0cba810ef50ac22c3042d02938c",
+      "titulo": "A Bolsa Amarela",
+      "autor": "Lygia Bojunga",
+      "genero": "Ficção",
+      "capa": "assets/livros/bk_06f62b9c48ed29e6e13756f7fb344aa0fff2a0cba810ef50ac22c3042d02938c.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_2c80fbbf773feaccdaa069d91cd31c4e431f64424b1212de88137987d7894b1e",
+      "titulo": "A Aldeia Aérea",
+      "autor": "Júlio Verne",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_2c80fbbf773feaccdaa069d91cd31c4e431f64424b1212de88137987d7894b1e.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_6aa70353a2c604f0de2662b5877edd7a1f06b7516a97d6b84c96101dd97aa8b1",
+      "titulo": "A alma do imperador",
+      "autor": "Brandon Sanderson",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_6aa70353a2c604f0de2662b5877edd7a1f06b7516a97d6b84c96101dd97aa8b1.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_976a3f49660628c1d6d91023bbe6e92541975680101b8f7a17673c269e7580fa",
+      "titulo": "A alma do oceano",
+      "autor": "Natasha Bowen",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_976a3f49660628c1d6d91023bbe6e92541975680101b8f7a17673c269e7580fa.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_37e1ae02976c68c88981395b0596d3ab8313f3817b392d607c0b94ae46c30040",
+      "titulo": "A alma indomável",
+      "autor": "Michael A. Singer",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_37e1ae02976c68c88981395b0596d3ab8313f3817b392d607c0b94ae46c30040.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_cc6b6447fe04c414021ba27767221402a948e2a5820ef0b4ed24b677b77a18f2",
+      "titulo": "A alquimia do luar",
+      "autor": "David Ferraro",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_cc6b6447fe04c414021ba27767221402a948e2a5820ef0b4ed24b677b77a18f2.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_1f39bf078318a2136bd609f0f97d455b06e8c372d70913bcd34ee7705bd45efe",
+      "titulo": "[Anômalos 2]A Ameaca Invisivel",
+      "autor": "Barbara Morais",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_1f39bf078318a2136bd609f0f97d455b06e8c372d70913bcd34ee7705bd45efe.webp",
+      "sinopse": "A presença das pessoas vestidas de preto posicionadas em cada esquina, armadas com cassetetes e revólveres, me deixa perturbada. Seus uniformes são adornados com um triângulo azul claro costurado do lado esquerdo do peito, para diferenciá-los dos policiais anômalos, com suas faixas amarelas no uniforme.",
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_0851ae70ea8c25b8c3bfc487ea1cc43c7d750b2cbc6076f8f1409a2caa7ac7ee",
+      "titulo": "A amiga maldita",
+      "autor": "Beatrice Salvioni",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_0851ae70ea8c25b8c3bfc487ea1cc43c7d750b2cbc6076f8f1409a2caa7ac7ee.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_f45e6f86d426d739c84b5da4cc491e53586a85af4ebb1dcc65738779257d0660",
+      "titulo": "A Andarilha, ou Dificuldades Femininas",
+      "autor": "Frances Burney",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_f45e6f86d426d739c84b5da4cc491e53586a85af4ebb1dcc65738779257d0660.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_9f8733796c3059ab85944079e625031abd2c28dfdeaeb1d01d1e0cd8461c7113",
+      "titulo": "A angústia do rei Salomão",
+      "autor": "Romain Gary",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_9f8733796c3059ab85944079e625031abd2c28dfdeaeb1d01d1e0cd8461c7113.webp",
+      "sinopse": null,
+      "destaque": false,
+      "disponivelNoApp": true
+    },
+    {
+      "id": "bk_17ee7d3e0b527fb5cb33e8c9d6d2b4fb49501338e4be3c7dfa86faf0fe2d5b9a",
+      "titulo": "A Aprendiz",
+      "autor": "Trudi Canavan",
+      "genero": "Ficção fantástica",
+      "capa": "assets/livros/bk_17ee7d3e0b527fb5cb33e8c9d6d2b4fb49501338e4be3c7dfa86faf0fe2d5b9a.webp",
+      "sinopse": "Sozinha entre todos os aprendizes do Clã dos Magos, somente Sonea vem de uma classe menos privilegiada. No entanto, ela ganhou aliados poderosos, como Lorde Dannyl, recentemente promovido a Embaixador.",
+      "destaque": false,
+      "disponivelNoApp": true
+    }
+  ],
+  "sections": [
+    {
+      "id": "selec-a-o-do-cata-logo",
+      "titulo": "Seleção do catálogo",
+      "items": [
+        {
+          "id": "bk_ebc5b632dc494e1f02662b860ad8b9e7926dab30d0c4573a85d321524600cdc5",
+          "titulo": "100 dias depois do fim",
+          "autor": "Victor Érik",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_ebc5b632dc494e1f02662b860ad8b9e7926dab30d0c4573a85d321524600cdc5.webp",
+          "sinopse": null,
+          "destaque": true,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_fa86e1da299898cdb960a1c757d3dbbf3936d7da95f8ddbc37c8fcd770f10aed",
+          "titulo": "124 fábulas de Esopo",
+          "autor": "Esopo",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_fa86e1da299898cdb960a1c757d3dbbf3936d7da95f8ddbc37c8fcd770f10aed.webp",
+          "sinopse": null,
+          "destaque": true,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_ab3deb8b4e317c2e1040c79891e25e321f8f346a6b444add498dd72d37cc8e84",
+          "titulo": "13 segundos",
+          "autor": "Bel Rodrigues",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_ab3deb8b4e317c2e1040c79891e25e321f8f346a6b444add498dd72d37cc8e84.webp",
+          "sinopse": null,
+          "destaque": true,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_2b7ae400571f0af74aa2875b21eb16310060b15d35281daddde3caf83db904ed",
+          "titulo": "1Q84 - Livro 3",
+          "autor": "Haruki Murakami",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_2b7ae400571f0af74aa2875b21eb16310060b15d35281daddde3caf83db904ed.webp",
+          "sinopse": "Em um ano próximo a 1984, dois personagens repletos de segredos e envolvidos em tramas obscuras tentam sair de uma realidade implacável: o mundo de 1Q84. No último volume da trilogia Haruki Murakami, os protagonistas Tengo e Aomame continuam presos ao mundo paralelo, “onde coisas estranhas podem acontecer”.",
+          "destaque": true,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_79af80d2f2ea601cbf8e6c18331faf011f90a7e41259c84cda49c87cd232087d",
+          "titulo": "1Q84",
+          "autor": "Haruki Murakami",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_79af80d2f2ea601cbf8e6c18331faf011f90a7e41259c84cda49c87cd232087d.webp",
+          "sinopse": "1Q84 é o livro mais ambicioso de Haruki Murakami, fenômeno da literatura contemporânea.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_ee95033ce28443522154a52b16e7e66c10b6ddbbd289e00de1a0226fcc8cde87",
+          "titulo": "1Q84 – Volume 2",
+          "autor": "Haruki Murakami",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_ee95033ce28443522154a52b16e7e66c10b6ddbbd289e00de1a0226fcc8cde87.webp",
+          "sinopse": "No primeiro volume do best seller 1Q84, mistérios rondam duas pessoas no Japão de 1984. A charmosa assassina Aomame e o aspirante a escritor Tengo vão aos poucos se dando conta de que entraram em um mundo paralelo, cada um à própria maneira, e o perigo em torno de ambos parece somente crescer.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_b4529274666b51ba3d9933ac73b88559c24bbb97bc01eff55a7e79243834c64b",
+          "titulo": "2083 Vicente Muñoz Puelles",
+          "autor": "",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_b4529274666b51ba3d9933ac73b88559c24bbb97bc01eff55a7e79243834c64b.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_1fb85dba65a746aa7a63706e6dd859286743ca67f996b152b0f0c13402884725",
+          "titulo": "47 Ronins",
+          "autor": "John Allyn",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_1fb85dba65a746aa7a63706e6dd859286743ca67f996b152b0f0c13402884725.webp",
+          "sinopse": "No Japão feudal, o senhor de um clã samurai é condenado à morte por um assalto em terras do castelo. Como ditada por lei, o clã deve vingar-se o responsável pela morte de seu senhor.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_301fab2b4a334a77037fa5ae442bee29cad5435af55d2cdff32e5f111af166a9",
+          "titulo": "54",
+          "autor": "Wu Ming",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_301fab2b4a334a77037fa5ae442bee29cad5435af55d2cdff32e5f111af166a9.webp",
+          "sinopse": "1954. O suposto clima de tranquilidade do pós-guerra dá lugar aos desdobramentos do conflito na Coréia, da retirada francesa da Indochina e do endurecimento da Guerra Fria, com a fundação da KGB, o serviço secreto soviético. É esse o pano de fundo para o enredo de '54'.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_003578d10c0a50223b11021cffec155be207823327ee69edd25cb54264a61d26",
+          "titulo": "60 anos depois(Oficial)",
+          "autor": "Fredrik Colting",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_003578d10c0a50223b11021cffec155be207823327ee69edd25cb54264a61d26.webp",
+          "sinopse": "60 anos depois é a impressionante continuação de O apanhador no campo de centeio, um dos maiores clássicos da literatura contemporânea. Fredrik Colting mescla aqui criador e criatura, em uma experimentação literária que põe J. D. Salinger e seu mais famoso personagem, Holden Caulfield, contracenando juntos.",
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "espiritalidade",
+      "titulo": "Espiritualidade",
+      "items": [
+        {
+          "id": "bk_984b12fdbc37e3dc4497387327470afb6311231e0d88ed93662f23722c75f185",
+          "titulo": "10 Acusações Contra a Igreja Moderna",
+          "autor": "Paul Washer",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_984b12fdbc37e3dc4497387327470afb6311231e0d88ed93662f23722c75f185.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_e00ce2c8ff4e7f0cefe3c1353b32ac09bccdb63f91b879587862da3894419767",
+          "titulo": "12 passos para uma vida de compaixão",
+          "autor": "Karen Armstrong",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_e00ce2c8ff4e7f0cefe3c1353b32ac09bccdb63f91b879587862da3894419767.webp",
+          "sinopse": "Com base em um material extenso e variado - que abrange desde as crenças de diferentes religiões às descobertas da neurociência do início do século XXI -, Karen Armstrong busca sustentar neste livro que a compaixão é inerente ao cérebro humano, embora seja constantemente reprimida por instintos mais primitivos de…",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_e26e8c096ca379ccb2ac5efa945ee4187f905fb71e9d54a5d4fe2bd302695591",
+          "titulo": "141 SERMÕES DE JOHN WESLEY",
+          "autor": "soare",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_e26e8c096ca379ccb2ac5efa945ee4187f905fb71e9d54a5d4fe2bd302695591.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_111d674b4356afd8db0fb4669b2864c54a62158cff9ac9e3f390aa1c17042d0d",
+          "titulo": "30 Razões Porque Não Guardo o Sábado – Amilto Justus",
+          "autor": "Servicos Tecnicos",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_111d674b4356afd8db0fb4669b2864c54a62158cff9ac9e3f390aa1c17042d0d.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_3a37778fd2ee62e0dc247bf0374a3b331e7bd33a289f53d95d65484f95566663",
+          "titulo": "50 Mestres Fascinantes",
+          "autor": "Tom Butler-Bowdon",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_3a37778fd2ee62e0dc247bf0374a3b331e7bd33a289f53d95d65484f95566663.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_dc426cfc1ef14c1d0e59afe86a16d2d139d7ca3b02d127ba39a3bc099ff372aa",
+          "titulo": "54 perguntas sobre Jesus Cristo",
+          "autor": "Francisco Varo, Juan Chapa, Vicente Balaguer, Gonzalo Aranda, Santiago Ausín, Juan Luis Caballer",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_dc426cfc1ef14c1d0e59afe86a16d2d139d7ca3b02d127ba39a3bc099ff372aa.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_5f72cb31f41beadc26f43ce1f73763603f455f621f28ea306b8a55b27e08ed85",
+          "titulo": "terceiro olho : 7 Técnicas para abrir seu chakra com o terceiro olho: Técnicas rápidas e simples para aumentar a consciência e a espiritualidade: (glândula ... médium, espiritual)",
+          "autor": "Langlais, Madeleine",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_5f72cb31f41beadc26f43ce1f73763603f455f621f28ea306b8a55b27e08ed85.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_17d9270155e7b122b0cdc3dcafc5eb2162299486380379e4e1a546e3c593861f",
+          "titulo": "A Alma dos Animais",
+          "autor": "Prada, Irvênia",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_17d9270155e7b122b0cdc3dcafc5eb2162299486380379e4e1a546e3c593861f.webp",
+          "sinopse": "Qual a verdadeira natureza dos animais? Como se dá sua evolução espiritual e sua “entrada” no estágio humano? A manifestação da vida, evidências de que os animais têm mente e o papel do cérebro são questões amplamente discutidas, convergindo os pensamentos científico e espírita.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_f4ebd519b6eea03cb7db03290045407020e3121cfc615c5eaccdadf2c3f4ad44",
+          "titulo": "A arte de amar (Mindfulness essentials)",
+          "autor": "Thich Nhat Hanh",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_f4ebd519b6eea03cb7db03290045407020e3121cfc615c5eaccdadf2c3f4ad44.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_5ba2af0d7012060d209f9c17b5454ef58a8679152a0c5f7e456a84b726da5019",
+          "titulo": "A arte de comer (Mindfulness essentials)",
+          "autor": "Thich Nhat Hanh",
+          "genero": "Espiritualidade",
+          "capa": "assets/livros/bk_5ba2af0d7012060d209f9c17b5454ef58a8679152a0c5f7e456a84b726da5019.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "concrsos",
+      "titulo": "Concursos",
+      "items": [
+        {
+          "id": "bk_75258c5033bede5db4682281e3cc0fafcca704961ff70d0a92593399b6523a4a",
+          "titulo": "A sociedade perfeita",
+          "autor": "João Fragoso",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_75258c5033bede5db4682281e3cc0fafcca704961ff70d0a92593399b6523a4a.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_3f9ed6d60850b33af2cc543d040add12c2a2ee600a16c328cde96834d5d43d21",
+          "titulo": "A Teoria da Dependência: Do Nacional-Desenvolvimentismo ao Neoliberalismo",
+          "autor": "Cláudia Wasserman",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_3f9ed6d60850b33af2cc543d040add12c2a2ee600a16c328cde96834d5d43d21.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_c292a7fba81f56411a42c89bf659cfa1bd793efa70b1aeb713e7a6910a4e13d0",
+          "titulo": "A Teoria da Dependência: 50 Anos Depois",
+          "autor": "Claudio Katz",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_c292a7fba81f56411a42c89bf659cfa1bd793efa70b1aeb713e7a6910a4e13d0.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_9a0ae0e79cc6e5f11e36c93ab382f27691ada9144bb1b5d430780a460361a550",
+          "titulo": "A teoria da revolução no jovem Marx",
+          "autor": "Michael Löwy",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_9a0ae0e79cc6e5f11e36c93ab382f27691ada9144bb1b5d430780a460361a550.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_bdaab8b0105a49e8708532b0ef2c8840ce541ccddd7941695f313141e95e4bf8",
+          "titulo": "A Teoria das Formas de Governo",
+          "autor": "Norberto Bobbio",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_bdaab8b0105a49e8708532b0ef2c8840ce541ccddd7941695f313141e95e4bf8.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_12f2f6ba24e4413e5210d98a7368e0f69611a876c46c6eeef4aa3b131373229a",
+          "titulo": "A tolice da inteligência brasileira",
+          "autor": "Jessé Souza",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_12f2f6ba24e4413e5210d98a7368e0f69611a876c46c6eeef4aa3b131373229a.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_a5bc9c4a16440ae1500bb4a8cc5742747d39755edf1ee9021895a26a7d9b6d05",
+          "titulo": "A vida louca dos revolucionários",
+          "autor": "Demétrio Magnoli",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_a5bc9c4a16440ae1500bb4a8cc5742747d39755edf1ee9021895a26a7d9b6d05.webp",
+          "sinopse": "Descrição do produto A Revolução, assim, com maiúscula, é uma obsessão de nossa era histórica. Mudar radicalmente a sociedade, o mundo, a vida, engendrando um tempo em tudo diferente do presente - eis a ideia revolucionária.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_c3a52a6545d685fc6169d086d45c1b70d27125d59c1683860f7f33d98af7a878",
+          "titulo": "A vida secreta de Fidel – As revelações de seu guarda-costas pessoal",
+          "autor": "Juan Reinaldo Sánchez; Axel Gyldén",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_c3a52a6545d685fc6169d086d45c1b70d27125d59c1683860f7f33d98af7a878.webp",
+          "sinopse": "Poucos estiveram tão perto ou souberam da vida do líder máximo de Cuba quanto Juan Reinaldo Sánchez, seu guarda-costas pessoal. Ao longo de dezessete anos, ele foi responsável pela segurança de Fidel, mas também testemunha de seus relacionamentos, de sua vida em família, de suas horas de lazer, de suas estratégias…",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_d9f9fba5788ed1a9b16c01182d00f163d15d127c82814eb203bb3fc4004a43b9",
+          "titulo": "A volta do Estado planejador",
+          "autor": "Gilberto Maringoni (org.)",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_d9f9fba5788ed1a9b16c01182d00f163d15d127c82814eb203bb3fc4004a43b9.webp",
+          "sinopse": "1. Administração pública 2. Brasil - Política econômica 3. Brasil - Política e governo 4. Estado 5. Política social 6. Neoliberalismo - Brasil I. Maringoni, Gilberto.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_2ea2bf54fcbc675db796522f4e18cf6b6ad4e0ab22feac8429d65566d8d01b50",
+          "titulo": "A voz que ninguém escutou",
+          "autor": "Silva, Renan",
+          "genero": "Concursos",
+          "capa": "assets/livros/bk_2ea2bf54fcbc675db796522f4e18cf6b6ad4e0ab22feac8429d65566d8d01b50.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "esportes-e-jogos",
+      "titulo": "Esportes e jogos",
+      "items": [
+        {
+          "id": "bk_a8badcbddf50c502d3387f33048483446242fc7a934629e2f08367d23f28eaaa",
+          "titulo": "A última casa em Needless Street",
+          "autor": "Catriona Ward",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_a8badcbddf50c502d3387f33048483446242fc7a934629e2f08367d23f28eaaa.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_f4c96d6016424af1a04dc41910ba8e722a8f261539a9bb5fead20a47ccdc7387",
+          "titulo": "100 Coisas Que Todo Corredor Deveria Saber",
+          "autor": "Sergio Rocha; Raquel Castanharo",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_f4c96d6016424af1a04dc41910ba8e722a8f261539a9bb5fead20a47ccdc7387.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_43b5de80602a48f1e5bfc0856d31c7cb2958fa7abee3653ff2576dd233d00771",
+          "titulo": "A arte cavalheiresca do negro",
+          "autor": "Haendel Motta",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_43b5de80602a48f1e5bfc0856d31c7cb2958fa7abee3653ff2576dd233d00771.webp",
+          "sinopse": "Com ares de quimera, “sushi-com-vatapá”, o relato inspirado – narrado em primeira pessoa e apresentado como monografia final na faculdade de psicologia – traz um estudante às voltas com os limites de seu próprio corpo e pensamento.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_c5f1e51df07a84809d8e228125dcaec5b4ee24541f8d9d797cb7e3ebce9d9d0b",
+          "titulo": "A copa como ela é - A história de dez anos de preparação para a Copa de 2014",
+          "autor": "Chade, Jamil",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_c5f1e51df07a84809d8e228125dcaec5b4ee24541f8d9d797cb7e3ebce9d9d0b.webp",
+          "sinopse": "Durante dez anos, o jornalista Jamil Chade acompanhou de perto as negociações que culminaram na escolha do Brasil para sediar a Copa do Mundo de 2014, bem como todas as polêmicas que se seguiram ao anúncio. Correspondente de O Estado de S.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_9f29c4b909bb70d333d256e322350dffd3b38014159dc75dab450d4328a80777",
+          "titulo": "A invasão corinthiana",
+          "autor": "Igor Ojeda",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_9f29c4b909bb70d333d256e322350dffd3b38014159dc75dab450d4328a80777.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_7a6d1a837fa50c5130e7d7709c6862b7e28df10eb31bd1105f7db7f9e84ef14c",
+          "titulo": "A pessoa mais feliz do mundo, Dani Valente",
+          "autor": "Dani Valente",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_7a6d1a837fa50c5130e7d7709c6862b7e28df10eb31bd1105f7db7f9e84ef14c.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_bcb3512904b3a18c488013688f971103fc5f3a04fda2ecd0403bd978a4ac6988",
+          "titulo": "Almanaque Completo da Copa do Mundo - A História de Todos os Campeões Mundiais (Discovery Publicações)",
+          "autor": "Discovery Publicações",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_bcb3512904b3a18c488013688f971103fc5f3a04fda2ecd0403bd978a4ac6988.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_7cb60449cb6fa02e1bc52ad71bf694879af8703df47fc757c3db1b917a604019",
+          "titulo": "Sexo nas Copas",
+          "autor": "Gustavo Hoffman, Leonardo Bertozzi",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_7cb60449cb6fa02e1bc52ad71bf694879af8703df47fc757c3db1b917a604019.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_4240b5a6e5ca904f7a2e9a7ad0d33e8e70bc2ea1afbf9823c8fa234e03315bbd",
+          "titulo": "Amém, Marcos",
+          "autor": "Cesar Greco",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_4240b5a6e5ca904f7a2e9a7ad0d33e8e70bc2ea1afbf9823c8fa234e03315bbd.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_4af9ff8d86fb7ba9ed89eed7250f9d5fc39fb5b8689e66d86fa5c28db0d6af59",
+          "titulo": "Anatomia de uma derrota",
+          "autor": "Paulo Perdigão",
+          "genero": "Esportes e jogos",
+          "capa": "assets/livros/bk_4af9ff8d86fb7ba9ed89eed7250f9d5fc39fb5b8689e66d86fa5c28db0d6af59.webp",
+          "sinopse": "O livro definitivo sobre a derrota brasileira na final da Copa do Mundo de 1950. Reúne, além de uma análise minuciosa dos acontecimentos e do Brasil da década de 50, a narração do jogo, o depoimento dos jogadores e uma análise exaustiva do significado do jogo que marcou a vida brasileira no século XX.",
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "icc-a-o-cienti-ica",
+      "titulo": "Ficção científica",
+      "items": [
+        {
+          "id": "bk_d3c89a566c8d5cddef6adec3b1ffab780511a58704d1bf703a11dfef4dd331d7",
+          "titulo": "101 FATOS sobre Star Wars",
+          "autor": "Jonas Silvestre",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_d3c89a566c8d5cddef6adec3b1ffab780511a58704d1bf703a11dfef4dd331d7.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_2dd7659099966c3e234fe289aa43c426601bf57307522182945b08d97f58d9a7",
+          "titulo": "172 Horas na Lua",
+          "autor": "Johan Harstad",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_2dd7659099966c3e234fe289aa43c426601bf57307522182945b08d97f58d9a7.webp",
+          "sinopse": "O ano é 2018. Quase cinco décadas desde que o homem pisou na Lua pela primeira vez. Três adolescentes comuns vencem um sorteio mundial promovido pela NASA. Eles vão passar uma semana na base lunar DARLAH 2 - um lugar que, até então, só era conhecido pelos altos funcionários do governo americano.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_a2503235b5518d0690bbc74ccb235c0803b39f723e897c2208e1682c2ac39d76",
+          "titulo": "1984 - Edição especial",
+          "autor": "George Orwell",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_a2503235b5518d0690bbc74ccb235c0803b39f723e897c2208e1682c2ac39d76.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_5f057f5abc6e279c15020e900fa5216aa3d3dc06a7378bf896dd852f434577a5",
+          "titulo": "1984 - Edição Exclusiva Amazon",
+          "autor": "George Orwell",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_5f057f5abc6e279c15020e900fa5216aa3d3dc06a7378bf896dd852f434577a5.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_1fd71ba2a7f3554f76e1b1d51e5522b8e0ed7736538619fdfc5ed2ab768e3e26",
+          "titulo": "20 mil léguas submarinas",
+          "autor": "Jules Verne",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_1fd71ba2a7f3554f76e1b1d51e5522b8e0ed7736538619fdfc5ed2ab768e3e26.webp",
+          "sinopse": "Há mais de 150 anos, a obra mais famosa de Jules Verne encanta leitores de todas as idades. O escritor ajudou a criar um novo gênero literário, a ficção científica, e seus livros tinham um traço premonitório. Muitas das invenções humanas posteriores foram antecipadas em suas páginas.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_7c6f21aa395dac470a39d4b8059677e9d8868bfdb05394f7db28e0d88c480e04",
+          "titulo": "20.000 léguas submarinas: edição comentada e ilustrada (Clássicos Zahar)",
+          "autor": "Verne, Júlio",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_7c6f21aa395dac470a39d4b8059677e9d8868bfdb05394f7db28e0d88c480e04.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_60648535ce94ce5227e1bcc2733358fa04b1115ac9837b3d67f7b9f493211384",
+          "titulo": "20000 Leguas Submarinas",
+          "autor": "Júlio Verne",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_60648535ce94ce5227e1bcc2733358fa04b1115ac9837b3d67f7b9f493211384.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_d585e5f36d7eb925cf7cf401a29b5c491c31797734f9054a43e35bb93ec34cb3",
+          "titulo": "Untitled",
+          "autor": "Unknown Author",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_d585e5f36d7eb925cf7cf401a29b5c491c31797734f9054a43e35bb93ec34cb3.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_8a2db38d27a1ca90c6548e13e13f331a033b2d7a74e830b1f760a5e58573900a",
+          "titulo": "2001: uma odisseia no espaço",
+          "autor": "Arthur C. Clarke",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_8a2db38d27a1ca90c6548e13e13f331a033b2d7a74e830b1f760a5e58573900a.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_b872cb2fcb6ed96bee6510d38aaf627519a857cb61a6d9aa1a17f45cf1a6db3d",
+          "titulo": "2001: uma odisseia no espaço: Stanley Kubrick, Arthur C. Clarke, e a criação de uma obra-prima",
+          "autor": "Michael Benson",
+          "genero": "Ficção científica",
+          "capa": "assets/livros/bk_b872cb2fcb6ed96bee6510d38aaf627519a857cb61a6d9aa1a17f45cf1a6db3d.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "icc-a-o-anta-stica",
+      "titulo": "Ficção fantástica",
+      "items": [
+        {
+          "id": "bk_0d4664656c5ac212f3820d09026042dd047648de23d677d176844ec27e29f1bd",
+          "titulo": "O Poder do Mito",
+          "autor": "Joseph Campbell",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_0d4664656c5ac212f3820d09026042dd047648de23d677d176844ec27e29f1bd.webp",
+          "sinopse": "O poder do mito é fruto de uma série de conversas mantidas entre o autor e o destacado jornalista Bill Moyers, numa brilhante combinação de sabedoria e humor.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_dda58121cbd16171b8815d0fcc19c2b976ee84d2edd632d4b1d219c891de4391",
+          "titulo": "007 - A Morte no Japão",
+          "autor": "Ian Fleming",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_dda58121cbd16171b8815d0fcc19c2b976ee84d2edd632d4b1d219c891de4391.webp",
+          "sinopse": "Publicado no Reino Unido (UK) em 1964 (lançado originalmente no Brasil pela Livraria do Globo como \"A Morte no Japão\" e, em Portugal, 007 - Só Se Vive Duas Vezes\"). Foi o 5º filme da série com Sean Connery no papel de 007.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_eb2347e8caf537964b88aa9aedbb389daca0ea142b42c67df5f1fe67dea5df62",
+          "titulo": "007 - O Homem do Revólver de Ouro",
+          "autor": "Ian Fleming",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_eb2347e8caf537964b88aa9aedbb389daca0ea142b42c67df5f1fe67dea5df62.webp",
+          "sinopse": "Francisco Scaramanga, agente do KGB e impiedoso assassino profissional a sôldo das forças internacionais de subversão e beligerância (interpretado no Cinema pelo ator Christopher Lee, primo / \"real life step-cousin\" de Ian Fleming/(from wikipedia).",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_141da7aa071f5e569d4cb4a4e813e20ae53aee6bd69700146b1df5775275e9eb",
+          "titulo": "007 - Os Diamantes São Eternos",
+          "autor": "Ian Fleming",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_141da7aa071f5e569d4cb4a4e813e20ae53aee6bd69700146b1df5775275e9eb.webp",
+          "sinopse": "A história do livro é centrada na investigação de James Bond em uma operação internacional de contrabando de diamantes. Plano criado por uma rede que tem início nas minas de diamantes da Serra Leoa e termina em Las Vegas. Ao longo da trama, Bond conhece um dos membros da quadrilha de contrabando, a bela Tiffany Case.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_7360dfbedc6fcbd993b9b32f21e0eec5f27a541bfabb51e78418aa9222b99a73",
+          "titulo": "007 - Para Você, Somente",
+          "autor": "Ian Fleming",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_7360dfbedc6fcbd993b9b32f21e0eec5f27a541bfabb51e78418aa9222b99a73.webp",
+          "sinopse": "É o oitavo livro de Ian Fleming sobre o agente secreto britânico James Bond, publicado em 1960, na realidade um livro de contos. É o primeiro das duas coletâneas de contos da série James Bond de Ian Fleming, o outro se chama \"Octopussy and The Living Daylights\".",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_a04889f1571e3f295ce7874c43fc5e2a17a45f3986bb8bc45b085d39d520e205",
+          "titulo": "007 - O Foguete da Morte",
+          "autor": "Ian Fleming",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_a04889f1571e3f295ce7874c43fc5e2a17a45f3986bb8bc45b085d39d520e205.webp",
+          "sinopse": "\"Moonraker\" (lançado originalmente no Brasil como O Foguete da Morte) é o terceiro livro de Ian Fleming sobre o agente secreto britânico James Bond, lançado em 1953 no Reino Unido (UK).",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_b9719172eb2fa1b091c6e0fa58a1d678f37462d5980d7004ba1133360b9db820",
+          "titulo": "11 hábitos em 11 semanas",
+          "autor": "Ícaro Alcântara",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_b9719172eb2fa1b091c6e0fa58a1d678f37462d5980d7004ba1133360b9db820.webp",
+          "sinopse": "Nutrição. Saúde - Aspectos nutricionais. Hábitos alimentares. Qualidade de vida. Onze hábitos em onze semanas.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_af7be24b1eb1ed0c741f352253191338eb2638891554d0a4a0b14b18069ecea4",
+          "titulo": "24 horas da vida de uma mulher e outras novelas (Coleção Clássicos de Ouro)",
+          "autor": "Zweig, Stefan",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_af7be24b1eb1ed0c741f352253191338eb2638891554d0a4a0b14b18069ecea4.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_c2499131d1bbc8e8699f539c881fe57012e2f443b0774beb48e22b36db8fa4a2",
+          "titulo": "4 3 2 1",
+          "autor": "Paul Auster",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_c2499131d1bbc8e8699f539c881fe57012e2f443b0774beb48e22b36db8fa4a2.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_a8a7f818d71d638cbc3474bb186aa396af35be71e14ae915b7c8eed84a151887",
+          "titulo": "99 dias",
+          "autor": "Katie Cotugno",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_a8a7f818d71d638cbc3474bb186aa396af35be71e14ae915b7c8eed84a151887.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "ilosoia",
+      "titulo": "Filosofia",
+      "items": [
+        {
+          "id": "bk_5f4da98256d8c95af3c7d8943ddd0b8895d903e4271f2bf43bd1ef33c78efd4a",
+          "titulo": "Dez lições sobre Hannah Arendt",
+          "autor": "Oliveira, Luciano",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_5f4da98256d8c95af3c7d8943ddd0b8895d903e4271f2bf43bd1ef33c78efd4a.webp",
+          "sinopse": "Marcada pelo \"choque\" do fenômeno totalitário, a obra de Arendt contém, do princípio ao fim, uma exaltação e uma defesa vibrante das liberdades públicas.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_85e2d3373211be804a5743c5f06e941393be755b977df0ef2cfd3731e7e44f1b",
+          "titulo": "Dez Lições Sobre Hume",
+          "autor": "Marconi Pequeno,",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_85e2d3373211be804a5743c5f06e941393be755b977df0ef2cfd3731e7e44f1b.webp",
+          "sinopse": "A presente obra tem início com a apresentação da biografia intelectual de Hume para, em seguida, destacar a importância que ele assume na história da filosofia.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_f8bee30db953146354f57ea987fb40fdc772070c50a4b5e6bb520f931a088963",
+          "titulo": "100 Aforismos Sobre o Amor e a Morte",
+          "autor": "Friedrich Nietzsche",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_f8bee30db953146354f57ea987fb40fdc772070c50a4b5e6bb520f931a088963.webp",
+          "sinopse": "A maioria dos treze livros publicados durante a vida de Nietzsche se compõe de breves seções numeradas. São os chamados “aforismos”, que ele adotou dos moralistas franceses do século XVIII e a que deu maior extensão e amplitude temática.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_fd3c6cd0b6ffeabdf2b1f8d53fe9a956ca1469a7cae44df18e7eb896633e578d",
+          "titulo": "100 palavras do marxismo",
+          "autor": "Löwy, Michael; Gérard Duménil; Emmanuel Renault",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_fd3c6cd0b6ffeabdf2b1f8d53fe9a956ca1469a7cae44df18e7eb896633e578d.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_0cea16c638985755a6d5f2d50f53da163f666db27fdfb724732d069995c3cf89",
+          "titulo": "1001 frases de grandes pensadores",
+          "autor": "Barba , Danilo E.",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_0cea16c638985755a6d5f2d50f53da163f666db27fdfb724732d069995c3cf89.webp",
+          "sinopse": "Uma imagem pode valer mais do que mil palavras, mas mil citações de grandes pensadores formam a melhor imagem que o intelecto pode enxergar.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_38a4ef2e354f40b3baecda12b94aa3d6f83fee414f88580ad4e0cfb5033f4156",
+          "titulo": "101 Verdades Sobre A Vida",
+          "autor": "Arthur Schopenhauer",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_38a4ef2e354f40b3baecda12b94aa3d6f83fee414f88580ad4e0cfb5033f4156.webp",
+          "sinopse": "Arthur Schopenhauer defendia que a verdadeira felicidade do homem não pode advir de objetos ou bens materiais, mas sim, de seu próprio eu.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_42019fa7bedbf5e68f12ec26d850bc17884347f19e6236f589e720257e99a787",
+          "titulo": "38 Estratégias para Vencer Qualquer Debate - A Arte de ter Razão",
+          "autor": "Arthur Schopenhauer",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_42019fa7bedbf5e68f12ec26d850bc17884347f19e6236f589e720257e99a787.webp",
+          "sinopse": "A forma como nos comportamos socialmente não mudou muito desde Aristóteles. Partindo dos escritos do pensador grego, Schopenhauer desenvolve em sua Dialética Erística, 38 estratégias sobre a arte de vencer um oponente num debate não importando os meios.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_b2cba69c2c1e066040ab9962af834d5cb0049f9bbcad6fb9f6c620c23d6d9402",
+          "titulo": "50 clássicos da filosofia",
+          "autor": "Tom Butler-Bowdon",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_b2cba69c2c1e066040ab9962af834d5cb0049f9bbcad6fb9f6c620c23d6d9402.webp",
+          "sinopse": "De Aristóteles a Wittgenstein, 50 clássicos da filosofia oferece uma porta de entrada para o pensamento de grandes autores, ajudando os leitores a compreender as principais questões – e possíveis respostas – sobre a existência humana.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_d8f9733a5186620897f831ade1781ac73b7bc44d3a6378f6038572f91b4cbb5e",
+          "titulo": "50 ideias de Filosofia: Que você precisa conhecer",
+          "autor": "Dupré, Ben",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_d8f9733a5186620897f831ade1781ac73b7bc44d3a6378f6038572f91b4cbb5e.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_27650ce337c16701d3907336c910a444a3a77fa6cceffcb5d6941ec6bb551134",
+          "titulo": "A abolição do homem; A abolição do homem",
+          "autor": "C. S.Lewis",
+          "genero": "Filosofia",
+          "capa": "assets/livros/bk_27650ce337c16701d3907336c910a444a3a77fa6cceffcb5d6941ec6bb551134.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "gastronomia",
+      "titulo": "Gastronomia",
+      "items": [
+        {
+          "id": "bk_32d6f668a1ca68249e8f2c67683d3c25aa00493d85af8fbf6515b08bfa88937b",
+          "titulo": "101 RECEITAS: Faça de tudo e mais um pouco!",
+          "autor": "Cecília Alves de Carvalho",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_32d6f668a1ca68249e8f2c67683d3c25aa00493d85af8fbf6515b08bfa88937b.webp",
+          "sinopse": "Que tal ter o mais completo e definitivo livro de culinária do Brasil? Esta seleção reúne os mais variados tipos de receitas para você preparar de tudo e mais um pouco.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_218511fc0f2efeab82cd2b40ae2b9de93eab8b37b85de6838414f62998f2d8a2",
+          "titulo": "30 Receitas de Boteco: comidinhas e porções",
+          "autor": "Alves de Carvalho, Cecília",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_218511fc0f2efeab82cd2b40ae2b9de93eab8b37b85de6838414f62998f2d8a2.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_ca9a02649c0fde2e6379590e6d6867779e2e0cb41549a15eeb26be391bfabd45",
+          "titulo": "417 Receitas Vegetarianas...",
+          "autor": "Mazokatto, Parinbbago",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_ca9a02649c0fde2e6379590e6d6867779e2e0cb41549a15eeb26be391bfabd45.webp",
+          "sinopse": "Preparando As Agradáveis E Magníficas 417 Receitas Para O Estilo De Vida Vegetariano Receitas Para Dieta Vegetariana - Receitas De Sopas, Pães, Café Da Manhã, Massas, Saladas, Pizzas, Sobremesas, Molhos, Bebidas, Macarrão, Sanduíches, Tortas E Muito Mais Introdução Dietas Vegetarianas Guia Ecológico Comida E Ecologia…",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_206eb2c8174d840029bd21675f6c0f4010672c714f173ef5d4d5175857d380f8",
+          "titulo": "A culinária caipira da paulistânia",
+          "autor": "Carlos Alberto Dória",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_206eb2c8174d840029bd21675f6c0f4010672c714f173ef5d4d5175857d380f8.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_6e0d7c1e65754324f5abe59540b1f25dc277fd1495e921038deadc81a73284c8",
+          "titulo": "A experiência da mesa - O segredo para criar relacionamentos profundos",
+          "autor": "Titus, Devi",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_6e0d7c1e65754324f5abe59540b1f25dc277fd1495e921038deadc81a73284c8.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_a7873195f049a1d91007eb4d4056695e678fe127c6afd2d5e511fd58a89d9242",
+          "titulo": "A experiência do gosto",
+          "autor": "Jorge Lucki",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_a7873195f049a1d91007eb4d4056695e678fe127c6afd2d5e511fd58a89d9242.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_24442b1e1f45d545e34588416c0f5ae60ee0f679c0859cd0dc1085344761836b",
+          "titulo": "A formação da culinária brasileira",
+          "autor": "Carlos Alberto Dória",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_24442b1e1f45d545e34588416c0f5ae60ee0f679c0859cd0dc1085344761836b.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_f2badcf79868bf17f702cf0fc6db46a6fefe5c3d4e007280cbf4eca868aa339e",
+          "titulo": "A história do Romanée-Conti",
+          "autor": "Maximillian Potter",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_f2badcf79868bf17f702cf0fc6db46a6fefe5c3d4e007280cbf4eca868aa339e.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_f40f9bb970091c0f96b812d8ec09d824fc91d8579362a717cf9a80f11996fc3a",
+          "titulo": "A pequena cozinha em Paris",
+          "autor": "Khoo, Rachel",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_f40f9bb970091c0f96b812d8ec09d824fc91d8579362a717cf9a80f11996fc3a.webp",
+          "sinopse": "“A pequena cozinha em Paris é um livro recheado de charme e bom gosto. As receitas são saborosas e, acima de tudo, funcionam. E são fáceis de preparar.” – The Boston Globe. “O conceito de ‘pequena cozinha’ pode ser um grande entrave para a maioria dos chefs, mas Rachel Khoo soube tirar proveito.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_706f1bc70e7fbcea15e1aa2ff8a1ce374dbc5f67eaec23fc12551ff0b413a46b",
+          "titulo": "A viúva Clicquot: A história de um império do champanhe e da mulher que o construiu",
+          "autor": "Tilar J. Mazzeo",
+          "genero": "Gastronomia",
+          "capa": "assets/livros/bk_706f1bc70e7fbcea15e1aa2ff8a1ce374dbc5f67eaec23fc12551ff0b413a46b.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "mais-icc-a-o",
+      "titulo": "Mais ficção",
+      "items": [
+        {
+          "id": "bk_1c869953b35b206d428b706acfb976c184b52ae791ddcc59cd88c4c698910f4c",
+          "titulo": "Quanto mais sei acabo menos sabendo",
+          "autor": "RICHARD THE MARS",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_1c869953b35b206d428b706acfb976c184b52ae791ddcc59cd88c4c698910f4c.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_f8236ba4ca56c2774baf00d592a5d8cfc1c5f9e4c199d3d539d8884736c1157c",
+          "titulo": "@Re_vira_volta: uma experiência em twitteratura",
+          "autor": "André Lemos",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_f8236ba4ca56c2774baf00d592a5d8cfc1c5f9e4c199d3d539d8884736c1157c.webp",
+          "sinopse": "@re_vira_volta conta a história de um personagem que se vê desaparecendo dos bancos de dados eletrônicos que comandam a vida social. A narrativa cruza referências e citações da literatura (Paul Auster, T.S. Eliot, S. Mallarmé, P. Verlaine, S. Beckett, J. L. Borges, C. Baudelaire) e da música (R.E.M, P. J.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_65920e1a8ca5d3a20f9c2051d8c1f08c4d66af050b846b60bd2cc5bcb96f0a5a",
+          "titulo": "A 25ª Hora",
+          "autor": "C. Virgil Gheorghiu",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_65920e1a8ca5d3a20f9c2051d8c1f08c4d66af050b846b60bd2cc5bcb96f0a5a.webp",
+          "sinopse": "Iohann Moritz é um camponês romeno que, em meio à guerra, vê-se reduzido à sua dimensão social: homens deixaram de ser indivíduos e se tornaram simples membros de categorias.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_baf46c326f5223fc2152a636f243f1608d50990af4ab23c7e13eed181b4bf257",
+          "titulo": "A Auto-Estrada",
+          "autor": "Stephen King",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_baf46c326f5223fc2152a636f243f1608d50990af4ab23c7e13eed181b4bf257.webp",
+          "sinopse": "A história deste livro se passa no meio-oeste americano entre 1973 e 1974, no momento em que Dowes tem sua vida absolutamente desintegrada pelo profundo luto. Por consequência, todas as relações de sua vida se fragilizam, e entre elas está o casamento.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_4bb4cf8f89827655c5af045616d0ac90c8a3d3f8e7e3a554020c918fefeb0393",
+          "titulo": "A Avenida",
+          "autor": "James Lawless",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_4bb4cf8f89827655c5af045616d0ac90c8a3d3f8e7e3a554020c918fefeb0393.webp",
+          "sinopse": "A AVENIDA Uma rapariga, de roupa muito reduzida, dançando por trás de uma janela iluminada arrebata Francis Copeland do seu mundo de livros.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_49c2b88f663df9121f0d00239328da006ce4307610a9ed1818dbe31e0583b5fe",
+          "titulo": "A Bagaceira",
+          "autor": "José Américo de Almeida",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_49c2b88f663df9121f0d00239328da006ce4307610a9ed1818dbe31e0583b5fe.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_077f4b7ed0915cbe1b92a8ac2f80fee42e18f0daf98066415519c4806a1e89e0",
+          "titulo": "A balada de Adam Henry",
+          "autor": "Ian McEwan",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_077f4b7ed0915cbe1b92a8ac2f80fee42e18f0daf98066415519c4806a1e89e0.webp",
+          "sinopse": "Poucos autores de língua inglesa são mais importantes na atualidade do que Ian McEwan. Em quarenta anos de carreira, ele compôs marcos da literatura contemporânea, como Amor sem fim (1997), Amsterdam (1998) e Reparação (2001).",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_90e536af0846f0bbafe8235c5f5a5f38a926dcb97c1248e6333b248f93ddf402",
+          "titulo": "A Balada do Café Triste",
+          "autor": "Carson McCullers",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_90e536af0846f0bbafe8235c5f5a5f38a926dcb97c1248e6333b248f93ddf402.webp",
+          "sinopse": "A Balada do Café Triste narra o encontro, num pequeno povoado norte-americano, de Miss Amélia, um corcunda que se afirma vagamente seu primo e um condenado, Marvin Macy, que regressa da prisão para se vingar de um repúdio antigo.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_5e05e02cdccf30dabd145e323ecefae6101664d79532fe0a01c622238861a6b8",
+          "titulo": "A BESTA DOS MIL ANOS",
+          "autor": "Ilmar Penna Marinho Junior",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_5e05e02cdccf30dabd145e323ecefae6101664d79532fe0a01c622238861a6b8.webp",
+          "sinopse": "Em 2007, durante visita ao Vale do Loire, berço da gloriosa tradição castelar francesa, Ilmar Penna Marinho Junior e a esposa Solange, se encantaram com a sedutora cidade de Angers e o seu Castelo (Château d ́Angers).",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_06f62b9c48ed29e6e13756f7fb344aa0fff2a0cba810ef50ac22c3042d02938c",
+          "titulo": "A Bolsa Amarela",
+          "autor": "Lygia Bojunga",
+          "genero": "Ficção",
+          "capa": "assets/livros/bk_06f62b9c48ed29e6e13756f7fb344aa0fff2a0cba810ef50ac22c3042d02938c.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    },
+    {
+      "id": "mais-antasia",
+      "titulo": "Mais fantasia",
+      "items": [
+        {
+          "id": "bk_2c80fbbf773feaccdaa069d91cd31c4e431f64424b1212de88137987d7894b1e",
+          "titulo": "A Aldeia Aérea",
+          "autor": "Júlio Verne",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_2c80fbbf773feaccdaa069d91cd31c4e431f64424b1212de88137987d7894b1e.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_6aa70353a2c604f0de2662b5877edd7a1f06b7516a97d6b84c96101dd97aa8b1",
+          "titulo": "A alma do imperador",
+          "autor": "Brandon Sanderson",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_6aa70353a2c604f0de2662b5877edd7a1f06b7516a97d6b84c96101dd97aa8b1.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_976a3f49660628c1d6d91023bbe6e92541975680101b8f7a17673c269e7580fa",
+          "titulo": "A alma do oceano",
+          "autor": "Natasha Bowen",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_976a3f49660628c1d6d91023bbe6e92541975680101b8f7a17673c269e7580fa.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_37e1ae02976c68c88981395b0596d3ab8313f3817b392d607c0b94ae46c30040",
+          "titulo": "A alma indomável",
+          "autor": "Michael A. Singer",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_37e1ae02976c68c88981395b0596d3ab8313f3817b392d607c0b94ae46c30040.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_cc6b6447fe04c414021ba27767221402a948e2a5820ef0b4ed24b677b77a18f2",
+          "titulo": "A alquimia do luar",
+          "autor": "David Ferraro",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_cc6b6447fe04c414021ba27767221402a948e2a5820ef0b4ed24b677b77a18f2.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_1f39bf078318a2136bd609f0f97d455b06e8c372d70913bcd34ee7705bd45efe",
+          "titulo": "[Anômalos 2]A Ameaca Invisivel",
+          "autor": "Barbara Morais",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_1f39bf078318a2136bd609f0f97d455b06e8c372d70913bcd34ee7705bd45efe.webp",
+          "sinopse": "A presença das pessoas vestidas de preto posicionadas em cada esquina, armadas com cassetetes e revólveres, me deixa perturbada. Seus uniformes são adornados com um triângulo azul claro costurado do lado esquerdo do peito, para diferenciá-los dos policiais anômalos, com suas faixas amarelas no uniforme.",
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_0851ae70ea8c25b8c3bfc487ea1cc43c7d750b2cbc6076f8f1409a2caa7ac7ee",
+          "titulo": "A amiga maldita",
+          "autor": "Beatrice Salvioni",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_0851ae70ea8c25b8c3bfc487ea1cc43c7d750b2cbc6076f8f1409a2caa7ac7ee.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_f45e6f86d426d739c84b5da4cc491e53586a85af4ebb1dcc65738779257d0660",
+          "titulo": "A Andarilha, ou Dificuldades Femininas",
+          "autor": "Frances Burney",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_f45e6f86d426d739c84b5da4cc491e53586a85af4ebb1dcc65738779257d0660.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_9f8733796c3059ab85944079e625031abd2c28dfdeaeb1d01d1e0cd8461c7113",
+          "titulo": "A angústia do rei Salomão",
+          "autor": "Romain Gary",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_9f8733796c3059ab85944079e625031abd2c28dfdeaeb1d01d1e0cd8461c7113.webp",
+          "sinopse": null,
+          "destaque": false,
+          "disponivelNoApp": true
+        },
+        {
+          "id": "bk_17ee7d3e0b527fb5cb33e8c9d6d2b4fb49501338e4be3c7dfa86faf0fe2d5b9a",
+          "titulo": "A Aprendiz",
+          "autor": "Trudi Canavan",
+          "genero": "Ficção fantástica",
+          "capa": "assets/livros/bk_17ee7d3e0b527fb5cb33e8c9d6d2b4fb49501338e4be3c7dfa86faf0fe2d5b9a.webp",
+          "sinopse": "Sozinha entre todos os aprendizes do Clã dos Magos, somente Sonea vem de uma classe menos privilegiada. No entanto, ela ganhou aliados poderosos, como Lorde Dannyl, recentemente promovido a Embaixador.",
+          "destaque": false,
+          "disponivelNoApp": true
+        }
+      ]
+    }
+  ]
+}

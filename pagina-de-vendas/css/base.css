@@ -1,0 +1,57 @@
+:root {
+  --sales-ink: #211b2c;
+  --sales-muted: #726b79;
+  --sales-plum: #523178;
+  --sales-plum-dark: #35204f;
+  --sales-gold: #ce9d51;
+  --sales-paper: #fffdf9;
+  --sales-cream: #f6f0e5;
+  --sales-line: rgba(61, 41, 89, .13);
+  --sales-radius: 18px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--sales-ink);
+  background: var(--sales-paper);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { min-width: 320px; margin: 0; background: linear-gradient(180deg, #fffdf9 0%, #fcf8f1 40%, #f5eef8 100%); }
+button, input { font: inherit; }
+button { cursor: pointer; }
+img { max-width: 100%; }
+
+.sales-skip-link { position: fixed; z-index: 30; top: .8rem; left: .8rem; padding: .7rem 1rem; color: #fff; background: var(--sales-plum); transform: translateY(-180%); }
+.sales-skip-link:focus { transform: translateY(0); }
+.sales-eyebrow { margin: 0 0 .65rem; color: var(--sales-plum); font-size: .72rem; font-weight: 850; letter-spacing: .15em; text-transform: uppercase; }
+.sales-button { min-height: 3.15rem; border: 0; border-radius: 999px; padding: .85rem 1.35rem; font-weight: 850; letter-spacing: .01em; transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
+.sales-button:hover { transform: translateY(-2px); }
+.sales-button:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid #e2b76f; outline-offset: 3px; }
+.sales-button--primary { color: #fff; background: linear-gradient(135deg, #67469b, var(--sales-plum)); box-shadow: 0 .7rem 1.5rem rgba(82, 49, 120, .25); }
+.sales-button--primary:hover { box-shadow: 0 .9rem 1.8rem rgba(82, 49, 120, .34); }
+.sales-modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1rem; background: rgba(22, 13, 31, .68); backdrop-filter: blur(6px); }
+.sales-modal[hidden] { display: none; }
+.sales-modal__dialog { position: relative; width: min(38rem, 100%); max-height: min(44rem, calc(100vh - 2rem)); overflow: auto; padding: clamp(1.5rem, 5vw, 2.4rem); border-radius: var(--sales-radius); background: var(--sales-paper); box-shadow: 0 1.2rem 4rem rgba(0, 0, 0, .3); }
+.sales-modal__dialog h2 { margin: 0 0 .8rem; font-size: clamp(1.65rem, 5vw, 2.45rem); letter-spacing: -.045em; }
+.sales-modal__dialog p { color: var(--sales-muted); line-height: 1.65; }
+.sales-modal__close { position: absolute; top: 1rem; right: 1rem; width: 2.3rem; height: 2.3rem; border: 1px solid var(--sales-line); border-radius: 50%; color: var(--sales-ink); background: #fff; font-size: 1.5rem; line-height: 1; }
+
+/* Compatibilidade visual da página isolada de HQs criada na etapa anterior. */
+.sales-shell { width: min(1120px, calc(100% - 2rem)); margin-inline: auto; padding: clamp(2.5rem, 7vw, 6rem) 0; }
+.sales-preparation { max-width: 46rem; padding: clamp(1.5rem, 5vw, 3rem); border: 1px solid var(--sales-line); border-radius: var(--sales-radius); background: #fff; box-shadow: 0 .8rem 2rem rgba(42, 25, 57, .07); }
+.sales-preparation h1, .sales-section-heading h2 { margin: 0; letter-spacing: -.045em; }
+.sales-preparation h1 { font-size: clamp(2rem, 7vw, 3.5rem); line-height: 1.08; }
+.sales-preparation p:last-child { color: var(--sales-muted); line-height: 1.6; }
+.sales-carousel { display: grid; grid-auto-columns: minmax(9.5rem, 12rem); grid-auto-flow: column; gap: 1rem; overflow-x: auto; padding: .25rem 0 1rem; scroll-snap-type: x mandatory; }
+.sales-button--secondary { color: var(--sales-plum); background: #eee7f7; }
+.sales-catalog__notice { min-height: 1.5rem; color: var(--sales-muted); }
+
+.sales-platform-section { margin-top: clamp(3rem, 8vw, 6rem); padding: clamp(1.5rem, 5vw, 3rem); border-radius: var(--sales-radius); background: linear-gradient(145deg, #ece6f6, #f5eadb); text-align: center; }
+.sales-platform-section h2 { margin: 0 0 1.5rem; color: var(--sales-plum-dark); font-size: clamp(1.8rem, 5vw, 3.2rem); letter-spacing: -.055em; }
+.sales-platform-showcase { display: grid; justify-items: center; width: min(100%, 50rem); margin: 0 auto; overflow: hidden; border: 1px solid rgba(60, 42, 83, .13); border-radius: 1rem; background: linear-gradient(145deg, #d7c8aa, #f7f1e8); box-shadow: 0 1rem 2.4rem rgba(57, 37, 66, .15); }
+.sales-platform-showcase img { display: block; width: 100%; height: auto; object-fit: contain; }
+.sales-platform-showcase figcaption { width: 100%; padding: .8rem 1rem; color: #51445b; background: rgba(255,255,255,.78); font-size: clamp(.76rem, 2vw, .92rem); line-height: 1.5; }
+.sales-platform-showcase__tagline { margin: 1rem auto 0; color: var(--sales-plum-dark); font-size: clamp(1rem, 2.5vw, 1.25rem); font-weight: 850; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}
