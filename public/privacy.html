@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Política de Privacidade do Lumeo Android: conta, arquivos, Google Drive, Premium e anúncios.">
+  <link rel="canonical" href="https://lumeo-livros.vercel.app/privacy">
+  <title>Política de Privacidade — Lumeo Android</title>
+  <style>
+    :root{color-scheme:light;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#292335;background:#f7f6fb}
+    *{box-sizing:border-box}body{margin:0;font-size:1rem;line-height:1.7}header,main,footer{width:min(100% - 2rem,52rem);margin-inline:auto}
+    header{padding-block:1.25rem;border-bottom:1px solid #ded8e8}nav{display:flex;flex-wrap:wrap;align-items:center;gap:1rem}a{color:#533294;text-underline-offset:.2em;overflow-wrap:anywhere}
+    .brand{font-size:1.4rem;font-weight:800;color:#533294;margin-right:auto}main{padding-block:2rem 3rem}h1{font-size:clamp(1.8rem,6vw,2.5rem);line-height:1.2;color:#35204f;margin:0 0 1rem}
+    h2{font-size:1.25rem;line-height:1.4;color:#35204f;margin:2rem 0 .75rem}p{margin:0 0 .9rem;overflow-wrap:anywhere}.updated{color:#655d71}.intro{font-size:1.1rem}
+    footer{padding-block:1.25rem;border-top:1px solid #ded8e8}a:focus-visible{outline:3px solid #9d71d1;outline-offset:4px;border-radius:2px}
+    .langs{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font-size:.95rem}.closing{margin-top:2.5rem;padding-top:1.25rem;border-top:1px solid #ded8e8}
+    article{display:none}article:target,#pt-BR{display:block}main:has(article:target) #pt-BR:not(:target){display:none}article{scroll-margin-top:1rem}
+  </style>
+</head>
+<body>
+<header><nav aria-label="Idioma / Language"><span class="brand">Lumeo Android</span><span class="langs"><a href="#pt-BR" hreflang="pt-BR">Português (Brasil)</a><a href="#pt-PT" hreflang="pt-PT">Português (Portugal)</a><a href="#en" hreflang="en">English</a><a href="#es" hreflang="es">Español</a></span></nav></header>
+<main id="conteudo">
+<article id="pt-BR" lang="pt-BR">
+<h1>Política de Privacidade — Lumeo Android</h1><p class="updated">Última revisão: 31 de outubro de 2026.</p><p class="intro">O Lumeo Android é uma biblioteca pessoal: seus livros, HQs, audiolivros e preferências ficam no dispositivo. Esta política explica o tratamento relacionado à conta, ao Google Drive, às compras do Premium, aos anúncios do plano gratuito, quando ativados, e às consultas que você pede no leitor.</p>
+<section><h2>1. Conta e entrada</h2><p>Para usar o Lumeo no Android é preciso entrar com uma conta Google, pelo Firebase Authentication (serviço do Google). Nesse processo são tratados o identificador da conta, o e-mail, o nome e a foto do perfil. O nome e a foto aparecem no menu do aplicativo.</p></section>
+<section><h2>2. Biblioteca e arquivos locais</h2><p>Você escolhe arquivos PDF, EPUB, CBR, CBZ e MP3 pelo seletor de arquivos do Android, que dá ao aplicativo acesso aos itens escolhidos. O Lumeo não pede acesso contínuo a todos os arquivos do aparelho.</p>
+<p>Os livros, capas, organização por gênero, progresso, preferências, marcadores, destaques, anotações e lembretes de leitura ficam no armazenamento privado do aplicativo. O reconhecimento de texto e de balões das HQs é feito no próprio dispositivo.</p></section>
+<section><h2>3. Google Drive</h2><p>Quando você cola um link de uma pasta do Google Drive, o Lumeo acessa o Drive diretamente pela API oficial do Google. Links públicos podem ser lidos com a chave pública do aplicativo; pastas privadas pedem sua autorização pelo fluxo oficial do Google, que pode ser recusada ou cancelada.</p>
+<p>O aplicativo pede o escopo drive.readonly, usado para listar pastas, ler metadados e baixar os arquivos e capítulos que você escolher. O Lumeo não cria, altera, move ou exclui conteúdo no seu Google Drive. O token de acesso fica em memória durante a sessão e não é enviado a servidores do Lumeo.</p>
+<p>Os arquivos baixados e as capas ficam no armazenamento privado do aplicativo para leitura offline. O Lumeo não envia seus livros, HQs, capas ou o conteúdo das suas leituras a servidores próprios.</p></section>
+<section><h2>4. Lumeo Premium e Google Play</h2><p>A assinatura Premium é anual, com renovação automática até o cancelamento, e é vendida e cobrada pelo Google Play, de acordo com os termos dele. O Lumeo não recebe os dados do seu cartão ou de outro meio de pagamento. O preço e a moeda são os informados pelo Google Play para a sua conta.</p>
+<p>Para confirmar uma compra, o aplicativo envia o token da compra e o produto às nossas funções no Firebase (Cloud Functions), que consultam o Google Play. No Cloud Firestore ficam o token vinculado ao identificador da sua conta, o produto, o estado e a data de validade. Ao Google Play é enviado um identificador derivado da sua conta para associar a compra. Esse identificador é pseudonimizado: não contém diretamente seu nome ou e-mail, mas não é tratado como dado anônimo.</p>
+<p>O cancelamento é feito no Google Play: o Premium continua até o fim do período pago. Quando a assinatura expira, é reembolsada ou revogada, a conta volta ao plano gratuito. O dispositivo guarda a última resposta do servidor para funcionar sem conexão.</p></section>
+<section><h2>5. Anúncios no plano gratuito</h2><p>Os anúncios só aparecem quando estão ativados no aplicativo. Nesse caso, o plano gratuito mostra banners do Google AdMob em áreas de navegação e leitura. Nos leitores, aparecem em espaço livre abaixo do conteúdo, sem cobrir páginas ou balões. Contas Premium não veem anúncios.</p>
+<p>Quando vídeos premiados estão habilitados, são usados para liberar créditos de download ou de importação de links. Para validar cada vídeo, o Google envia às nossas funções uma confirmação assinada, com um código derivado da sua conta. No Cloud Firestore ficam os créditos, os links usados no mês e os identificadores de transações de recompensa.</p>
+<p>O Google pode tratar o identificador de publicidade do Android, o endereço IP, dados do dispositivo e a interação com os anúncios, conforme as políticas dele. Nas regiões em que a lei exige, um formulário de consentimento do Google aparece antes dos anúncios. A opção Privacidade e anúncios, em Lumeo Premium, permite rever as escolhas quando disponibilizada pelo serviço. O identificador de publicidade pode ser redefinido ou excluído nas configurações do Android.</p></section>
+<section><h2>6. Consultas no leitor</h2><p>Somente quando você pede: a tradução envia o trecho selecionado ao serviço MyMemory; o significado envia a palavra ao Free Dictionary API (dictionaryapi.dev); e a pesquisa abre o texto selecionado no Google. Esses serviços seguem as próprias políticas. Não use essas opções em trechos que não queira compartilhar.</p></section>
+<section><h2>7. Diagnóstico</h2><p>O Lumeo não adiciona ferramentas próprias de análise de uso ou de relatórios de falhas. O diagnóstico das configurações só é copiado quando você toca no botão, e só sai do aparelho se você decidir enviá-lo.</p></section>
+<section><h2>8. Uso limitado dos dados Google</h2><p>O acesso aos dados do Google Drive segue a Google API Services User Data Policy, incluindo os requisitos de Limited Use. As informações recebidas do Drive são usadas para fornecer a importação e a reprodução que você pediu, e não são vendidas nem usadas para publicidade.</p></section>
+<section><h2>9. Compartilhamento</h2><p>O Lumeo não vende dados pessoais. Os dados descritos aqui são tratados pelos serviços necessários ao funcionamento: Google (Firebase, Google Drive, Google Play e, quando os anúncios estão ativados, AdMob) e, quando você pede uma consulta, MyMemory e Free Dictionary API. Esses serviços podem tratar dados fora do seu país.</p></section>
+<section><h2>10. Conservação e segurança</h2><p>Os arquivos e dados locais são mantidos no dispositivo. No servidor, são mantidos dados de conta, compras e, quando utilizados, créditos e registros de vídeos premiados. Esta política não fixa um prazo de conservação nem promete eliminação automática. Você pode enviar dúvidas sobre a conservação dos seus dados ao contato indicado na seção 13.</p>
+<p>A comunicação usa conexões seguras. No Firestore, cada conta pode ler o próprio estado do Premium, e o aplicativo não pode conceder esse acesso por conta própria. Nenhum sistema, contudo, pode garantir segurança absoluta.</p></section>
+<section><h2>11. Direitos e solicitações de privacidade</h2><p>Você pode encaminhar solicitações de acesso, correção ou exclusão de dados, oposição ao tratamento e retirada de consentimento, conforme a legislação aplicável, ao contato oficial delima20k@gmail.com. Não envie senhas, códigos de login do Google ou dados de cartão.</p>
+<p>Você pode revogar o acesso do Lumeo ao Google Drive nas permissões da sua Conta Google. Sair da conta ou remover dados locais não equivale a excluir a conta no Firebase nem os registros de compras no servidor. Os arquivos originais no Google Drive não são apagados por essas ações do Lumeo.</p>
+<p>Excluir dados ou solicitar exclusão de conta não cancela automaticamente uma assinatura nem gera reembolso. O gerenciamento de assinaturas é feito no Google Play. A eliminação de registros pode depender de obrigações legais aplicáveis.</p></section>
+<section><h2>12. Alterações</h2><p>Esta política poderá ser atualizada para refletir mudanças no aplicativo, nos serviços utilizados ou em requisitos legais. A data de revisão é indicada nesta página.</p></section>
+<section><h2>13. Contato</h2><p>Serviço: Lumeo Android. E-mail oficial de contato, suporte e privacidade: delima20k@gmail.com.</p></section>
+<p class="closing"><a href="mailto:delima20k@gmail.com">Contato e suporte: delima20k@gmail.com</a></p>
+</article>
+<article id="pt-PT" lang="pt-PT">
+<h1>Política de Privacidade — Lumeo Android</h1>
+<p class="updated">Última revisão: 31 de outubro de 2026.</p>
+<p class="intro">O Lumeo Android é uma biblioteca pessoal: os seus livros, BD, audiolivros e preferências ficam no dispositivo. Esta política explica o tratamento relacionado com a conta, o Google Drive, as compras do Premium, os anúncios do plano gratuito, quando ativados, e as consultas que pede no leitor.</p>
+<section><h2>1. Conta e início de sessão</h2>
+<p>Para utilizar o Lumeo no Android é necessário iniciar sessão com uma conta Google, através do Firebase Authentication (serviço da Google). Neste processo são tratados o identificador da conta, o e-mail, o nome e a fotografia do perfil. O nome e a fotografia aparecem no menu da aplicação.</p></section>
+<section><h2>2. Biblioteca e ficheiros locais</h2>
+<p>Escolhe ficheiros PDF, EPUB, CBR, CBZ e MP3 através do seletor de ficheiros do Android, que dá à aplicação acesso aos itens escolhidos. O Lumeo não pede acesso contínuo a todos os ficheiros do aparelho.</p>
+<p>Os livros, capas, organização por género, progresso, preferências, marcadores, destaques, anotações e lembretes de leitura ficam no armazenamento privado da aplicação. O reconhecimento de texto e de balões da BD é feito no próprio dispositivo.</p></section>
+<section><h2>3. Google Drive</h2>
+<p>Quando cola uma ligação de uma pasta do Google Drive, o Lumeo acede ao Drive diretamente pela API oficial da Google. As ligações públicas podem ser lidas com a chave pública da aplicação; as pastas privadas pedem a sua autorização pelo fluxo oficial da Google, que pode ser recusada ou cancelada.</p>
+<p>A aplicação pede o âmbito drive.readonly, utilizado para listar pastas, ler metadados e transferir os ficheiros e capítulos que escolher. O Lumeo não cria, altera, move nem elimina conteúdo no seu Google Drive. O token de acesso fica em memória durante a sessão e não é enviado para servidores do Lumeo.</p>
+<p>Os ficheiros transferidos e as capas ficam no armazenamento privado da aplicação para leitura offline. O Lumeo não envia os seus livros, BD, capas ou o conteúdo das suas leituras para servidores próprios.</p></section>
+<section><h2>4. Lumeo Premium e Google Play</h2>
+<p>A assinatura Premium é anual, com renovação automática até ao cancelamento, e é vendida e cobrada pelo Google Play, de acordo com os respetivos termos. O Lumeo não recebe os dados do seu cartão ou de outro meio de pagamento. O preço e a moeda são os indicados pelo Google Play para a sua conta.</p>
+<p>Para confirmar uma compra, a aplicação envia o token da compra e o produto às nossas funções no Firebase (Cloud Functions), que consultam o Google Play. No Cloud Firestore ficam o token associado ao identificador da sua conta, o produto, o estado e a data de validade. Ao Google Play é enviado um identificador derivado da sua conta para associar a compra. Este identificador é pseudonimizado: não contém diretamente o seu nome ou e-mail, mas não é tratado como dado anónimo.</p>
+<p>O cancelamento é feito no Google Play: o Premium continua até ao fim do período pago. Quando a assinatura expira, é reembolsada ou revogada, a conta volta ao plano gratuito. O dispositivo guarda a última resposta do servidor para funcionar sem ligação.</p></section>
+<section><h2>5. Anúncios no plano gratuito</h2>
+<p>Os anúncios só aparecem quando estão ativados na aplicação. Nesse caso, o plano gratuito mostra banners do Google AdMob em áreas de navegação e leitura. Nos leitores, aparecem em espaço livre abaixo do conteúdo, sem cobrir páginas ou balões. As contas Premium não veem anúncios.</p>
+<p>Quando os vídeos premiados estão ativados, são utilizados para libertar créditos de transferência ou de importação de ligações. Para validar cada vídeo, a Google envia às nossas funções uma confirmação assinada, com um código derivado da sua conta. No Cloud Firestore ficam os créditos, as ligações utilizadas no mês e os identificadores de transações de recompensa.</p>
+<p>A Google pode tratar o identificador de publicidade do Android, o endereço IP, dados do dispositivo e a interação com os anúncios, conforme as respetivas políticas. Nas regiões em que a lei o exige, um formulário de consentimento da Google aparece antes dos anúncios. A opção Privacidade e anúncios, em Lumeo Premium, permite rever as escolhas quando disponibilizada pelo serviço. O identificador de publicidade pode ser reposto ou eliminado nas definições do Android.</p></section>
+<section><h2>6. Consultas no leitor</h2>
+<p>Apenas quando o pede: a tradução envia o excerto selecionado ao serviço MyMemory; o significado envia a palavra à Free Dictionary API (dictionaryapi.dev); e a pesquisa abre o texto selecionado no Google. Estes serviços seguem as próprias políticas. Não utilize estas opções em excertos que não queira partilhar.</p></section>
+<section><h2>7. Diagnóstico</h2>
+<p>O Lumeo não adiciona ferramentas próprias de análise de utilização ou de relatórios de falhas. O diagnóstico das definições só é copiado quando toca no botão, e só sai do aparelho se decidir enviá-lo.</p></section>
+<section><h2>8. Utilização limitada dos dados Google</h2>
+<p>O acesso aos dados do Google Drive segue a Google API Services User Data Policy, incluindo os requisitos de Limited Use. As informações recebidas do Drive são utilizadas para fornecer a importação e a reprodução que pediu, e não são vendidas nem utilizadas para publicidade.</p></section>
+<section><h2>9. Partilha</h2>
+<p>O Lumeo não vende dados pessoais. Os dados aqui descritos são tratados pelos serviços necessários ao funcionamento: Google (Firebase, Google Drive, Google Play e, quando os anúncios estão ativados, AdMob) e, quando pede uma consulta, MyMemory e Free Dictionary API. Estes serviços podem tratar dados fora do seu país.</p></section>
+<section><h2>10. Conservação e segurança</h2>
+<p>Os ficheiros e dados locais são mantidos no dispositivo. No servidor, são mantidos dados de conta, compras e, quando utilizados, créditos e registos de vídeos premiados. Esta política não fixa um prazo de conservação nem promete eliminação automática. Pode enviar questões sobre a conservação dos seus dados para o contacto indicado na secção 13.</p>
+<p>A comunicação utiliza ligações seguras. No Firestore, cada conta pode ler o próprio estado do Premium, e a aplicação não pode conceder esse acesso por si só. Nenhum sistema, contudo, pode garantir segurança absoluta.</p></section>
+<section><h2>11. Direitos e pedidos de privacidade</h2>
+<p>Pode encaminhar pedidos de acesso, retificação ou eliminação de dados, oposição ao tratamento e retirada de consentimento, nos termos da legislação aplicável, para o contacto oficial delima20k@gmail.com. Não envie palavras-passe, códigos de início de sessão da Google ou dados de cartão.</p>
+<p>Pode revogar o acesso do Lumeo ao Google Drive nas permissões da sua Conta Google. Terminar sessão ou remover dados locais não equivale a eliminar a conta no Firebase nem os registos de compras no servidor. Os ficheiros originais no Google Drive não são apagados por estas ações do Lumeo.</p>
+<p>Eliminar dados ou pedir a eliminação da conta não cancela automaticamente uma assinatura nem gera reembolso. A gestão de assinaturas é feita no Google Play. A eliminação de registos pode depender de obrigações legais aplicáveis.</p></section>
+<section><h2>12. Alterações</h2>
+<p>Esta política poderá ser atualizada para refletir mudanças na aplicação, nos serviços utilizados ou em requisitos legais. A data de revisão é indicada nesta página.</p></section>
+<section><h2>13. Contacto</h2>
+<p>Serviço: Lumeo Android. E-mail oficial de contacto, apoio e privacidade: delima20k@gmail.com.</p></section>
+<p class="closing"><a href="mailto:delima20k@gmail.com">Contacto e apoio: delima20k@gmail.com</a></p>
+</article>
+<article id="en" lang="en">
+<h1>Privacy Policy — Lumeo Android</h1>
+<p class="updated">Last reviewed: October 31, 2026.</p>
+<p class="intro">Lumeo Android is a personal library: your books, comics, audiobooks and preferences stay on your device. This policy explains how data is handled in connection with your account, Google Drive, Premium purchases, ads on the free plan, when turned on, and the lookups you request in the reader.</p>
+<section><h2>1. Account and sign-in</h2>
+<p>To use Lumeo on Android you must sign in with a Google account, through Firebase Authentication (a Google service). This process handles your account identifier, email, name and profile photo. Your name and photo appear in the app menu.</p></section>
+<section><h2>2. Library and local files</h2>
+<p>You choose PDF, EPUB, CBR, CBZ and MP3 files through the Android file picker, which gives the app access to the items you chose. Lumeo does not ask for ongoing access to all the files on your device.</p>
+<p>Books, covers, genre organization, progress, preferences, bookmarks, highlights, notes and reading reminders stay in the app's private storage. Text and speech-balloon recognition for comics runs on the device itself.</p></section>
+<section><h2>3. Google Drive</h2>
+<p>When you paste a link to a Google Drive folder, Lumeo accesses Drive directly through Google's official API. Public links can be read with the app's public key; private folders ask for your authorization through Google's official flow, which you can decline or cancel.</p>
+<p>The app requests the drive.readonly scope, used to list folders, read metadata and download the files and chapters you choose. Lumeo does not create, change, move or delete content in your Google Drive. The access token stays in memory during the session and is not sent to Lumeo servers.</p>
+<p>Downloaded files and covers stay in the app's private storage for offline reading. Lumeo does not send your books, comics, covers or the content of your reading to its own servers.</p></section>
+<section><h2>4. Lumeo Premium and Google Play</h2>
+<p>The Premium subscription is annual, renews automatically until canceled, and is sold and billed by Google Play under its terms. Lumeo does not receive your card or other payment details. The price and currency are those shown by Google Play for your account.</p>
+<p>To confirm a purchase, the app sends the purchase token and the product to our functions on Firebase (Cloud Functions), which check with Google Play. Cloud Firestore stores the token linked to your account identifier, the product, the status and the expiry date. An identifier derived from your account is sent to Google Play to associate the purchase. This identifier is pseudonymized: it does not directly contain your name or email, but it is not treated as anonymous data.</p>
+<p>Cancellation is done on Google Play: Premium continues until the end of the paid period. When the subscription expires, is refunded or is revoked, the account returns to the free plan. The device keeps the server's last response so it can work without a connection.</p></section>
+<section><h2>5. Ads on the free plan</h2>
+<p>Ads only appear when they are turned on in the app. In that case, the free plan shows Google AdMob banners in browsing and reading areas. In the readers, they appear in free space below the content, without covering pages or speech balloons. Premium accounts do not see ads.</p>
+<p>When rewarded videos are turned on, they are used to unlock credits for downloads or link imports. To validate each video, Google sends our functions a signed confirmation with a code derived from your account. Cloud Firestore stores the credits, the links used in the month and the reward transaction identifiers.</p>
+<p>Google may process the Android advertising ID, IP address, device data and interaction with ads, under its policies. Where the law requires it, a Google consent form appears before ads. The Privacy and ads option, under Lumeo Premium, lets you review your choices when the service makes it available. You can reset or delete the advertising ID in Android settings.</p></section>
+<section><h2>6. Lookups in the reader</h2>
+<p>Only when you ask: translation sends the selected passage to the MyMemory service; meaning sends the word to the Free Dictionary API (dictionaryapi.dev); and search opens the selected text on Google. These services follow their own policies. Do not use these options on passages you do not want to share.</p></section>
+<section><h2>7. Diagnostics</h2>
+<p>Lumeo does not add its own usage analytics or crash-reporting tools. The settings diagnostics are only copied when you tap the button, and only leave your device if you choose to send them.</p></section>
+<section><h2>8. Limited use of Google data</h2>
+<p>Access to Google Drive data follows the Google API Services User Data Policy, including the Limited Use requirements. Information received from Drive is used to provide the import and playback you requested, and is not sold or used for advertising.</p></section>
+<section><h2>9. Sharing</h2>
+<p>Lumeo does not sell personal data. The data described here is handled by the services needed for operation: Google (Firebase, Google Drive, Google Play and, when ads are turned on, AdMob) and, when you request a lookup, MyMemory and the Free Dictionary API. These services may process data outside your country.</p></section>
+<section><h2>10. Retention and security</h2>
+<p>Local files and data are kept on the device. On the server, account and purchase data and, when used, credits and rewarded video records are kept. This policy does not set a retention period and does not promise automatic deletion. You can send questions about the retention of your data to the contact listed in section 13.</p>
+<p>Communication uses secure connections. In Firestore, each account can read its own Premium status, and the app cannot grant that access on its own. No system, however, can guarantee absolute security.</p></section>
+<section><h2>11. Rights and privacy requests</h2>
+<p>You can send requests for access, correction or deletion of data, objection to processing and withdrawal of consent, as provided by applicable law, to the official contact delima20k@gmail.com. Do not send passwords, Google sign-in codes or card details.</p>
+<p>You can revoke Lumeo's access to Google Drive in your Google Account permissions. Signing out or removing local data is not the same as deleting the Firebase account or the purchase records on the server. The original files in Google Drive are not erased by these actions in Lumeo.</p>
+<p>Deleting data or requesting account deletion does not automatically cancel a subscription or trigger a refund. Subscriptions are managed on Google Play. Deletion of records may depend on applicable legal obligations.</p></section>
+<section><h2>12. Changes</h2>
+<p>This policy may be updated to reflect changes in the app, in the services used or in legal requirements. The review date is shown on this page.</p></section>
+<section><h2>13. Contact</h2>
+<p>Service: Lumeo Android. Official contact, support and privacy email: delima20k@gmail.com.</p></section>
+<p class="closing"><a href="mailto:delima20k@gmail.com">Contact and support: delima20k@gmail.com</a></p>
+</article>
+<article id="es" lang="es">
+<h1>Política de Privacidad — Lumeo Android</h1>
+<p class="updated">Última revisión: 31 de octubre de 2026.</p>
+<p class="intro">Lumeo Android es una biblioteca personal: tus libros, cómics, audiolibros y preferencias se quedan en el dispositivo. Esta política explica el tratamiento relacionado con la cuenta, Google Drive, las compras de Premium, los anuncios del plan gratuito, cuando estén activados, y las consultas que pides en el lector.</p>
+<section><h2>1. Cuenta e inicio de sesión</h2>
+<p>Para usar Lumeo en Android es necesario iniciar sesión con una cuenta de Google, mediante Firebase Authentication (servicio de Google). En este proceso se tratan el identificador de la cuenta, el correo electrónico, el nombre y la foto de perfil. El nombre y la foto aparecen en el menú de la aplicación.</p></section>
+<section><h2>2. Biblioteca y archivos locales</h2>
+<p>Eliges archivos PDF, EPUB, CBR, CBZ y MP3 con el selector de archivos de Android, que da a la aplicación acceso a los elementos elegidos. Lumeo no pide acceso continuo a todos los archivos del aparato.</p>
+<p>Los libros, portadas, organización por género, progreso, preferencias, marcadores, destacados, notas y recordatorios de lectura se quedan en el almacenamiento privado de la aplicación. El reconocimiento de texto y de globos de los cómics se realiza en el propio dispositivo.</p></section>
+<section><h2>3. Google Drive</h2>
+<p>Cuando pegas un enlace de una carpeta de Google Drive, Lumeo accede a Drive directamente mediante la API oficial de Google. Los enlaces públicos pueden leerse con la clave pública de la aplicación; las carpetas privadas piden tu autorización mediante el flujo oficial de Google, que puedes rechazar o cancelar.</p>
+<p>La aplicación pide el ámbito drive.readonly, usado para listar carpetas, leer metadatos y descargar los archivos y capítulos que elijas. Lumeo no crea, modifica, mueve ni elimina contenido en tu Google Drive. El token de acceso se queda en memoria durante la sesión y no se envía a servidores de Lumeo.</p>
+<p>Los archivos descargados y las portadas se quedan en el almacenamiento privado de la aplicación para la lectura sin conexión. Lumeo no envía tus libros, cómics, portadas ni el contenido de tus lecturas a servidores propios.</p></section>
+<section><h2>4. Lumeo Premium y Google Play</h2>
+<p>La suscripción Premium es anual, se renueva automáticamente hasta su cancelación y la vende y cobra Google Play, de acuerdo con sus condiciones. Lumeo no recibe los datos de tu tarjeta ni de otro medio de pago. El precio y la moneda son los que indica Google Play para tu cuenta.</p>
+<p>Para confirmar una compra, la aplicación envía el token de la compra y el producto a nuestras funciones en Firebase (Cloud Functions), que consultan a Google Play. En Cloud Firestore se guardan el token vinculado al identificador de tu cuenta, el producto, el estado y la fecha de validez. A Google Play se envía un identificador derivado de tu cuenta para asociar la compra. Este identificador está seudonimizado: no contiene directamente tu nombre ni tu correo, pero no se trata como dato anónimo.</p>
+<p>La cancelación se realiza en Google Play: Premium continúa hasta el final del período pagado. Cuando la suscripción caduca, se reembolsa o se revoca, la cuenta vuelve al plan gratuito. El dispositivo guarda la última respuesta del servidor para funcionar sin conexión.</p></section>
+<section><h2>5. Anuncios en el plan gratuito</h2>
+<p>Los anuncios solo aparecen cuando están activados en la aplicación. En ese caso, el plan gratuito muestra banners de Google AdMob en áreas de navegación y lectura. En los lectores, aparecen en espacio libre debajo del contenido, sin cubrir páginas ni globos. Las cuentas Premium no ven anuncios.</p>
+<p>Cuando los vídeos con recompensa están activados, se usan para liberar créditos de descarga o de importación de enlaces. Para validar cada vídeo, Google envía a nuestras funciones una confirmación firmada, con un código derivado de tu cuenta. En Cloud Firestore se guardan los créditos, los enlaces usados en el mes y los identificadores de transacciones de recompensa.</p>
+<p>Google puede tratar el identificador de publicidad de Android, la dirección IP, datos del dispositivo y la interacción con los anuncios, según sus políticas. En las regiones donde la ley lo exige, un formulario de consentimiento de Google aparece antes de los anuncios. La opción Privacidad y anuncios, en Lumeo Premium, permite revisar tus elecciones cuando el servicio la pone a disposición. El identificador de publicidad puede restablecerse o eliminarse en los ajustes de Android.</p></section>
+<section><h2>6. Consultas en el lector</h2>
+<p>Solo cuando lo pides: la traducción envía el fragmento seleccionado al servicio MyMemory; el significado envía la palabra a Free Dictionary API (dictionaryapi.dev); y la búsqueda abre el texto seleccionado en Google. Estos servicios siguen sus propias políticas. No uses estas opciones en fragmentos que no quieras compartir.</p></section>
+<section><h2>7. Diagnóstico</h2>
+<p>Lumeo no añade herramientas propias de análisis de uso ni de informes de fallos. El diagnóstico de los ajustes solo se copia cuando tocas el botón, y solo sale del aparato si decides enviarlo.</p></section>
+<section><h2>8. Uso limitado de los datos de Google</h2>
+<p>El acceso a los datos de Google Drive sigue la Google API Services User Data Policy, incluidos los requisitos de Limited Use. La información recibida de Drive se usa para ofrecer la importación y la reproducción que pediste, y no se vende ni se usa para publicidad.</p></section>
+<section><h2>9. Compartición</h2>
+<p>Lumeo no vende datos personales. Los datos descritos aquí los tratan los servicios necesarios para el funcionamiento: Google (Firebase, Google Drive, Google Play y, cuando los anuncios están activados, AdMob) y, cuando pides una consulta, MyMemory y Free Dictionary API. Estos servicios pueden tratar datos fuera de tu país.</p></section>
+<section><h2>10. Conservación y seguridad</h2>
+<p>Los archivos y datos locales se conservan en el dispositivo. En el servidor se conservan datos de cuenta, compras y, cuando se utilizan, créditos y registros de vídeos con recompensa. Esta política no fija un plazo de conservación ni promete una eliminación automática. Puedes enviar preguntas sobre la conservación de tus datos al contacto indicado en la sección 13.</p>
+<p>La comunicación usa conexiones seguras. En Firestore, cada cuenta puede leer su propio estado de Premium, y la aplicación no puede conceder ese acceso por sí sola. Sin embargo, ningún sistema puede garantizar una seguridad absoluta.</p></section>
+<section><h2>11. Derechos y solicitudes de privacidad</h2>
+<p>Puedes enviar solicitudes de acceso, rectificación o eliminación de datos, oposición al tratamiento y retirada del consentimiento, conforme a la legislación aplicable, al contacto oficial delima20k@gmail.com. No envíes contraseñas, códigos de inicio de sesión de Google ni datos de tarjeta.</p>
+<p>Puedes revocar el acceso de Lumeo a Google Drive en los permisos de tu Cuenta de Google. Cerrar sesión o quitar datos locales no equivale a eliminar la cuenta en Firebase ni los registros de compras en el servidor. Los archivos originales de Google Drive no se borran con estas acciones de Lumeo.</p>
+<p>Eliminar datos o solicitar la eliminación de la cuenta no cancela automáticamente una suscripción ni genera un reembolso. Las suscripciones se gestionan en Google Play. La eliminación de registros puede depender de las obligaciones legales aplicables.</p></section>
+<section><h2>12. Cambios</h2>
+<p>Esta política puede actualizarse para reflejar cambios en la aplicación, en los servicios utilizados o en requisitos legales. La fecha de revisión se indica en esta página.</p></section>
+<section><h2>13. Contacto</h2>
+<p>Servicio: Lumeo Android. Correo oficial de contacto, soporte y privacidad: delima20k@gmail.com.</p></section>
+<p class="closing"><a href="mailto:delima20k@gmail.com">Contacto y soporte: delima20k@gmail.com</a></p>
+</article>
+</main>
+</body>
+</html>
