@@ -44,6 +44,8 @@
       "destination": "/api/index?__lumeo_route=collections/:collectionId/comic-cover/:fileId&path=:collectionPath"
     },
     { "source": "/api/:path*", "destination": "/api/index?__lumeo_route=:path*" },
+    { "source": "/excluir-conta", "destination": "/excluir-conta.html" },
+    { "source": "/excluir-conta/", "destination": "/excluir-conta.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/privacy/", "destination": "/privacy.html" },
     { "source": "/((?!api/.*|assets/.*|icons/.*|ocr/.*|screenshots/.*|sw.js|manifest.json|onedrive-auth.html).*)", "destination": "/index.html" }
