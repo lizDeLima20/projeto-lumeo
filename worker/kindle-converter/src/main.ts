@@ -1,19 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { StructuredDriveCatalogProvider } from "../../../server/src/catalog/StructuredDriveCatalogProvider.js";
 import { opdsAutoajudaSource } from "../../../server/src/opds/OpdsSources.js";
 import { CalibreConverter } from "./CalibreConverter.js";
-import { MemoryEditionQueue, SupabaseEditionQueue, SupabaseEditionStorage, type EditionStorage } from "./EditionQueue.js";
+import { GoogleDriveEditionStore } from "./DriveEditionStore.js";
+import { MemoryEditionQueue, SupabaseEditionQueue, type EditionStore } from "./EditionQueue.js";
 import { KindleConversionWorker, jsonLog, type WatchedSource } from "./KindleConversionWorker.js";
 
 /**
  * Kindle conversion worker (Docker, outside Vercel).
  *   (no flag)      keeps running: scans Drive, converts the queue, waits, repeats
  *   --once         scans, converts everything queued, exits
- *   --dry-run      in memory, nothing written to Supabase; with --limit N converts N books and
- *                  keeps the AZW3s in KINDLE_DRY_RUN_DIR (or only checks them when it is unset)
+ *   --drive-check  signs in to Drive, finds (or creates) the "Lumeo Kindle AZW3" folder, exits
+ *   --dry-run      in memory, nothing written to Supabase or Drive; with --limit N converts N
+ *                  books and keeps the AZW3s in KINDLE_DRY_RUN_DIR (or only checks them)
  */
 const env = process.env, args = process.argv.slice(2);
 const flag = (name: string) => args.includes(name);
@@ -33,12 +36,25 @@ const converter = new CalibreConverter({
 });
 const settings = { workerId: env.KINDLE_WORKER_ID ?? `kindle-${hostname()}-${process.pid}`, maxAttempts: int(env.KINDLE_MAX_ATTEMPTS, 3), staleAfterMinutes: int(env.KINDLE_STALE_AFTER_MINUTES, 30) };
 
+/** The Drive folder "Lumeo Kindle AZW3", as the account that owns the catalog (OAuth, drive.file). */
+function driveStore(): GoogleDriveEditionStore {
+  return new GoogleDriveEditionStore(
+    { clientId: env.KINDLE_DRIVE_CLIENT_ID?.trim() ?? "", clientSecret: env.KINDLE_DRIVE_CLIENT_SECRET?.trim() ?? "", refreshToken: env.KINDLE_DRIVE_REFRESH_TOKEN?.trim() ?? "" },
+    { folderId: env.KINDLE_DRIVE_FOLDER_ID?.trim() || undefined, folderName: env.KINDLE_DRIVE_FOLDER_NAME?.trim() || undefined },
+  );
+}
+
 async function main(): Promise<void> {
   if (flag("--dry-run")) return dryRun();
+  const store = driveStore();
+  // Before anything else: the folder exists and the worker may write to it.
+  const folderId = await store.folderId();
+  jsonLog("KINDLE_DRIVE_FOLDER", { folderId, link: `https://drive.google.com/drive/folders/${folderId}` });
+  if (flag("--drive-check")) return;
   const url = env.SUPABASE_URL, key = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Defina SUPABASE_URL e SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_ROLE_KEY) no ambiente do worker.");
   const database = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const worker = new KindleConversionWorker(sources, new SupabaseEditionQueue(database), new SupabaseEditionStorage(database), converter, settings);
+  const worker = new KindleConversionWorker(sources, new SupabaseEditionQueue(database), store, converter, settings);
   jsonLog("KINDLE_WORKER_STARTED", { workerId: settings.workerId, sources: sources.map((source) => source.sourceId) });
   if (flag("--once")) { await worker.scan(); while (await worker.processNext()) { /* drain */ } return; }
   const stop = new AbortController();
@@ -46,15 +62,17 @@ async function main(): Promise<void> {
   await worker.run(stop.signal, { scanIntervalMs: int(env.KINDLE_SCAN_INTERVAL_MINUTES, 30) * 60_000, idleMs: int(env.KINDLE_IDLE_SECONDS, 60) * 1000 });
 }
 
-/** Converts real books from the real folder without touching Supabase. */
+/** Converts real books from the real folder without touching Supabase or Drive. */
 async function dryRun(): Promise<void> {
   const limit = int(option("--limit"), 3), keep = env.KINDLE_DRY_RUN_DIR;
   const queue = new MemoryEditionQueue();
-  const storage: EditionStorage = {
-    upload: async (path, bytes) => { if (keep) { await mkdir(dirname(join(keep, path)), { recursive: true }); await writeFile(join(keep, path), bytes); } },
-    remove: async (path) => { if (keep) await rm(join(keep, path), { force: true }); },
+  const store: EditionStore = {
+    save: async (job, file) => {
+      if (keep) { await mkdir(keep, { recursive: true }); await writeFile(join(keep, file.name), file.bytes); }
+      return { driveFileId: `local_${job.bookId}`, size: file.bytes.length, md5: createHash("md5").update(file.bytes).digest("hex") };
+    },
   };
-  const worker = new KindleConversionWorker(sources, queue, storage, converter, settings);
+  const worker = new KindleConversionWorker(sources, queue, store, converter, settings);
   await worker.scan();
   const pick = option("--books")?.split(",").map((id) => id.trim()).filter(Boolean);
   // Only the chosen books (or the first N) stay in the queue.

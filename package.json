@@ -15,6 +15,7 @@
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
     "typecheck:worker": "tsc -p worker/kindle-converter/tsconfig.json --noEmit",
     "worker:kindle": "tsx worker/kindle-converter/src/main.ts",
+    "worker:kindle:drive-auth": "tsx worker/kindle-converter/src/driveAuth.ts",
     "test:server": "tsx --test server/tests/*.test.ts",
     "test:storage": "tsx --test tests/*.test.ts",
     "test": "npm run test:server && npm run test:storage",

@@ -60,11 +60,12 @@ test("login recusado e catálogo fora do ar viram mensagens claras", function()
     eq(select(3, api:genres()), "Resposta inválida do catálogo.")
 end)
 
-test("download: segue o 302 sem mandar a senha ao armazenamento, salva na pasta fixa, sem .part", function()
+test("download: segue o 302 até o AZW3 no Google Drive sem mandar a senha, salva na pasta fixa, sem .part", function()
     local api = Api:new{ server = SERVER, username = "leitor", password = "s3nha" }
     local b = book("bk_1")
-    Stubs.routes[b.kindle.url] = { code = 302, headers = { location = "https://storage.test/sign/bk_1.azw3?token=t" }, body = "<html>redirect</html>" }
-    Stubs.routes["https://storage.test/sign/bk_1.azw3?token=t"] = { code = 200, body = AZW3 }
+    local drive = "https://drive.usercontent.google.com/download?id=azw3Drive_bk_1&export=download&confirm=t"
+    Stubs.routes[b.kindle.url] = { code = 302, headers = { location = drive }, body = "" }
+    Stubs.routes[drive] = { code = 200, body = AZW3 }
     local path, message = api:downloadBook(b)
     eq(message, nil); eq(path, "/koreader/Lumeo/Autora - Livro bk_1.azw3")
     eq(Stubs.disk[path], AZW3, "conteúdo é o AZW3, não o corpo do 302")

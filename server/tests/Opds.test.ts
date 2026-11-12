@@ -13,7 +13,7 @@ import type { CatalogBookRecord, CatalogPage, CatalogQuery } from "../src/catalo
 import { ServerApp, opdsAutoajudaSource, opdsSourceCatalog } from "../src/app.js";
 import { Config } from "../src/config/Config.js";
 import { ApiError } from "../src/errors/ApiError.js";
-import { SupabaseKindleEditions, kindleOffer, type KindleEdition, type KindleEditionReader } from "../src/kindle/KindleEditions.js";
+import { SupabaseKindleEditions, kindleDownloadUrl, kindleOffer, type KindleEdition, type KindleEditionReader } from "../src/kindle/KindleEditions.js";
 import { kindleFileName } from "../src/opds/KindleCatalogJson.js";
 
 const PASSWORD = "senha-de-teste-123";
@@ -317,20 +317,17 @@ describe("catálogo OPDS: página do livro no KOReader", () => {
 });
 
 class FakeEditions implements KindleEditionReader {
-  public readonly signed: string[] = [];
-  public broken = false; public signFails = false;
+  public broken = false;
   public constructor(public readonly rows: KindleEdition[] = []) {}
   public async editionsFor(bookIds: readonly string[]) {
     if (this.broken) throw new Error("relation \"kindle_editions\" does not exist");
     return new Map(this.rows.filter(row => bookIds.includes(row.bookId)).map(row => [row.bookId, row]));
   }
-  public async signedUrl(edition: KindleEdition) {
-    if (this.signFails) throw new Error("storage down");
-    this.signed.push(edition.bookId); return `https://supabase.test/storage/v1/object/sign/kindle-editions/${edition.storagePath}?token=t`;
-  }
 }
 
-const ready = (bookId: string, size = 1_990_000): KindleEdition => ({ bookId, status: "ready", format: "azw3", storagePath: `opds-autoajuda/${bookId}.azw3`, size });
+/** The converted file's id in the "Lumeo Kindle AZW3" Drive folder (never the EPUB's). */
+const azw3Id = (bookId: string) => `azw3Drive_${bookId}`;
+const ready = (bookId: string, size = 1_990_000): KindleEdition => ({ bookId, status: "ready", format: "azw3", driveFileId: azw3Id(bookId), size });
 
 function setupKindle(rows: KindleEdition[], books = Array.from({ length: 65 }, (_, index) => book(index + 1)), perHour = 3) {
   const store = new MemoryStore(), catalog = new FakeCatalog(books), editions = new FakeEditions(rows);
@@ -344,8 +341,8 @@ describe("edição Kindle (AZW3) no catálogo", () => {
     const epub = book(2), pdf = book(1);
     assert.deepEqual(kindleOffer(epub, undefined), { status: "pending", format: null, size: null });
     assert.equal(kindleOffer(epub, { ...ready("livro-2"), status: "processing" }).status, "processing");
-    assert.equal(kindleOffer(epub, { bookId: "livro-2", status: "failed", format: null, storagePath: null, size: null }).status, "failed");
-    assert.equal(kindleOffer(epub, { ...ready("livro-2"), storagePath: null }).status, "pending", "pronta sem arquivo não conta como pronta");
+    assert.equal(kindleOffer(epub, { bookId: "livro-2", status: "failed", format: null, driveFileId: null, size: null }).status, "failed");
+    assert.equal(kindleOffer(epub, { ...ready("livro-2"), driveFileId: null }).status, "pending", "pronta sem arquivo não conta como pronta");
     assert.deepEqual(kindleOffer(epub, ready("livro-2")), { status: "ready", format: "azw3", size: 1_990_000, edition: ready("livro-2") });
     assert.deepEqual(kindleOffer(pdf, undefined), { status: "unavailable", format: null, size: null }, "PDF do catálogo não vai como AZW3");
     assert.equal(kindleOffer(pdf, ready("livro-1")).status, "ready", "se um dia houver AZW3 para ele, vale o AZW3");
@@ -367,18 +364,26 @@ describe("edição Kindle (AZW3) no catálogo", () => {
     assert.match(koreaderDescription(entries[0]!), /\nKindle: versão Kindle indisponível\n/);
   });
 
-  it("download?formato=kindle: AZW3 pronto → 302 para o endereço assinado, contado no limite", async () => {
-    const { controller, editions, store } = setupKindle([ready("livro-2")]);
+  it("download?formato=kindle: AZW3 pronto → 302 para o arquivo AZW3 no Drive (não o EPUB), contado no limite", async () => {
+    const { controller, store } = setupKindle([ready("livro-2")]);
     const result = await call(controller, "/api/opds/livros/livro-2/download?formato=kindle");
     assert.equal(result.status, 302);
-    assert.equal(result.headers.location, "https://supabase.test/storage/v1/object/sign/kindle-editions/opds-autoajuda/livro-2.azw3?token=t");
+    assert.equal(result.headers.location, `https://drive.usercontent.google.com/download?id=${azw3Id("livro-2")}&export=download&confirm=t`);
+    assert.equal(result.headers.location, kindleDownloadUrl(ready("livro-2")));
+    assert.ok(!String(result.headers.location).includes(book(2).driveFileId), "nunca o EPUB original");
     assert.equal(result.headers["cache-control"], "no-store");
     assert.deepEqual(store.downloads.map(item => item.bookId), ["livro-2"]);
-    assert.deepEqual(editions.signed, ["livro-2"]);
+  });
+
+  it("download?formato=kindle continua exigindo login (sem senha → 401, nada contado)", async () => {
+    const { controller, store } = setupKindle([ready("livro-2")]);
+    const anonymous = await call(controller, "/api/opds/livros/livro-2/download?formato=kindle", { auth: null });
+    assert.equal(anonymous.status, 401); assert.equal(anonymous.headers.location, undefined);
+    assert.equal(store.downloads.length, 0);
   });
 
   it("download?formato=kindle: sem AZW3 pronto (em preparação, falhou ou PDF) → 409 e nada é contado", async () => {
-    const { controller, store } = setupKindle([{ bookId: "livro-4", status: "failed", format: null, storagePath: null, size: null }]);
+    const { controller, store } = setupKindle([{ bookId: "livro-4", status: "failed", format: null, driveFileId: null, size: null }]);
     const pdf = await call(controller, "/api/opds/livros/livro-1/download?formato=kindle");
     assert.equal(pdf.status, 409); assert.match(pdf.body.toString(), /não tem versão Kindle/);
     const pending = await call(controller, "/api/opds/livros/livro-2/download?formato=kindle");
@@ -395,18 +400,19 @@ describe("edição Kindle (AZW3) no catálogo", () => {
     assert.equal((await call(controller, "/api/opds/livros/livro-2/download?formato=mobi")).status, 400);
   });
 
-  it("limite por hora vale para a edição Kindle e não chega a assinar endereço", async () => {
-    const { controller, editions } = setupKindle([ready("livro-2")], undefined, 1);
+  it("limite por hora vale para a edição Kindle e não entrega o endereço", async () => {
+    const { controller, store } = setupKindle([ready("livro-2")], undefined, 1);
     assert.equal((await call(controller, "/api/opds/livros/livro-2/download?formato=kindle")).status, 302);
     const limited = await call(controller, "/api/opds/livros/livro-2/download?formato=kindle");
-    assert.equal(limited.status, 429);
-    assert.deepEqual(editions.signed, ["livro-2"]);
+    assert.equal(limited.status, 429); assert.equal(limited.headers.location, undefined);
+    assert.equal(store.downloads.length, 1);
   });
 
-  it("armazenamento fora do ar ao assinar → 502 e o download não é contado", async () => {
+  it("tabela de edições fora do ar na hora do download → 409 (sem endereço) e nada é contado", async () => {
     const { controller, editions, store } = setupKindle([ready("livro-2")]);
-    editions.signFails = true;
-    assert.equal((await call(controller, "/api/opds/livros/livro-2/download?formato=kindle")).status, 502);
+    editions.broken = true;
+    const result = await call(controller, "/api/opds/livros/livro-2/download?formato=kindle");
+    assert.equal(result.status, 409); assert.equal(result.headers.location, undefined);
     assert.equal(store.downloads.length, 0);
   });
 
@@ -478,7 +484,9 @@ describe("JSON da extensão do Kindle (/api/opds/kindle)", () => {
   it("linhas do banco inválidas são ignoradas", () => {
     assert.equal(SupabaseKindleEditions.edition({ book_id: "a", status: "talvez" }), null);
     assert.equal(SupabaseKindleEditions.edition({ status: "ready" }), null);
-    assert.deepEqual(SupabaseKindleEditions.edition({ book_id: "a", status: "ready", format: "pdf", storage_path: "", size_bytes: -1 }), { bookId: "a", status: "ready", format: null, storagePath: null, size: null });
-    assert.deepEqual(SupabaseKindleEditions.edition({ book_id: "a", status: "ready", format: "azw3", storage_path: "s/a.azw3", size_bytes: "1990000" }), { bookId: "a", status: "ready", format: "azw3", storagePath: "s/a.azw3", size: 1_990_000 });
+    assert.deepEqual(SupabaseKindleEditions.edition({ book_id: "a", status: "ready", format: "pdf", drive_file_id: "", size_bytes: -1 }), { bookId: "a", status: "ready", format: null, driveFileId: null, size: null });
+    assert.deepEqual(SupabaseKindleEditions.edition({ book_id: "a", status: "ready", format: "azw3", drive_file_id: "1AbC-dEf_ghIJkl", size_bytes: "1990000" }), { bookId: "a", status: "ready", format: "azw3", driveFileId: "1AbC-dEf_ghIJkl", size: 1_990_000 });
+    assert.equal(SupabaseKindleEditions.edition({ book_id: "a", status: "ready", format: "azw3", drive_file_id: "x/../y?z=1", size_bytes: 10 })?.driveFileId, null, "id estranho não vira endereço");
+    assert.throws(() => kindleDownloadUrl({ driveFileId: null }), /NOT_READY/);
   });
 });

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +9,8 @@ import { strToU8, unzipSync, zipSync, strFromU8 } from "fflate";
 import sharp from "sharp";
 import type { CatalogBookRecord } from "../src/catalog/types.js";
 import { CalibreConverter, PermanentConversionError, ebookConvertArgs, type ConvertedEdition, type EditionConverter } from "../../worker/kindle-converter/src/CalibreConverter.js";
-import { MemoryEditionQueue, editionMetadata, editionPath, planQueue, type EditionJob, type EditionStorage } from "../../worker/kindle-converter/src/EditionQueue.js";
+import { DriveRequestError, GoogleDriveEditionStore } from "../../worker/kindle-converter/src/DriveEditionStore.js";
+import { EditionStoreUnavailable, MemoryEditionQueue, editionMetadata, planQueue, type EditionJob, type EditionStore } from "../../worker/kindle-converter/src/EditionQueue.js";
 import { calibreMissingItems, checkEpub, checkPdf, inspectKf8, looksLikeHtml, repairEpub, resolveZipPath } from "../../worker/kindle-converter/src/KindleFiles.js";
 import { KindleConversionWorker, type WatchedSource } from "../../worker/kindle-converter/src/KindleConversionWorker.js";
 
@@ -139,11 +141,6 @@ describe("worker Kindle: fila", () => {
     assert.deepEqual(second.jobs.map((job) => job.bookId), ["bk_1", "bk_2"]); assert.equal(second.unchanged, 1);
     assert.equal(planQueue("s", 10, [book(4, { sha256: "a".repeat(64) })], state).jobs.length, 1, "sha256 novo reconverte");
   });
-
-  it("caminho no armazenamento: um arquivo por livro, sem caracteres perigosos", () => {
-    assert.equal(editionPath("opds-autoajuda", "bk_abc"), "opds-autoajuda/bk_abc.azw3");
-    assert.equal(editionPath("s", "../../x y/z"), "s/__.._x_y_z.azw3", "sem barras: não sai da pasta da fonte");
-  });
 });
 
 class FakeConverter implements EditionConverter {
@@ -153,27 +150,48 @@ class FakeConverter implements EditionConverter {
 }
 const converted = (size = 5000): ConvertedEdition => ({ format: "azw3", bytes: new Uint8Array(size), sha256: "f".repeat(64), info: { ok: true, title: "T" }, coverSource: "catalog", repairedPaths: 0 });
 
-function workerWith(converter: EditionConverter, books: CatalogBookRecord[], options: { uploadFails?: boolean; sources?: WatchedSource[] } = {}) {
-  const queue = new MemoryEditionQueue(), uploads = new Map<string, Uint8Array>(), removed: string[] = [], logs: Array<{ event: string; data?: Record<string, unknown> }> = [];
-  const storage: EditionStorage = {
-    upload: async (path, bytes) => { if (options.uploadFails) throw new Error("storage 503"); uploads.set(path, bytes); },
-    remove: async (path) => { removed.push(path); },
+function workerWith(converter: EditionConverter, books: CatalogBookRecord[], options: { saveFails?: (call: number) => Error | null; sources?: WatchedSource[] } = {}) {
+  const queue = new MemoryEditionQueue(), logs: Array<{ event: string; data?: Record<string, unknown> }> = [];
+  const saves: Array<{ bookId: string; name: string; size: number; previous: string | null }> = [];
+  const store: EditionStore = {
+    save: async (job, file) => {
+      const failure = options.saveFails?.(saves.length + 1) ?? null;
+      saves.push({ bookId: job.bookId, name: file.name, size: file.bytes.length, previous: job.driveFileId });
+      if (failure) throw failure;
+      // Same book, same Drive file: a new conversion overwrites it.
+      return { driveFileId: job.driveFileId ?? `drive_${job.bookId}_0000`, size: file.bytes.length, md5: "m" };
+    },
   };
   const sources = options.sources ?? [{ sourceId: "opds-autoajuda", priority: 10, locale: "pt-BR", catalog: { list: async (query) => ({ items: books.slice(query.offset, query.offset + query.limit), nextCursor: query.offset + query.limit < books.length ? "n" : null }) } }];
-  const worker = new KindleConversionWorker(sources, queue, storage, converter, { workerId: "w1", maxAttempts: 3, staleAfterMinutes: 30 }, (event, data) => logs.push({ event, data }));
-  return { worker, queue, uploads, removed, logs };
+  const worker = new KindleConversionWorker(sources, queue, store, converter, { workerId: "w1", maxAttempts: 3, staleAfterMinutes: 30 }, (event, data) => logs.push({ event, data }));
+  return { worker, queue, saves, logs };
 }
 
 describe("worker Kindle: detectar → enfileirar → converter → salvar", () => {
-  it("varre o Drive pelo catálogo (todas as páginas), converte e marca pronto com o arquivo salvo", async () => {
+  it("varre o Drive pelo catálogo (todas as páginas), converte e guarda só o vínculo com o arquivo do Drive", async () => {
     const books = Array.from({ length: 620 }, (_, index) => book(index + 1));
-    const { worker, queue, uploads } = workerWith(new FakeConverter(() => converted()), books);
+    const { worker, queue, saves } = workerWith(new FakeConverter(() => converted()), books);
     assert.equal(await worker.scan(), 620, "passa da 1ª página de 500");
     assert.equal(await worker.scan(), 0, "nada muda, nada é enfileirado de novo");
     assert.equal(await worker.processNext(), true);
     const row = queue.rows.get("bk_1")!;
-    assert.equal(row.status, "ready"); assert.equal(row.edition?.storagePath, "opds-autoajuda/bk_1.azw3"); assert.equal(row.edition?.size, 5000);
-    assert.ok(uploads.has("opds-autoajuda/bk_1.azw3"));
+    assert.equal(row.status, "ready");
+    assert.deepEqual(row.edition, { format: "azw3", driveFileId: "drive_bk_1_0000", size: 5000, sha256: "f".repeat(64) }, "id do Drive, tamanho, checksum e formato; nenhum byte");
+    assert.equal(row.epubDriveFileId, "arquivo1", "vínculo com o EPUB original");
+    assert.deepEqual(saves, [{ bookId: "bk_1", name: "Autora 1 - Livro 1.azw3", size: 5000, previous: null }]);
+  });
+
+  it("livro alterado no catálogo: reconvertido por cima do mesmo arquivo do Drive (sem apagar, sem duplicar)", async () => {
+    let title = "Livro 1";
+    const catalog: WatchedSource = { sourceId: "opds-autoajuda", priority: 10, locale: "pt-BR", catalog: { list: async () => ({ items: [book(1, { title })], nextCursor: null }) } };
+    const { worker, queue, saves } = workerWith(new FakeConverter(() => converted()), [], { sources: [catalog] });
+    await worker.scan(); await worker.processNext();
+    title = "Livro 1 (edição revista)";
+    assert.equal(await worker.scan(), 1);
+    assert.equal(queue.rows.get("bk_1")!.driveFileId, "drive_bk_1_0000", "a fila lembra o arquivo anterior");
+    await worker.processNext();
+    assert.equal(saves[1]!.previous, "drive_bk_1_0000"); assert.equal(saves[1]!.name, "Autora 1 - Livro 1 (edição revista).azw3");
+    assert.equal(queue.rows.get("bk_1")!.edition?.driveFileId, "drive_bk_1_0000");
   });
 
   it("a pasta Autoajuda vem antes das outras", async () => {
@@ -196,10 +214,31 @@ describe("worker Kindle: detectar → enfileirar → converter → salvar", () =
     assert.equal(logs.filter((log) => log.event === "KINDLE_RETRY_LATER").length, 2);
   });
 
-  it("armazenamento fora do ar não marca pronto", async () => {
-    const { worker, queue } = workerWith(new FakeConverter(() => converted()), [book(1)], { uploadFails: true });
-    await worker.scan(); await worker.processNext();
-    assert.equal(queue.rows.get("bk_1")!.status, "pending"); assert.match(queue.rows.get("bk_1")!.lastError!, /storage 503/);
+  it("Drive fora do ar: não marca pronto, devolve à fila sem gastar tentativa e o worker para de pegar livros", async () => {
+    const { worker, queue, logs } = workerWith(new FakeConverter(() => converted()), [book(1)], { saveFails: () => new EditionStoreUnavailable("Drive 503: backendError") });
+    await worker.scan();
+    for (let round = 0; round < 5; round++) await assert.rejects(worker.processNext(), EditionStoreUnavailable);
+    const row = queue.rows.get("bk_1")!;
+    assert.equal(row.status, "pending"); assert.equal(row.attempts, 0, "5 quedas do Drive não queimam as 3 tentativas"); assert.match(row.lastError!, /Drive 503/);
+    assert.equal(row.edition, null);
+    assert.equal(logs.filter((log) => log.event === "KINDLE_STORE_UNAVAILABLE").length, 5);
+  });
+
+  it("Drive recusou o arquivo (400): conta como tentativa do livro, até falhar", async () => {
+    const { worker, queue } = workerWith(new FakeConverter(() => converted()), [book(1)], { saveFails: () => new DriveRequestError(400, "Drive 400: invalid name") });
+    await worker.scan();
+    while (await worker.processNext()) { /* drain */ }
+    assert.equal(queue.rows.get("bk_1")!.status, "failed"); assert.equal(queue.rows.get("bk_1")!.attempts, 3);
+  });
+
+  it("Drive cai no meio da fila: o worker espera (não fica reconvertendo em laço)", async () => {
+    const converter = new FakeConverter(() => converted());
+    const { worker } = workerWith(converter, [book(1), book(2), book(3)], { saveFails: (call) => call >= 2 ? new EditionStoreUnavailable("Drive 503") : null });
+    const stop = new AbortController();
+    const running = worker.run(stop.signal, { scanIntervalMs: 60_000, idleMs: 1_000 });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    stop.abort(); await running;
+    assert.equal(converter.seen.length, 2, "1 livro salvo, 1 devolvido à fila, e então espera");
   });
 
   it("uma pasta ilegível não impede as outras", async () => {
@@ -219,6 +258,151 @@ describe("worker Kindle: detectar → enfileirar → converter → salvar", () =
   });
 });
 
+/** A tiny Google: OAuth token, Drive files/permissions and resumable uploads, in memory. */
+class FakeGoogle {
+  public readonly calls: Array<{ method: string; url: string; body?: unknown }> = [];
+  public readonly files = new Map<string, { name: string; mimeType: string; parents: string[]; trashed: boolean; appProperties: Record<string, string>; bytes?: Uint8Array; permissions: Array<{ type: string; role: string }> }>();
+  public tokenError: string | null = null;
+  public fail: (method: string, url: string) => { status: number; reason: string } | null = () => null;
+  public corruptUpload = false;
+  public tokens = 0;
+  private sessions = new Map<string, { existing: string | null; metadata: Record<string, unknown> }>();
+  private next = 1;
+
+  public folder(name: string, parents = ["root"]) { const id = `folder_${this.next++}_xxxxxxxx`; this.files.set(id, { name, mimeType: "application/vnd.google-apps.folder", parents, trashed: false, appProperties: {}, permissions: [] }); return id; }
+  public byBook(bookId: string) { return [...this.files.entries()].filter(([, file]) => file.appProperties.lumeoBookId === bookId); }
+
+  public readonly fetch = (async (input: string | URL, init: RequestInit = {}) => {
+    const url = new URL(String(input)), method = init.method ?? "GET";
+    const body = typeof init.body === "string" ? (init.body.startsWith("{") ? JSON.parse(init.body) : Object.fromEntries(new URLSearchParams(init.body))) : init.body;
+    this.calls.push({ method, url: url.toString(), body });
+    const json = (value: unknown, status = 200, headers: Record<string, string> = {}) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", ...headers } });
+    if (url.host === "oauth2.googleapis.com") {
+      if (this.tokenError) return json({ error: this.tokenError }, 400);
+      this.tokens++; return json({ access_token: `at${this.tokens}`, expires_in: 3600 });
+    }
+    const failure = this.fail(method, url.toString());
+    if (failure) return json({ error: { message: failure.reason, errors: [{ reason: failure.reason }] } }, failure.status);
+    const path = url.pathname, q = url.searchParams.get("q") ?? "";
+    if (method === "PUT" && url.searchParams.has("upload_id")) {
+      const session = this.sessions.get(url.searchParams.get("upload_id")!)!;
+      const bytes = new Uint8Array(body as Uint8Array), id = session.existing ?? `azw3_${this.next++}_xxxxxxxx`;
+      const previous = this.files.get(id);
+      this.files.set(id, { name: String(session.metadata.name), mimeType: String(session.metadata.mimeType), parents: previous?.parents ?? (session.metadata.parents as string[]), trashed: false, appProperties: session.metadata.appProperties as Record<string, string>, bytes, permissions: previous?.permissions ?? [] });
+      const md5 = this.corruptUpload ? "0".repeat(32) : createHash("md5").update(bytes).digest("hex");
+      return json({ id, size: String(bytes.length), md5Checksum: md5, trashed: false });
+    }
+    if (path.startsWith("/upload/drive/v3/files")) {
+      const existing = path.split("/")[5] ?? null, uploadId = `u${this.next++}`;
+      this.sessions.set(uploadId, { existing, metadata: body as Record<string, unknown> });
+      return new Response(null, { status: 200, headers: { location: `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=${uploadId}` } });
+    }
+    const [, , , , id, sub] = path.split("/");
+    if (!id && method === "GET") {
+      const list = [...this.files.entries()].filter(([, file]) => !file.trashed && (
+        q.includes("mimeType = 'application/vnd.google-apps.folder'") ? file.mimeType.endsWith("folder") && q.includes(`name = '${file.name}'`) && file.parents.includes("root")
+          : q.includes("appProperties has") && q.includes(`value='${file.appProperties.lumeoBookId}'`) && file.parents.some((parent) => q.startsWith(`'${parent}' in parents`))));
+      return json({ files: list.map(([fileId]) => ({ id: fileId })) });
+    }
+    if (!id && method === "POST") { const created = this.folder((body as { name: string }).name); return json({ id: created }); }
+    const file = this.files.get(id!);
+    if (!file) return json({ error: { message: "File not found", errors: [{ reason: "notFound" }] } }, 404);
+    if (sub === "permissions" && method === "GET") return json({ permissions: file.permissions });
+    if (sub === "permissions" && method === "POST") { file.permissions.push(body as { type: string; role: string }); return json({ id: "anyoneWithLink" }); }
+    if (method === "GET") return json({ id, mimeType: file.mimeType, trashed: file.trashed, parents: file.parents });
+    return json({ error: { message: "unexpected" } }, 500);
+  }) as unknown as typeof fetch;
+}
+
+describe("worker Kindle: pasta Lumeo Kindle AZW3 no Google Drive", () => {
+  const oauth = { clientId: "cid", clientSecret: "secret", refreshToken: "refresh" };
+  const job = (bookId = "bk_1", driveFileId: string | null = null): EditionJob => ({ bookId, sourceId: "opds-autoajuda", priority: 10, attempts: 1, epubDriveFileId: "epubOriginal_123", epubSha256: null, metadata: editionMetadata(book(1)), driveFileId });
+  const file = (size = 3000, fill = 7) => ({ name: "Autora 1 - Livro 1.azw3", bytes: new Uint8Array(size).fill(fill), sha256: "a".repeat(64) });
+
+  it("cria a pasta na raiz, compartilha por link (leitura) e envia o AZW3 conferindo tamanho e MD5", async () => {
+    const google = new FakeGoogle(), store = new GoogleDriveEditionStore(oauth, {}, google.fetch);
+    const saved = await store.save(job(), file());
+    const [folderId, folder] = [...google.files.entries()].find(([, entry]) => entry.mimeType.endsWith("folder"))!;
+    assert.equal(folder.name, "Lumeo Kindle AZW3"); assert.deepEqual(folder.parents, ["root"]);
+    assert.deepEqual(folder.permissions, [{ type: "anyone", role: "reader", allowFileDiscovery: false }], "o Kindle baixa sem login Google, como os EPUBs do catálogo");
+    const stored = google.files.get(saved.driveFileId)!;
+    assert.deepEqual(stored.parents, [folderId]); assert.equal(stored.mimeType, "application/vnd.amazon.mobi8-ebook"); assert.equal(stored.name, "Autora 1 - Livro 1.azw3");
+    assert.deepEqual(stored.appProperties, { lumeoBookId: "bk_1", lumeoEpubFileId: "epubOriginal_123", lumeoSha256: "a".repeat(64) });
+    assert.equal(stored.bytes!.length, 3000); assert.equal(saved.size, 3000); assert.equal(saved.md5, createHash("md5").update(file().bytes).digest("hex"));
+    await store.save(job("bk_2"), file());
+    assert.equal(google.calls.filter((call) => call.url.includes("google-apps.folder")).length, 1, "a pasta é procurada uma vez só");
+    assert.equal(google.calls.filter((call) => call.method === "DELETE").length, 0, "nada é apagado");
+    assert.ok(google.calls.every((call) => /^https:\/\/(www\.googleapis\.com|oauth2\.googleapis\.com)\//.test(call.url)));
+    assert.ok(!google.calls.some((call) => call.url.includes("epubOriginal_123/") || call.url.includes("files/epubOriginal_123")), "o EPUB original nunca é tocado");
+  });
+
+  it("usa a pasta que já existe (não cria outra) e não repete o compartilhamento", async () => {
+    const google = new FakeGoogle(), existing = google.folder("Lumeo Kindle AZW3");
+    google.files.get(existing)!.permissions.push({ type: "anyone", role: "reader" });
+    const store = new GoogleDriveEditionStore(oauth, {}, google.fetch);
+    assert.equal(await store.folderId(), existing);
+    assert.equal([...google.files.values()].filter((entry) => entry.mimeType.endsWith("folder")).length, 1);
+    assert.equal(google.calls.filter((call) => call.method === "POST" && call.url.includes("/permissions")).length, 0);
+  });
+
+  it("reconversão sobrescreve o mesmo arquivo (mesmo id), inclusive quando o vínculo se perdeu; nunca duplica", async () => {
+    const google = new FakeGoogle(), store = new GoogleDriveEditionStore(oauth, {}, google.fetch);
+    const first = await store.save(job(), file(3000, 1));
+    const again = await store.save(job("bk_1", first.driveFileId), file(4000, 2));
+    assert.equal(again.driveFileId, first.driveFileId);
+    const patch = google.calls.find((call) => call.method === "PATCH")!;
+    assert.match(patch.url, new RegExp(`/upload/drive/v3/files/${first.driveFileId}\\?uploadType=resumable`));
+    assert.equal((patch.body as { parents?: unknown }).parents, undefined, "não muda de pasta");
+    // Upload done but the database never got the id (worker died): found by its tag.
+    const lost = await store.save(job("bk_1", null), file(5000, 3));
+    assert.equal(lost.driveFileId, first.driveFileId);
+    assert.equal(google.byBook("bk_1").length, 1); assert.equal(google.files.get(first.driveFileId)!.bytes!.length, 5000);
+  });
+
+  it("arquivo anterior na lixeira ou fora da pasta: envia um novo", async () => {
+    const google = new FakeGoogle(), store = new GoogleDriveEditionStore(oauth, {}, google.fetch);
+    const first = await store.save(job(), file());
+    google.files.get(first.driveFileId)!.trashed = true;
+    const next = await store.save(job("bk_1", first.driveFileId), file());
+    assert.notEqual(next.driveFileId, first.driveFileId);
+    assert.equal(google.files.get(first.driveFileId)!.trashed, true, "o da lixeira fica como está");
+  });
+
+  it("arquivo no Drive diferente do convertido (MD5) → erro do livro, não 'pronto'", async () => {
+    const google = new FakeGoogle(), store = new GoogleDriveEditionStore(oauth, {}, google.fetch);
+    google.corruptUpload = true;
+    await assert.rejects(store.save(job(), file()), (error: Error) => !(error instanceof EditionStoreUnavailable) && /não confere/.test(error.message));
+  });
+
+  it("login revogado, cota, limite de uso e Google fora do ar → 'Drive indisponível'; 400 → erro do livro", async () => {
+    const revoked = new FakeGoogle(); revoked.tokenError = "invalid_grant";
+    await assert.rejects(new GoogleDriveEditionStore(oauth, {}, revoked.fetch).save(job(), file()), (error: Error) => error instanceof EditionStoreUnavailable && /drive-auth/.test(error.message));
+    for (const [status, reason] of [[403, "storageQuotaExceeded"], [429, "userRateLimitExceeded"], [503, "backendError"]] as const) {
+      const google = new FakeGoogle(); google.fail = (method, url) => method === "POST" && url.includes("/upload/") ? { status, reason } : null;
+      await assert.rejects(new GoogleDriveEditionStore(oauth, {}, google.fetch).save(job(), file()), (error: Error) => error instanceof EditionStoreUnavailable && error.message.includes(reason));
+    }
+    const refused = new FakeGoogle(); refused.fail = (method, url) => method === "POST" && url.includes("/upload/") ? { status: 400, reason: "invalidName" } : null;
+    await assert.rejects(new GoogleDriveEditionStore(oauth, {}, refused.fetch).save(job(), file()), (error: Error) => error instanceof DriveRequestError && !(error instanceof EditionStoreUnavailable));
+    const down = new FakeGoogle(); let first = true;
+    down.fail = (method, url) => url.includes("google-apps.folder") && first ? (first = false, { status: 503, reason: "backendError" }) : null;
+    const store = new GoogleDriveEditionStore(oauth, {}, down.fetch);
+    await assert.rejects(store.folderId(), EditionStoreUnavailable);
+    assert.match(await store.folderId(), /^folder_/, "depois de uma queda, tenta de novo (não guarda o erro)");
+  });
+
+  it("token vencido no meio (401): renova uma vez e segue", async () => {
+    const google = new FakeGoogle(); let once = true;
+    google.fail = (method) => method === "PUT" && once ? (once = false, { status: 401, reason: "authError" }) : null;
+    await new GoogleDriveEditionStore(oauth, {}, google.fetch).save(job(), file());
+    assert.equal(google.tokens, 2);
+  });
+
+  it("sem as credenciais do Drive o worker nem começa", () => {
+    assert.throws(() => new GoogleDriveEditionStore({ ...oauth, refreshToken: "" }), /drive-auth/);
+    assert.throws(() => new GoogleDriveEditionStore(oauth, { folderId: "../x" }), /KINDLE_DRIVE_FOLDER_ID/);
+  });
+});
+
 const calibre = process.env.CALIBRE_BIN ?? join(homedir(), "calibre-bin", "calibre");
 /** Runs only where Calibre is installed and starts (the worker's image, or a machine set up for it). */
 // Converting loads Qt (which needs libOpenGL & co.); "--version" alone does not, so Qt is checked.
@@ -233,7 +417,7 @@ describe("worker Kindle: conversão real com Calibre", { skip: !calibreWorks && 
       return new Response("não", { status: 404 });
     }) as unknown as typeof fetch;
     const record = book(1, { title: "Clareza & Conexão", author: "Yung Pueblo", description: "Sinopse do catálogo." });
-    return { fetcher, job: { bookId: record.bookId, sourceId: "s", priority: 10, attempts: 1, epubDriveFileId: record.driveFileId, epubSha256: null, metadata: editionMetadata(record), storagePath: null } };
+    return { fetcher, job: { bookId: record.bookId, sourceId: "s", priority: 10, attempts: 1, epubDriveFileId: record.driveFileId, epubSha256: null, metadata: editionMetadata(record), driveFileId: null } };
   };
   const converter = (fetcher: typeof fetch) => new CalibreConverter({ calibreBin: calibre, maxEpubBytes: 50 * 1048576, convertTimeoutMs: 180_000, downloadTimeoutMs: 30_000 }, fetcher);
 

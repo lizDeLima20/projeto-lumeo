@@ -1,7 +1,7 @@
 import type { CatalogBookRecord, CatalogQuery, CatalogPage } from "../../../server/src/catalog/types.js";
-import { KINDLE_FILE_TYPES } from "../../../server/src/kindle/KindleEditions.js";
+import { kindleFileName } from "../../../server/src/opds/KindleCatalogJson.js";
 import { PermanentConversionError, type EditionConverter } from "./CalibreConverter.js";
-import { editionPath, planQueue, type EditionQueue, type EditionStorage } from "./EditionQueue.js";
+import { EditionStoreUnavailable, planQueue, type EditionQueue, type EditionStore } from "./EditionQueue.js";
 
 /** A Drive folder the worker watches, read through the catalog's own provider (same ids, same data). */
 export interface WatchedSource {
@@ -19,14 +19,14 @@ export const jsonLog: WorkerLog = (event, data = {}) => console.log(JSON.stringi
 
 /**
  * The conversion engine: finds the catalog's EPUBs in Drive, queues the new or changed ones,
- * converts them one by one with Calibre and stores each AZW3 for the OPDS/Kindle extension to
- * offer. It runs in its own container, never inside a Vercel function.
+ * converts them one by one with Calibre and keeps each AZW3 in the Drive folder "Lumeo Kindle
+ * AZW3" for the OPDS/Kindle extension to offer (the database only gets the link). It runs in its own container, never inside a Vercel function.
  */
 export class KindleConversionWorker {
   public constructor(
     private readonly sources: readonly WatchedSource[],
     private readonly queue: EditionQueue,
-    private readonly storage: EditionStorage,
+    private readonly store: EditionStore,
     private readonly converter: EditionConverter,
     private readonly settings: WorkerSettings,
     private readonly log: WorkerLog = jsonLog,
@@ -57,12 +57,16 @@ export class KindleConversionWorker {
     const started = Date.now();
     try {
       const edition = await this.converter.convert(job);
-      const path = editionPath(job.sourceId, job.bookId);
-      await this.storage.upload(path, edition.bytes, KINDLE_FILE_TYPES.azw3);
-      await this.queue.complete(job, this.settings.workerId, { format: "azw3", storagePath: path, size: edition.bytes.length, sha256: edition.sha256 });
-      if (job.storagePath && job.storagePath !== path) await this.storage.remove(job.storagePath).catch(() => undefined);
-      this.log("KINDLE_CONVERTED", { bookId: job.bookId, bytes: edition.bytes.length, seconds: Math.round((Date.now() - started) / 100) / 10, cover: edition.coverSource, repairedPaths: edition.repairedPaths, title: edition.info.title });
+      const name = kindleFileName({ title: job.metadata.title, author: job.metadata.author, bookId: job.bookId }, "azw3");
+      const stored = await this.store.save(job, { name, bytes: edition.bytes, sha256: edition.sha256 });
+      await this.queue.complete(job, this.settings.workerId, { format: "azw3", driveFileId: stored.driveFileId, size: stored.size, sha256: edition.sha256 });
+      this.log("KINDLE_CONVERTED", { bookId: job.bookId, driveFileId: stored.driveFileId, replaced: Boolean(job.driveFileId), bytes: edition.bytes.length, seconds: Math.round((Date.now() - started) / 100) / 10, cover: edition.coverSource, repairedPaths: edition.repairedPaths, title: edition.info.title });
     } catch (error) {
+      if (error instanceof EditionStoreUnavailable) {
+        await this.queue.release(job, this.settings.workerId, reason(error)).catch((failure) => this.log("KINDLE_QUEUE_UPDATE_FAILED", { bookId: job.bookId, reason: reason(failure) }));
+        this.log("KINDLE_STORE_UNAVAILABLE", { bookId: job.bookId, reason: reason(error) });
+        throw error;
+      }
       const permanent = error instanceof PermanentConversionError, final = permanent || job.attempts >= this.settings.maxAttempts;
       await this.queue.fail(job, this.settings.workerId, reason(error), final).catch((failure) => this.log("KINDLE_QUEUE_UPDATE_FAILED", { bookId: job.bookId, reason: reason(failure) }));
       this.log(final ? "KINDLE_FAILED" : "KINDLE_RETRY_LATER", { bookId: job.bookId, attempt: job.attempts, reason: reason(error) });
@@ -70,20 +74,25 @@ export class KindleConversionWorker {
     return true;
   }
 
-  /** Scans every `scanIntervalMs`, drains the queue, waits `idleMs` when there is nothing to do. */
-  public async run(signal: AbortSignal, timing: { scanIntervalMs: number; idleMs: number }): Promise<void> {
-    let nextScan = 0;
+  /** Scans every `scanIntervalMs`, drains the queue, waits `idleMs` when there is nothing to do.
+   *  When the queue or the Drive is down it waits too, twice as long each time (up to 30 min). */
+  public async run(signal: AbortSignal, timing: { scanIntervalMs: number; idleMs: number; maxBackoffMs?: number }): Promise<void> {
+    let nextScan = 0, backoff = 0;
     while (!signal.aborted) {
       if (Date.now() >= nextScan) { await this.scan(); nextScan = Date.now() + timing.scanIntervalMs; }
-      let worked = false;
+      let worked = false, stalled = false;
       while (!signal.aborted && Date.now() < nextScan) {
         let had: boolean;
         try { had = await this.processNext(); }
-        catch (error) { this.log("KINDLE_QUEUE_UNAVAILABLE", { reason: reason(error) }); had = false; }
+        catch (error) {
+          if (!(error instanceof EditionStoreUnavailable)) this.log("KINDLE_QUEUE_UNAVAILABLE", { reason: reason(error) });
+          stalled = true; break;
+        }
         if (!had) break;
-        worked = true;
+        worked = true; backoff = 0;
       }
-      if (!worked) await sleep(timing.idleMs, signal);
+      if (stalled) { backoff = Math.min(backoff ? backoff * 2 : timing.idleMs, timing.maxBackoffMs ?? 30 * 60_000); await sleep(backoff, signal); }
+      else if (!worked) await sleep(timing.idleMs, signal);
     }
     this.log("KINDLE_WORKER_STOPPED", { workerId: this.settings.workerId });
   }

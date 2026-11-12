@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CatalogBookRecord } from "../../../server/src/catalog/types.js";
-import { KINDLE_EDITIONS_BUCKET, KINDLE_EDITIONS_TABLE, KINDLE_FILE_TYPES, type KindleEditionStatus } from "../../../server/src/kindle/KindleEditions.js";
+import { KINDLE_EDITIONS_TABLE, type KindleEditionStatus } from "../../../server/src/kindle/KindleEditions.js";
 
 /** What the AZW3 carries inside, taken from the catalog (not from the EPUB's own metadata). */
 export interface EditionMetadata {
@@ -25,12 +25,13 @@ export interface EditionJob {
   epubDriveFileId: string;
   epubSha256: string | null;
   metadata: EditionMetadata;
-  /** The file of a previous conversion, removed when the new one lands elsewhere. */
-  storagePath: string | null;
+  /** The Drive file of a previous conversion: a new conversion overwrites it (same id). */
+  driveFileId: string | null;
 }
 
 export interface KnownEdition { epubDriveFileId: string; epubSha256: string | null; metadata: EditionMetadata; status: KindleEditionStatus; }
-export interface CompletedEdition { format: "azw3"; storagePath: string; size: number; sha256: string; }
+/** What the database keeps of a converted book: the link to its Drive file, never the file. */
+export interface CompletedEdition { format: "azw3"; driveFileId: string; size: number; sha256: string; }
 
 export interface EditionQueue {
   known(sourceId: string): Promise<Map<string, KnownEdition>>;
@@ -40,11 +41,22 @@ export interface EditionQueue {
   complete(job: EditionJob, worker: string, edition: CompletedEdition): Promise<void>;
   /** A permanent failure (or the last attempt) is "failed"; otherwise the book goes back to the queue. */
   fail(job: EditionJob, worker: string, reason: string, final: boolean): Promise<void>;
+  /** Back to the queue without spending the attempt: the book was fine, the storage was not. */
+  release(job: EditionJob, worker: string, reason: string): Promise<void>;
 }
 
-export interface EditionStorage {
-  upload(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
-  remove(path: string): Promise<void>;
+/**
+ * The storage cannot take files right now (login refused, folder missing, quota, rate limit,
+ * Google down, no network). The conversion was fine, so the book goes back to the queue without
+ * losing an attempt, and the worker waits before trying again.
+ */
+export class EditionStoreUnavailable extends Error {}
+
+export interface StoredEdition { driveFileId: string; size: number; md5: string; }
+
+/** Where the AZW3s are kept (the Drive folder "Lumeo Kindle AZW3"). */
+export interface EditionStore {
+  save(job: EditionJob, file: { name: string; bytes: Uint8Array; sha256: string }): Promise<StoredEdition>;
 }
 
 export function editionMetadata(book: CatalogBookRecord, publisher: string | null = null): EditionMetadata {
@@ -54,11 +66,6 @@ export function editionMetadata(book: CatalogBookRecord, publisher: string | nul
   };
 }
 
-/** Where a book's AZW3 lives in the bucket: one file per book, named after its (safe) id. */
-export function editionPath(sourceId: string, bookId: string): string {
-  const safe = (value: string) => value.replace(/[^A-Za-z0-9_.-]+/g, "_").replace(/^\.+/, "_").slice(0, 150) || "livro";
-  return `${safe(sourceId)}/${safe(bookId)}.azw3`;
-}
 
 const sameMetadata = (left: EditionMetadata, right: EditionMetadata) =>
   (["title", "author", "language", "synopsis", "coverUrl", "publisher", "collection", "volume"] as const).every((key) => (left[key] ?? null) === (right[key] ?? null));
@@ -74,7 +81,7 @@ export function planQueue(sourceId: string, priority: number, books: readonly Ca
     if (book.format !== "epub") { skipped++; continue; }
     const metadata = editionMetadata(book), previous = known.get(book.bookId);
     if (previous && previous.epubDriveFileId === book.driveFileId && (previous.epubSha256 ?? null) === (book.sha256 ?? null) && sameMetadata(previous.metadata, metadata)) { unchanged++; continue; }
-    jobs.push({ bookId: book.bookId, sourceId, priority, attempts: 0, epubDriveFileId: book.driveFileId, epubSha256: book.sha256 ?? null, metadata, storagePath: null });
+    jobs.push({ bookId: book.bookId, sourceId, priority, attempts: 0, epubDriveFileId: book.driveFileId, epubSha256: book.sha256 ?? null, metadata, driveFileId: null });
   }
   return { jobs, unchanged, skipped };
 }
@@ -101,7 +108,7 @@ export class SupabaseEditionQueue implements EditionQueue {
         book_id: job.bookId, source_id: job.sourceId, priority: job.priority, epub_drive_file_id: job.epubDriveFileId, epub_sha256: job.epubSha256,
         metadata: job.metadata, status: "pending", attempts: 0, last_error: null, locked_by: null, locked_at: null, updated_at: new Date().toISOString(),
       }));
-      // An existing row keeps its file (format/storage_path) until the new conversion replaces it.
+      // An existing row keeps its file (format/drive_file_id) until the new conversion replaces it.
       const { error } = await this.database.from(KINDLE_EDITIONS_TABLE).upsert(rows, { onConflict: "book_id" });
       if (error) throw error;
     }
@@ -115,13 +122,13 @@ export class SupabaseEditionQueue implements EditionQueue {
     return {
       bookId: String(row.book_id), sourceId: String(row.source_id), priority: Number(row.priority), attempts: Number(row.attempts),
       epubDriveFileId: String(row.epub_drive_file_id), epubSha256: (row.epub_sha256 as string | null) ?? null, metadata: row.metadata as EditionMetadata,
-      storagePath: (row.storage_path as string | null) ?? null,
+      driveFileId: (row.drive_file_id as string | null) ?? null,
     };
   }
 
   public async complete(job: EditionJob, worker: string, edition: CompletedEdition): Promise<void> {
     const { error } = await this.database.from(KINDLE_EDITIONS_TABLE).update({
-      status: "ready", format: edition.format, storage_path: edition.storagePath, size_bytes: edition.size, sha256: edition.sha256,
+      status: "ready", format: edition.format, drive_file_id: edition.driveFileId, size_bytes: edition.size, sha256: edition.sha256,
       last_error: null, locked_by: null, locked_at: null, converted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }).eq("book_id", job.bookId).eq("locked_by", worker);
     if (error) throw error;
@@ -133,20 +140,15 @@ export class SupabaseEditionQueue implements EditionQueue {
     }).eq("book_id", job.bookId).eq("locked_by", worker);
     if (error) throw error;
   }
+
+  public async release(job: EditionJob, worker: string, reason: string): Promise<void> {
+    const { error } = await this.database.from(KINDLE_EDITIONS_TABLE).update({
+      status: "pending", attempts: Math.max(0, job.attempts - 1), last_error: reason.slice(0, 2000), locked_by: null, locked_at: null, updated_at: new Date().toISOString(),
+    }).eq("book_id", job.bookId).eq("locked_by", worker);
+    if (error) throw error;
+  }
 }
 
-/** The private kindle-editions bucket. */
-export class SupabaseEditionStorage implements EditionStorage {
-  public constructor(private readonly database: SupabaseClient) {}
-  public async upload(path: string, bytes: Uint8Array, contentType: string = KINDLE_FILE_TYPES.azw3): Promise<void> {
-    const { error } = await this.database.storage.from(KINDLE_EDITIONS_BUCKET).upload(path, bytes, { contentType, upsert: true });
-    if (error) throw error;
-  }
-  public async remove(path: string): Promise<void> {
-    const { error } = await this.database.storage.from(KINDLE_EDITIONS_BUCKET).remove([path]);
-    if (error) throw error;
-  }
-}
 
 /** In memory: tests and the --dry-run mode (nothing is written to Supabase). */
 export class MemoryEditionQueue implements EditionQueue {
@@ -158,7 +160,7 @@ export class MemoryEditionQueue implements EditionQueue {
   public async enqueue(jobs: readonly EditionJob[]) {
     for (const job of jobs) {
       const previous = this.rows.get(job.bookId);
-      this.rows.set(job.bookId, { ...job, attempts: 0, status: "pending", lockedBy: null, lastError: null, edition: previous?.edition ?? null, storagePath: previous?.edition?.storagePath ?? null, createdAt: previous?.createdAt ?? this.clock++ });
+      this.rows.set(job.bookId, { ...job, attempts: 0, status: "pending", lockedBy: null, lastError: null, edition: previous?.edition ?? null, driveFileId: previous?.edition?.driveFileId ?? null, createdAt: previous?.createdAt ?? this.clock++ });
     }
   }
   public async claim(worker: string, maxAttempts: number) {
@@ -170,11 +172,16 @@ export class MemoryEditionQueue implements EditionQueue {
   public async complete(job: EditionJob, worker: string, edition: CompletedEdition) {
     const row = this.rows.get(job.bookId);
     if (row?.lockedBy !== worker) return;
-    Object.assign(row, { status: "ready", edition, storagePath: edition.storagePath, lockedBy: null, lastError: null });
+    Object.assign(row, { status: "ready", edition, driveFileId: edition.driveFileId, lockedBy: null, lastError: null });
   }
   public async fail(job: EditionJob, worker: string, reason: string, final: boolean) {
     const row = this.rows.get(job.bookId);
     if (row?.lockedBy !== worker) return;
     Object.assign(row, { status: final ? "failed" : "pending", lockedBy: null, lastError: reason });
+  }
+  public async release(job: EditionJob, worker: string, reason: string) {
+    const row = this.rows.get(job.bookId);
+    if (row?.lockedBy !== worker) return;
+    Object.assign(row, { status: "pending", attempts: Math.max(0, row.attempts - 1), lockedBy: null, lastError: reason });
   }
 }

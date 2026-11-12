@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { CatalogApplicationService } from "../catalog/CatalogApplicationService.js";
 import { ApiError } from "../errors/ApiError.js";
 import type { CatalogBookRecord } from "../catalog/types.js";
-import { TolerantKindleEditions, kindleOffer, type KindleEditionReader, type KindleOffer } from "../kindle/KindleEditions.js";
+import { TolerantKindleEditions, kindleDownloadUrl, kindleOffer, type KindleEditionReader, type KindleOffer } from "../kindle/KindleEditions.js";
 import { KindleCatalogJson } from "./KindleCatalogJson.js";
 import { OpdsAuth } from "./OpdsAuth.js";
 import type { OpdsCoverService } from "./OpdsCoverService.js";
@@ -19,7 +19,7 @@ export type OpdsCatalog = Pick<CatalogApplicationService, "list" | "get">;
 export interface OpdsSettings { locale?: string; requireHttps: boolean; }
 
 /** No Kindle editions at all (tests, or a server without the editions store). */
-const NO_EDITIONS: KindleEditionReader = { editionsFor: async () => new Map(), signedUrl: async () => { throw new Error("KINDLE_EDITIONS_DISABLED"); } };
+const NO_EDITIONS: KindleEditionReader = { editionsFor: async () => new Map() };
 
 /**
  * The OPDS 1.2 catalog read by KOReader (Kindle): genres, their books, covers, downloads and a
@@ -85,7 +85,7 @@ export class OpdsController {
       if (wanted === "kindle") {
         const offer = kindleOffer(record, (await this.editions.editionsFor([record.bookId])).get(record.bookId));
         if (offer.status !== "ready") return this.text(response, 409, offer.status === "pending" || offer.status === "processing" ? "A versão Kindle deste livro ainda está sendo preparada. Tente de novo mais tarde." : "Este livro não tem versão Kindle (AZW3).");
-        target = { format: offer.format, bytes: offer.size, url: () => this.editions.signedUrl(offer.edition) };
+        target = { format: offer.format, bytes: offer.size, url: async () => kindleDownloadUrl(offer.edition) };
       }
       const download = await this.downloads.download(result.user.id, record, target).catch((error: unknown) => {
         console.warn(JSON.stringify({ event: "OPDS_DOWNLOAD_FAILED", bookId: record.bookId, format: wanted ?? record.format, reason: error instanceof Error ? error.message : (error as { message?: string })?.message ?? "unknown" }));

@@ -4,7 +4,7 @@ Esta é a interface do Lumeo dentro do KOReader, num Kindle com jailbreak. A int
 
 - **Tela inicial:** busca por título ou autor, carrossel de gêneros e uma grade de capas 3 × 3 com o título embaixo de cada capa.
 - **Tela do livro:** capa grande, título, autor, sinopse, idioma e formato, o botão **Baixar para a biblioteca** e o botão **Voltar**.
-- **Download:** o livro em AZW3, convertido pelo worker com capa e metadados dentro do arquivo, vai sempre para `/mnt/us/documents/Lumeo`. Não há escolha de pasta. A biblioteca do próprio Kindle indexa o livro com capa, e os três pontinhos funcionam normalmente.
+- **Download:** o livro em AZW3, convertido pelo worker com capa e metadados dentro do arquivo e guardado na pasta **Lumeo Kindle AZW3** do Google Drive, vai sempre para `/mnt/us/documents/Lumeo`. Não há escolha de pasta. A biblioteca do próprio Kindle indexa o livro com capa, e os três pontinhos funcionam normalmente.
 - **Livros sem AZW3:** EPUB ainda em conversão, conversão que falhou e PDF do catálogo aparecem com o botão desativado e o motivo na tela.
 
 ## Instalar
