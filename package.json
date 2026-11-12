@@ -13,6 +13,8 @@
     "build:server": "tsc -p server/tsconfig.json",
     "typecheck": "tsc --noEmit",
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
+    "typecheck:worker": "tsc -p worker/kindle-converter/tsconfig.json --noEmit",
+    "worker:kindle": "tsx worker/kindle-converter/src/main.ts",
     "test:server": "tsx --test server/tests/*.test.ts",
     "test:storage": "tsx --test tests/*.test.ts",
     "test": "npm run test:server && npm run test:storage",
@@ -27,7 +29,8 @@
     "android:install": "./scripts/android-terminal.sh install",
     "android:logs": "./scripts/android-terminal.sh logs",
     "android:dev": "./scripts/android-terminal.sh dev",
-    "android:open": "cap open android"
+    "android:open": "cap open android",
+    "opds:user": "tsx scripts/opds-user.ts"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.30.0",
@@ -36,6 +39,7 @@
     "@fontsource-variable/literata": "^5.3.0",
     "@lingo-reader/mobi-parser": "^0.4.6",
     "@supabase/supabase-js": "^2.57.0",
+    "bcryptjs": "^3.0.3",
     "fflate": "^0.8.3",
     "html2canvas": "^1.4.1",
     "libarchive.js": "^2.0.2",

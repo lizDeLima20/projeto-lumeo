@@ -29,6 +29,11 @@ export interface ServerConfig {
    *  crawl, deliberately outside normal Lumeo account auth so it can run as a plain
    *  maintenance call. Empty means the route refuses every request, never falls open. */
   collectionReindexSecret: string;
+  /** OPDS catalog (KOReader): downloads allowed per reader per hour, and the catalog language. */
+  opdsDownloadsPerHour?: number;
+  opdsCatalogLocale?: string;
+  /** The only Drive folder exposed by the initial OPDS/Kindle pilot. */
+  opdsAutoajudaFolderId?: string;
 }
 
 export class Config {
@@ -76,6 +81,9 @@ export class Config {
       catalogSyncMaxFileBytes: Number(environment.CATALOG_SYNC_MAX_FILE_BYTES ?? 104_857_600),
       driveCollections: driveCollectionsFromEnvironment(environment.DRIVE_COLLECTIONS_JSON),
       collectionReindexSecret: environment.COLLECTION_REINDEX_SECRET ?? "",
+      opdsDownloadsPerHour: Math.max(1, Number.parseInt(environment.OPDS_DOWNLOADS_PER_HOUR ?? "30", 10) || 30),
+      opdsCatalogLocale: environment.OPDS_CATALOG_LOCALE?.trim() || "pt-BR",
+      opdsAutoajudaFolderId: environment.OPDS_AUTOAJUDA_FOLDER_ID?.trim() || "1Pqu3DcMJT8wTwC7pFX7e20Z9fPUDJBoZ",
     };
   }
 

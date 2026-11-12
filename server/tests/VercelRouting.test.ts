@@ -60,4 +60,18 @@ describe("Vercel BFF routing", () => {
     VercelRequestAdapter.restorePath(request);
     assert.equal(request.url, "/api/ready?check=1");
   });
+  it("restores the OPDS root and nested feeds without consuming Basic credentials", () => {
+    for (const [forwarded, restored] of [
+      ["/api/index?__lumeo_route=opds", "/api/opds"],
+      ["/api/index?__lumeo_route=opds/generos/autoajuda&page=2", "/api/opds/generos/autoajuda?page=2"],
+      ["/api/index?__lumeo_route=opds/kindle/livros&genero=autoajuda&page=3", "/api/opds/kindle/livros?genero=autoajuda&page=3"],
+      ["/api/index?__lumeo_route=opds/livros/bk_1/download&formato=kindle", "/api/opds/livros/bk_1/download?formato=kindle"],
+      ["/api/index?__lumeo_route=opds/livros/bk_1/capa&tamanho=grande", "/api/opds/livros/bk_1/capa?tamanho=grande"],
+    ]) {
+      const request = { url: forwarded, headers: { authorization: "Basic dXNlcjpwYXNz" } } as AuthenticatedRequest;
+      VercelRequestAdapter.restorePath(request);
+      assert.equal(request.url, restored);
+      assert.equal(request.headers.authorization, "Basic dXNlcjpwYXNz");
+    }
+  });
 });

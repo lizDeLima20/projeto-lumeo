@@ -21,7 +21,7 @@ import { GoogleCatalogDriveClient } from "./catalog/GoogleCatalogDriveClient.js"
 import { CatalogSourceRegistry } from "./catalog/CatalogSourceRegistry.js";
 import { CatalogRootDiscovery } from "./catalog/CatalogRootDiscovery.js";
 import { CatalogSourceRepository } from "./catalog/CatalogSourceRepository.js";
-import { ConfiguredCatalogSources } from "./catalog/CatalogGenreSources.js";
+import { ConfiguredCatalogSources, catalogGenreId } from "./catalog/CatalogGenreSources.js";
 import { CatalogSourceAdminService } from "./catalog/CatalogSourceAdminService.js";
 import { HybridCatalogSourceProvider } from "./catalog/HybridCatalogSourceProvider.js";
 import { AuthorizedDriveCatalogProvider } from "./catalog/AuthorizedDriveCatalogProvider.js";
@@ -33,6 +33,13 @@ import { SupabaseCollectionIndexStore } from "./collections/SupabaseCollectionIn
 import { DriveFolderBrowser } from "./collections/DriveFolderBrowser.js";
 import { DriveRequestLimiter } from "./collections/DriveRequestLimiter.js";
 import { UserPersistenceRepository } from "./repositories/UserPersistenceRepository.js";
+import { OpdsController, isOpdsRequest, type OpdsCatalog } from "./opds/OpdsController.js";
+import { OpdsCoverService } from "./opds/OpdsCoverService.js";
+import { OpdsDownloadService } from "./opds/OpdsDownloadService.js";
+import { OpdsAuth } from "./opds/OpdsAuth.js";
+import { OpdsUserRepository } from "./opds/OpdsUserRepository.js";
+import { SupabaseKindleEditions } from "./kindle/KindleEditions.js";
+import type { CatalogSourceConfig } from "./catalog/types.js";
 
 export type RequestHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 
@@ -47,9 +54,33 @@ export const isPublicCollectionRequest = (method: string | undefined, path: stri
   (method === "GET" && /^\/api\/collections(?:\/[a-z0-9-]+\/(?:folders(?:\/[A-Za-z0-9_-]+)?|search-index|comic-cover\/[A-Za-z0-9_-]+))?$/i.test(path))
   || (method === "POST" && /^\/api\/collections\/[a-z0-9-]+\/reindex$/i.test(path));
 
+// The OPDS catalog's source lives in its own module so the Kindle conversion worker reads the
+// very same folder, with the very same book ids.
+export { opdsAutoajudaSource } from "./opds/OpdsSources.js";
+import { opdsAutoajudaSource } from "./opds/OpdsSources.js";
+
+/**
+ * The OPDS catalog over one structured Drive source. A single source lists its books but not the
+ * genres (only the app's hybrid catalog builds that list), and the OPDS root is made of genres:
+ * without them the reader saw an empty catalog. The source's own genre is its shelf.
+ */
+export const opdsSourceCatalog = (provider: Pick<StructuredDriveCatalogProvider, "list" | "get">, source: CatalogSourceConfig): OpdsCatalog => {
+  const genres = source.genre ? [{ id: catalogGenreId(source.genre), name: source.genre }] : [];
+  return {
+    list: async (query) => ({ ...await provider.list(query), genres }),
+    get: async (bookId) => {
+      const book = await provider.get(bookId);
+      if (!book) throw new ApiError(404, "CATALOG_BOOK_NOT_FOUND", "Livro não encontrado no catálogo.");
+      return book;
+    },
+  };
+};
+
 export class ServerApp {
   public static create(config: ServerConfig = Config.fromEnvironment()): RequestHandler {
     let controller: ApiController | null = null;
+    // OPDS has its own source list so the Kindle pilot cannot change what the app publishes.
+    let opdsStore: OpdsUserRepository | null = null, opds: OpdsController | null = null;
     const getController = (): ApiController => {
       if (controller) return controller;
       if (config.localAuthMode) {
@@ -109,6 +140,17 @@ export class ServerApp {
       );
       return controller;
     };
+    const getOpds = (): OpdsController => {
+      if (opds) return opds;
+      // OPDS uses the public structured Autoajuda folder directly. It does not initialize the
+      // app catalog, comics collections or the private Drive service account.
+      const database = new SupabaseService(config).admin;
+      opdsStore = new OpdsUserRepository(database);
+      const source = opdsAutoajudaSource(config);
+      opds = new OpdsController(opdsSourceCatalog(new StructuredDriveCatalogProvider(source), source), new OpdsAuth(opdsStore), new OpdsCoverService(), new OpdsDownloadService(opdsStore, config.opdsDownloadsPerHour ?? 30),
+        { locale: config.opdsCatalogLocale, requireHttps: config.nodeEnv === "production" }, new SupabaseKindleEditions(database));
+      return opds;
+    };
     const requestIds = new RequestId();
     const securityHeaders = new SecurityHeaders();
     const rateLimiter = new RateLimiter({
@@ -142,6 +184,19 @@ export class ServerApp {
         };
         response.setHeader("Content-Type", "application/json; charset=utf-8");
         response.end(JSON.stringify({ status: config.localAuthMode || Object.values(checks).every(Boolean) ? "ok" : "degraded", checks, version: config.appVersion, environment: config.appEnv, timestamp: new Date().toISOString() }));
+        return;
+      }
+      // OPDS (KOReader): its own HTTP Basic login, checked by its controller; no app account.
+      if (isOpdsRequest(path)) {
+        try { await getOpds().handle(request, response, path, ServerApp.clientKey(request)); }
+        catch (error) {
+          // Supabase reports failures as plain objects ({ message, code }), not Error instances.
+          const detail = error && typeof error === "object" ? error as { message?: unknown; code?: unknown } : {};
+          console.error(JSON.stringify({ event: "OPDS_FAILED", requestId, reason: error instanceof Error ? error.message : String(detail.message ?? "unknown").slice(0, 300), code: typeof detail.code === "string" ? detail.code : undefined }));
+          response.statusCode = error instanceof ApiError ? error.status : 503;
+          response.setHeader("Content-Type", "text/plain; charset=utf-8");
+          response.end(error instanceof ApiError ? error.message : "Catálogo indisponível no momento.");
+        }
         return;
       }
       rateLimiter.assertAllowed(ServerApp.clientKey(request), path);

@@ -1,0 +1,19 @@
+# Lumeo Kindle worker. From the repository root:
+#   cp worker/kindle-converter/env.example worker/kindle-converter/.env   (and fill it)
+#   docker compose -f worker/kindle-converter/docker-compose.yml up -d --build
+services:
+  kindle-worker:
+    build:
+      context: ../..
+      dockerfile: worker/kindle-converter/Dockerfile
+    image: lumeo-kindle-worker
+    env_file: .env
+    restart: unless-stopped
+    # One conversion at a time; Calibre uses up to ~1 GB on large books.
+    mem_limit: 2g
+    tmpfs:
+      - /tmp:size=2g
+    stop_grace_period: 2m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

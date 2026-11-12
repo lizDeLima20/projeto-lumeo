@@ -1,0 +1,7 @@
+# Build context = repository root; only what the worker image uses goes in.
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!server/src
+!worker/kindle-converter/src
